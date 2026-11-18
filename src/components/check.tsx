@@ -17,7 +17,7 @@ export function CheckButton({ id, done, ring }: { id: number; done: boolean; rin
     toast.success("Task completed", { description: r.title, action: { label: "Undo", onClick: () => void toggleTask(id) } });
   });
   return (
-    <button onClick={click} aria-label={done ? "Reopen task" : "Complete task"}
+    <button data-check onClick={click} aria-label={done ? "Reopen task" : "Complete task"}
       className={`grid h-[18px] w-[18px] place-items-center rounded-full border-[1.5px] transition-all duration-200 ${on ? "scale-110 border-ok bg-ok text-white" : ring}`}>
       <Icon name="check" size={12} className={on ? "" : "opacity-0 group-hover:opacity-40"} />
     </button>

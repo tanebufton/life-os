@@ -1,11 +1,14 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { diffDays, nice } from "@/lib/dates";
+import { diffDays, fmtMinutes, fmtTime, nice } from "@/lib/dates";
+import { isOn } from "@/lib/features";
 import { describeRepeat, type TaskRow } from "@/lib/tasks";
 import { today } from "@/lib/time";
+import { firstUrl, hostOf } from "@/lib/ui";
 import { CheckButton } from "./check";
 import { Icon } from "./Icon";
 import { Pill } from "./Pill";
+import { RowActions } from "./rowactions";
 
 export function PageHead({ title, sub, icon, right }: { title: string; sub?: ReactNode; icon?: ReactNode; right?: ReactNode }) {
   return (
@@ -29,20 +32,28 @@ export function dueInfo(due: string, done: boolean): { text: string; cls: string
 export function TaskRow({ t }: { t: TaskRow }) {
   const done = !!t.done_at;
   const due = t.due ? dueInfo(t.due, done) : null;
+  const url = firstUrl(t.title, t.notes);
+  const from = t.source === "email" && t.meta ? (JSON.parse(t.meta).from as string | undefined)?.replace(/<.*>/, "").trim() : null;
   const ring = t.priority > 0 ? "border-danger bg-danger/10 hover:bg-danger/20" : t.priority < 0 ? "border-accent/70 hover:bg-accent/10" : "border-fg/35 hover:bg-fg/5";
   return (
-    <li className="group flex items-start gap-3 border-b px-2 py-2.5 transition-colors last:border-b-0 hover:bg-raise/60">
+    <li data-task-id={t.id} className="group flex items-start gap-3 border-b px-2 py-2.5 transition-colors last:border-b-0 hover:bg-raise/60">
       <div className="flex pt-px"><CheckButton id={t.id} done={done} ring={ring} /></div>
       <div className="min-w-0 flex-1">
         <Link href={`/tasks/${t.id}`} className={`block truncate text-[14.5px] leading-[18px] ${done ? "text-dim line-through" : ""}`}>{t.title}</Link>
         <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-          {due && <span className={`inline-flex items-center gap-1 ${due.cls}`}><Icon name="calendar" size={12} />{due.text}</span>}
+          {due && <span className={`inline-flex items-center gap-1 ${due.cls}`}><Icon name="calendar" size={12} />{due.text}{t.due_time && <span className="text-mute">· {fmtTime(t.due_time)}</span>}</span>}
+          {t.estimate ? <span className="inline-flex items-center gap-1 text-mute" title="Estimate"><Icon name="clock" size={12} />{fmtMinutes(t.estimate)}</span> : null}
           {t.repeat && <span className="inline-flex items-center gap-1 text-mute" title="Repeats"><Icon name="repeat" size={12} />{describeRepeat(t.repeat)}</span>}
+          {t.sub_total > 0 && <span className="inline-flex items-center gap-1 text-mute" title="Subtasks"><Icon name="list" size={12} />{t.sub_done}/{t.sub_total}</span>}
           {t.status === "doing" && !done && <span className="lozenge bg-accent/15 text-accent">In progress</span>}
-          {t.tags.map((g) => <Pill key={g} name={g} href={`/tasks?tag=${encodeURIComponent(g)}`} />)}
+          {from !== null && from !== undefined && <span className="inline-flex items-center gap-1 text-mute" title="Imported from email"><Icon name="mail" size={12} />{from || "Email"}</span>}
+          {t.source === "share" && <span className="inline-flex items-center gap-1 text-mute"><Icon name="share" size={12} />Shared</span>}
+          {url && <a href={url} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-1 text-accent hover:underline" title={url}><Icon name="link" size={12} />{hostOf(url)}</a>}
+          {t.tags.filter((g) => !(g === "email" && from !== null && from !== undefined)).map((g) => <Pill key={g} name={g} href={`/tasks?tag=${encodeURIComponent(g)}`} />)}
         </div>
       </div>
       {t.project_name && <span className="mt-px hidden shrink-0 items-center gap-1.5 text-xs text-mute sm:inline-flex"><span className="h-2 w-2 rounded-[3px]" style={{ background: t.project_color ?? "#888" }} />{t.project_name}</span>}
+      {!done && <RowActions id={t.id} due={t.due} focus={isOn("focus")} />}
     </li>
   );
 }

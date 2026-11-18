@@ -10,3 +10,9 @@ export const today = () => ymd(new Date());
 export const localDate = (utc: string) => ymd(new Date(utc.replace(" ", "T") + "Z"));
 
 export { addDays, addMonths, weekday, nice, diffDays } from "./dates";
+/** Current local date and "HH:MM" in the user's timezone. */
+export function localNow(d = new Date()): { date: string; hm: string } {
+  const parts = new Intl.DateTimeFormat("en-GB", { timeZone: tz(), year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(d);
+  const g = (t: string) => parts.find((p) => p.type === t)!.value;
+  return { date: `${g("year")}-${g("month")}-${g("day")}`, hm: `${g("hour")}:${g("minute")}` };
+}

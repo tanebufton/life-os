@@ -11,3 +11,11 @@ export function addMonths(s: string, n: number) {
 export const weekday = (s: string) => parse(s).getUTCDay(); // 0 = Sunday
 export const nice = (s: string) => new Intl.DateTimeFormat("en-NZ", { timeZone: "UTC", weekday: "short", day: "numeric", month: "short" }).format(parse(s));
 export const diffDays = (a: string, b: string) => Math.round((parse(a).getTime() - parse(b).getTime()) / 86_400_000);
+
+/** "17:30" -> "5:30 pm" */
+export function fmtTime(hm: string): string {
+  const [h, m] = hm.split(":").map(Number);
+  return `${h % 12 || 12}${m ? ":" + String(m).padStart(2, "0") : ""} ${h < 12 ? "am" : "pm"}`;
+}
+export function fmtMinutes(n: number): string { return n < 60 ? `${n}m` : `${Math.floor(n / 60)}h${n % 60 ? ` ${n % 60}m` : ""}`; }
+export const monthStart = (s: string) => s.slice(0, 8) + "01";

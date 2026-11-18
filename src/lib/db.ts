@@ -35,7 +35,36 @@ function migrate(d: Database.Database) {
   const cols = (d.prepare("PRAGMA table_info(tasks)").all() as { name: string }[]).map((c) => c.name);
   if (!cols.includes("status")) d.exec("ALTER TABLE tasks ADD COLUMN status TEXT NOT NULL DEFAULT 'todo'");
   if (!cols.includes("repeat")) d.exec("ALTER TABLE tasks ADD COLUMN repeat TEXT");
+  const add = (col: string, ddl: string) => { if (!cols.includes(col)) d.exec(`ALTER TABLE tasks ADD COLUMN ${ddl}`); };
+  add("parent_id", "parent_id INTEGER REFERENCES tasks(id) ON DELETE CASCADE");
+  add("due_time", "due_time TEXT");           // "HH:MM" local
+  add("estimate", "estimate INTEGER");        // minutes
+  add("source", "source TEXT NOT NULL DEFAULT 'manual'"); // manual | email | api | share | mcp
+  add("meta", "meta TEXT");                   // JSON (e.g. email sender)
+  add("deleted_at", "deleted_at TEXT");       // soft delete, purged after 30 days
+  d.exec(`
+    CREATE INDEX IF NOT EXISTS tasks_parent ON tasks(parent_id);
+    CREATE TABLE IF NOT EXISTS habits (
+      id INTEGER PRIMARY KEY, name TEXT NOT NULL, color TEXT NOT NULL DEFAULT '#1877f2',
+      days TEXT NOT NULL DEFAULT '0,1,2,3,4,5,6', archived INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE TABLE IF NOT EXISTS habit_logs (
+      habit_id INTEGER NOT NULL REFERENCES habits(id) ON DELETE CASCADE, date TEXT NOT NULL, PRIMARY KEY (habit_id, date)
+    );
+    CREATE TABLE IF NOT EXISTS journal (
+      date TEXT PRIMARY KEY, mood INTEGER, body TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE TABLE IF NOT EXISTS api_tokens (
+      id INTEGER PRIMARY KEY, name TEXT NOT NULL, hash TEXT NOT NULL UNIQUE, prefix TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')), last_used_at TEXT
+    );
+    CREATE TABLE IF NOT EXISTS email_log (
+      message_id TEXT PRIMARY KEY, sender TEXT, subject TEXT, task_id INTEGER, received_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE TABLE IF NOT EXISTS notifications_sent (key TEXT PRIMARY KEY, sent_at TEXT NOT NULL DEFAULT (datetime('now')));
+  `);
   d.exec("UPDATE tasks SET status='done' WHERE done_at IS NOT NULL AND status!='done'");
+  d.exec("DELETE FROM tasks WHERE deleted_at IS NOT NULL AND deleted_at < datetime('now','-30 days')");
   if (!(d.prepare("SELECT count(*) AS n FROM feeds").get() as { n: number }).n) {
     const ins = d.prepare("INSERT INTO feeds (url, title) VALUES (?,?)");
     ins.run("https://hnrss.org/frontpage", "Hacker News");

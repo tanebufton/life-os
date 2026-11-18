@@ -1,3 +1,4 @@
+import { FeatureGate } from "@/components/FeatureGate";
 import { Pomodoro, Timers } from "@/components/focus";
 import { Panel } from "@/components/Panel";
 import { PageHead } from "@/components/tasks";
@@ -7,7 +8,8 @@ import { queryTasks } from "@/lib/tasks";
 import { today } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
-export default function Focus() {
+export default async function Focus({ searchParams }: { searchParams: Promise<{ task?: string }> }) {
+  const taskParam = Number((await searchParams).task) || null;
   const tasks = queryTasks().map((t) => ({ id: t.id, title: t.title }));
   const t = today();
   const by = new Map(focusStats(7).map((s) => [s.date, s]));
@@ -16,10 +18,10 @@ export default function Focus() {
   const total = days.reduce((a, d) => a + d.minutes, 0);
   const label = (d: string) => new Intl.DateTimeFormat("en-NZ", { timeZone: "UTC", weekday: "short" }).format(new Date(d + "T00:00:00Z"));
   return (
-    <>
+    <FeatureGate feature="focus">
       <PageHead title="Focus" sub="Pomodoro, timers and your focus history" />
-      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
-        <Pomodoro tasks={tasks} />
+      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-4 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
+        <Pomodoro tasks={tasks} presetTask={taskParam} />
         <div className="space-y-4">
           <Timers />
           <Panel title="Last 7 days" i={2} right={<span><b className="text-fg">{total}</b> min total</span>}>
@@ -37,6 +39,6 @@ export default function Focus() {
           </Panel>
         </div>
       </div>
-    </>
+    </FeatureGate>
   );
 }

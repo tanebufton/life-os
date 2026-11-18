@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { AddTaskRow } from "@/components/addrow";
+import { FlashToast } from "@/components/flash";
 import { Pill } from "@/components/Pill";
 import { PageHead, TaskGroups, bucket } from "@/components/tasks";
 import { listTags, queryTasks } from "@/lib/tasks";
 
 export const dynamic = "force-dynamic";
-export default async function All({ searchParams }: { searchParams: Promise<{ tag?: string; done?: string }> }) {
-  const { tag, done } = await searchParams;
+export default async function All({ searchParams }: { searchParams: Promise<{ tag?: string; done?: string; deleted?: string }> }) {
+  const { tag, done, deleted } = await searchParams;
   const tags = listTags();
   const open = queryTasks({ tag });
   const finished = done ? queryTasks({ tag, state: "done", limit: 60 }) : [];
@@ -14,6 +15,7 @@ export default async function All({ searchParams }: { searchParams: Promise<{ ta
   const chip = (on: boolean) => `inline-flex h-7 items-center rounded-full border px-3 text-[13px] font-medium transition ${on ? "border-accent/40 bg-accent/10 text-accent" : "text-mute hover:bg-raise"}`;
   return (
     <div className="mx-auto max-w-3xl">
+      <FlashToast deleted={Number(deleted) || undefined} base="/tasks" />
       <PageHead title={tag ? `#${tag}` : "My tasks"} sub={`${open.length} open`} right={<Link href={q({ tag, done: done ? undefined : "1" })} className="btn">{done ? "Hide completed" : "Show completed"}</Link>} />
       {tags.length > 0 && (
         <div className="mb-5 flex flex-wrap items-center gap-1.5">

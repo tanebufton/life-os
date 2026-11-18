@@ -30,13 +30,13 @@ const MINUTES: Record<Mode, number> = { focus: 25, short: 5, long: 15 };
 const LABEL: Record<Mode, string> = { focus: "Focus", short: "Short break", long: "Long break" };
 const initial: P = { mode: "focus", total: 25 * 60, endsAt: null, left: 25 * 60, taskId: null, cycles: 0 };
 
-export function Pomodoro({ tasks }: { tasks: { id: number; title: string }[] }) {
+export function Pomodoro({ tasks, presetTask }: { tasks: { id: number; title: string }[]; presetTask?: number | null }) {
   const [p, setP] = useState<P>(initial);
   const [ready, setReady] = useState(false);
   const [mins, setMins] = useState(MINUTES);
   const finishing = useRef(false);
 
-  useEffect(() => { setP(load("lifeos.pomo", initial)); setMins(load("lifeos.pomo.mins", MINUTES)); setReady(true); }, []);
+  useEffect(() => { const saved = load("lifeos.pomo", initial); setP(presetTask ? { ...saved, mode: "focus", taskId: presetTask, ...(saved.endsAt ? {} : { total: (load("lifeos.pomo.mins", MINUTES).focus) * 60, left: (load("lifeos.pomo.mins", MINUTES).focus) * 60 }) } : saved); setMins(load("lifeos.pomo.mins", MINUTES)); setReady(true); }, [presetTask]);
   useEffect(() => { if (ready) save("lifeos.pomo", p); }, [p, ready]);
 
   const finish = useCallback((cur: P) => {

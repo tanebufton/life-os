@@ -7,38 +7,49 @@ export { describeRepeat, normalizeRepeat };
 export type Status = "todo" | "doing" | "done";
 export type TaskRow = {
   id: number; title: string; notes: string; project_id: number | null; priority: number;
-  due: string | null; done_at: string | null; status: Status; repeat: string | null;
-  project_name: string | null; project_color: string | null; tags: string[];
+  due: string | null; due_time: string | null; estimate: number | null; done_at: string | null; status: Status; repeat: string | null;
+  parent_id: number | null; source: string; meta: string | null; deleted_at: string | null;
+  project_name: string | null; project_color: string | null; tags: string[]; sub_total: number; sub_done: number;
 };
 export type NewTask = {
-  title: string; notes?: string; project_id?: number | null; project?: string; due?: string | null;
-  priority?: number; tags?: string[]; repeat?: string | null; status?: Status;
+  title: string; notes?: string; project_id?: number | null; project?: string; due?: string | null; due_time?: string | null; estimate?: number | null;
+  priority?: number; tags?: string[]; repeat?: string | null; status?: Status; parent_id?: number | null; source?: string; meta?: object | null;
 };
 
 const SELECT = `SELECT t.*, p.name AS project_name, p.color AS project_color,
-  (SELECT group_concat(g.name, ',') FROM task_tags tt JOIN tags g ON g.id=tt.tag_id WHERE tt.task_id=t.id) AS tags
+  (SELECT group_concat(g.name, ',') FROM task_tags tt JOIN tags g ON g.id=tt.tag_id WHERE tt.task_id=t.id) AS tags,
+  (SELECT count(*) FROM tasks s WHERE s.parent_id=t.id AND s.deleted_at IS NULL) AS sub_total,
+  (SELECT count(*) FROM tasks s WHERE s.parent_id=t.id AND s.deleted_at IS NULL AND s.done_at IS NOT NULL) AS sub_done
   FROM tasks t LEFT JOIN projects p ON p.id=t.project_id`;
 type Raw = Omit<TaskRow, "tags"> & { tags: string | null };
 const hydrate = (r: Raw): TaskRow => ({ ...r, tags: r.tags ? r.tags.split(",") : [] });
 
-export type Filter = { project?: number; tag?: string; state?: "open" | "done" | "all"; status?: Status; dueBy?: string; inbox?: boolean; limit?: number };
+export type Filter = {
+  project?: number; tag?: string; state?: "open" | "done" | "all"; status?: Status; dueBy?: string; dueOn?: string; inbox?: boolean; limit?: number;
+  parent?: number; includeSub?: boolean; source?: string; since?: string;
+};
 export function queryTasks(f: Filter = {}): TaskRow[] {
-  const w: string[] = [], a: unknown[] = [];
+  const w: string[] = ["t.deleted_at IS NULL"], a: unknown[] = [];
   const state = f.state ?? "open";
   if (state === "open") w.push("t.done_at IS NULL"); else if (state === "done") w.push("t.done_at IS NOT NULL");
+  if (f.parent) { w.push("t.parent_id=?"); a.push(f.parent); } else if (!f.includeSub) w.push("t.parent_id IS NULL");
   if (f.status) { w.push("t.status=?"); a.push(f.status); }
   if (f.project) { w.push("t.project_id=?"); a.push(f.project); }
+  if (f.source) { w.push("t.source=?"); a.push(f.source); }
   if (f.tag) { w.push("EXISTS (SELECT 1 FROM task_tags tt JOIN tags g ON g.id=tt.tag_id WHERE tt.task_id=t.id AND g.name=?)"); a.push(cleanTag(f.tag)); }
   if (f.dueBy) { w.push("t.due IS NOT NULL AND t.due<=?"); a.push(f.dueBy); }
+  if (f.dueOn) { w.push("t.due=?"); a.push(f.dueOn); }
+  if (f.since) { w.push("t.done_at >= ?"); a.push(f.since); }
   if (f.inbox) w.push("t.project_id IS NULL AND t.due IS NULL");
-  const order = state === "done" ? "t.done_at DESC, t.id DESC" : "t.done_at IS NOT NULL, t.priority DESC, t.due IS NULL, t.due, t.id";
-  const sql = `${SELECT} ${w.length ? "WHERE " + w.join(" AND ") : ""} ORDER BY ${order} LIMIT ?`;
+  const order = state === "done" ? "t.done_at DESC, t.id DESC" : "t.done_at IS NOT NULL, t.priority DESC, t.due IS NULL, t.due, t.due_time IS NULL, t.due_time, t.id";
+  const sql = `${SELECT} WHERE ${w.join(" AND ")} ORDER BY ${order} LIMIT ?`;
   return (db.prepare(sql).all(...a, f.limit ?? 500) as Raw[]).map(hydrate);
 }
-export const getTask = (id: number): TaskRow | undefined => {
-  const r = db.prepare(`${SELECT} WHERE t.id=?`).get(id) as Raw | undefined;
+export const getTask = (id: number, withDeleted = false): TaskRow | undefined => {
+  const r = db.prepare(`${SELECT} WHERE t.id=? ${withDeleted ? "" : "AND t.deleted_at IS NULL"}`).get(id) as Raw | undefined;
   return r && hydrate(r);
 };
+export const subtasks = (id: number) => queryTasks({ parent: id, state: "all" }).sort((a, b) => a.id - b.id);
 
 // ---------- tags ----------
 export const cleanTag = (s: string) =>
@@ -57,7 +68,7 @@ export function setTaskTags(id: number, names: string[]) {
 }
 export const listTags = () =>
   db.prepare(`SELECT g.name, COUNT(t.id) AS open FROM tags g
-    JOIN task_tags tt ON tt.tag_id=g.id JOIN tasks t ON t.id=tt.task_id AND t.done_at IS NULL
+    JOIN task_tags tt ON tt.tag_id=g.id JOIN tasks t ON t.id=tt.task_id AND t.done_at IS NULL AND t.deleted_at IS NULL
     GROUP BY g.id ORDER BY open DESC, g.name`).all() as { name: string; open: number }[];
 
 // ---------- projects ----------
@@ -74,7 +85,7 @@ function step(d: string, r: string): string {
   const n = parseInt(r), u = r.slice(-1);
   return u === "d" ? addDays(d, n) : u === "w" ? addDays(d, 7 * n) : u === "m" ? addMonths(d, n) : addMonths(d, 12 * n);
 }
-/** Next occurrence strictly after today (overdue repeats skip forward rather than piling up). */
+/** Next occurrence strictly after today (overdue repeats skip forward, no pile-up). */
 export function nextDue(due: string | null, r: string): string {
   const t = today();
   let d = due ?? t;
@@ -85,11 +96,12 @@ export function nextDue(due: string | null, r: string): string {
 // ---------- mutations ----------
 export function createTask(n: NewTask): number {
   const rep = normalizeRepeat(n.repeat);
-  const pid = n.project_id ?? projectByName(n.project);
-  const due = n.due === undefined ? (rep ? today() : null) : n.due;
+  const parent = n.parent_id ? getTask(n.parent_id) : undefined;
+  const pid = n.project_id ?? projectByName(n.project) ?? parent?.project_id ?? null;
+  const due = n.due === undefined ? (rep || n.due_time ? today() : null) : n.due; // a time or a repeat with no date means today
   const status = n.status && n.status !== "done" ? n.status : "todo";
-  const id = Number(db.prepare("INSERT INTO tasks (title,notes,project_id,due,priority,repeat,status) VALUES (?,?,?,?,?,?,?)")
-    .run(n.title.trim(), n.notes ?? "", pid, due, n.priority ?? 0, rep, status).lastInsertRowid);
+  const id = Number(db.prepare("INSERT INTO tasks (title,notes,project_id,due,due_time,estimate,priority,repeat,status,parent_id,source,meta) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)")
+    .run(n.title.trim(), n.notes ?? "", pid, due, n.due_time ?? null, n.estimate ?? null, n.priority ?? 0, rep, status, n.parent_id ?? null, n.source ?? "manual", n.meta ? JSON.stringify(n.meta) : null).lastInsertRowid);
   if (n.tags?.length) setTaskTags(id, n.tags);
   return id;
 }
@@ -100,16 +112,20 @@ export function completeTask(id: number): { id: number; next_due?: string } | nu
   if (t.done_at) return { id };
   if (t.repeat) {
     const next = db.transaction(() => {
-      const h = db.prepare("INSERT INTO tasks (title,notes,project_id,priority,due,status,done_at) VALUES (?,?,?,?,?,'done',datetime('now'))")
-        .run(t.title, t.notes, t.project_id, t.priority, t.due);
+      const h = db.prepare("INSERT INTO tasks (title,notes,project_id,priority,due,due_time,estimate,status,done_at,source) VALUES (?,?,?,?,?,?,?, 'done', datetime('now'), ?)")
+        .run(t.title, t.notes, t.project_id, t.priority, t.due, t.due_time, t.estimate, t.source);
       db.prepare("INSERT INTO task_tags (task_id, tag_id) SELECT ?, tag_id FROM task_tags WHERE task_id=?").run(h.lastInsertRowid, id);
       const nd = nextDue(t.due, t.repeat!);
       db.prepare("UPDATE tasks SET due=?, status='todo' WHERE id=?").run(nd, id);
+      db.prepare("UPDATE tasks SET done_at=NULL, status='todo' WHERE parent_id=?").run(id); // recurring checklists reset
       return nd;
     })();
     return { id, next_due: next };
   }
-  db.prepare("UPDATE tasks SET done_at=datetime('now'), status='done' WHERE id=?").run(id);
+  db.transaction(() => {
+    db.prepare("UPDATE tasks SET done_at=datetime('now'), status='done' WHERE id=?").run(id);
+    db.prepare("UPDATE tasks SET done_at=datetime('now'), status='done' WHERE parent_id=? AND done_at IS NULL AND deleted_at IS NULL").run(id);
+  })();
   return { id };
 }
 export const reopenTask = (id: number) => db.prepare("UPDATE tasks SET done_at=NULL, status='todo' WHERE id=?").run(id).changes > 0;
@@ -118,9 +134,30 @@ export function setStatus(id: number, status: Status) {
   const r = db.prepare("UPDATE tasks SET status=?, done_at=NULL WHERE id=?").run(status, id);
   return r.changes ? { id } : null;
 }
-export const deleteTask = (id: number) => db.prepare("DELETE FROM tasks WHERE id=?").run(id).changes > 0;
+/** Soft delete (children too). Recoverable for 30 days via restoreTask. */
+export function deleteTask(id: number): boolean {
+  return db.transaction(() => {
+    const r = db.prepare("UPDATE tasks SET deleted_at=datetime('now') WHERE id=? AND deleted_at IS NULL").run(id);
+    db.prepare("UPDATE tasks SET deleted_at=datetime('now') WHERE parent_id=? AND deleted_at IS NULL").run(id);
+    return r.changes > 0;
+  })();
+}
+export function restoreTask(id: number): boolean {
+  return db.transaction(() => {
+    const r = db.prepare("UPDATE tasks SET deleted_at=NULL WHERE id=? AND deleted_at IS NOT NULL").run(id);
+    db.prepare("UPDATE tasks SET deleted_at=NULL WHERE parent_id=?").run(id);
+    return r.changes > 0;
+  })();
+}
+export function duplicateTask(id: number): number | null {
+  const t = getTask(id);
+  if (!t) return null;
+  const copy = (src: TaskRow, parent?: number) => createTask({ title: src.title, notes: src.notes, project_id: src.project_id, due: src.due, due_time: src.due_time, estimate: src.estimate,
+    priority: src.priority, tags: src.tags, repeat: src.repeat, parent_id: parent, source: "manual" });
+  return db.transaction(() => { const nid = copy(t); for (const s of subtasks(id)) copy(s, nid); return nid; })();
+}
 
-export type Patch = Partial<Omit<NewTask, "project_id">> & { project_id?: number | null };
+export type Patch = Partial<Omit<NewTask, "project_id" | "meta" | "source">> & { project_id?: number | null };
 export function updateTask(id: number, p: Patch): boolean {
   if (!getTask(id)) return false;
   const sets: string[] = [], a: unknown[] = [];
@@ -130,6 +167,8 @@ export function updateTask(id: number, p: Patch): boolean {
   if (p.project !== undefined) set("project_id", projectByName(p.project));
   if (p.project_id !== undefined) set("project_id", p.project_id);
   if (p.due !== undefined) set("due", p.due);
+  if (p.due_time !== undefined) set("due_time", p.due_time || null);
+  if (p.estimate !== undefined) set("estimate", p.estimate || null);
   if (p.priority !== undefined) set("priority", p.priority);
   if (p.repeat !== undefined) set("repeat", normalizeRepeat(p.repeat));
   db.transaction(() => {
@@ -140,15 +179,73 @@ export function updateTask(id: number, p: Patch): boolean {
   return true;
 }
 
+// ---------- quick reschedule ----------
+export type Preset = "today" | "tomorrow" | "weekend" | "nextweek" | "none";
+export function presetDate(p: Preset, t = today()): string | null {
+  switch (p) {
+    case "today": return t;
+    case "tomorrow": return addDays(t, 1);
+    case "weekend": return addDays(t, ((6 - weekday(t) + 7) % 7) || 7);
+    case "nextweek": return addDays(t, ((1 - weekday(t) + 7) % 7) || 7);
+    default: return null;
+  }
+}
+export function reschedule(id: number, to: Preset | string): boolean {
+  const due = ["today", "tomorrow", "weekend", "nextweek", "none"].includes(to) ? presetDate(to as Preset) : /^\d{4}-\d{2}-\d{2}$/.test(to) ? to : undefined;
+  if (due === undefined) throw new Error(`Invalid date "${to}"`);
+  return db.prepare("UPDATE tasks SET due=? WHERE id=? AND deleted_at IS NULL").run(due, id).changes > 0;
+}
+
 export function doneToday(): number {
   const t = today();
-  return (db.prepare("SELECT done_at FROM tasks WHERE done_at >= datetime('now','-2 days')").all() as { done_at: string }[])
+  return (db.prepare("SELECT done_at FROM tasks WHERE done_at >= datetime('now','-2 days') AND deleted_at IS NULL").all() as { done_at: string }[])
     .filter((r) => localDate(r.done_at) === t).length;
 }
+export const openCount = () => (db.prepare("SELECT count(*) n FROM tasks WHERE done_at IS NULL AND deleted_at IS NULL AND parent_id IS NULL").get() as { n: number }).n;
 
 // ---------- quick add ----------
 export function parseQuickAdd(input: string): NewTask {
   const p = parseQuick(input, today());
   if (!p.title) throw new Error("Task title is empty");
   return p;
+}
+
+// ---------- search: "invoice #bills @home due:week is:any no:date has:subtasks" ----------
+const esc = (s: string) => s.replace(/[\\%_]/g, (c) => "\\" + c);
+export function searchTasks(q: string, limit = 50): TaskRow[] {
+  const w: string[] = ["t.deleted_at IS NULL"], a: unknown[] = [];
+  let state: "open" | "done" | "any" = "open";
+  const t = today();
+  for (const tok of q.trim().split(/\s+/).filter(Boolean)) {
+    const low = tok.toLowerCase();
+    let m: RegExpMatchArray | null;
+    if ((m = tok.match(/^#(.+)$/))) { w.push("EXISTS (SELECT 1 FROM task_tags tt JOIN tags g ON g.id=tt.tag_id WHERE tt.task_id=t.id AND g.name=?)"); a.push(cleanTag(m[1])); }
+    else if ((m = tok.match(/^@(.+)$/))) { w.push("(lower(p.name)=? OR replace(lower(p.name),' ','-')=?)"); a.push(m[1].toLowerCase(), m[1].toLowerCase()); }
+    else if (low === "!high" || low === "priority:high") w.push("t.priority>0");
+    else if (low === "!low" || low === "priority:low") w.push("t.priority<0");
+    else if ((m = low.match(/^is:(open|done|any|doing|todo|recurring|overdue)$/))) {
+      if (m[1] === "open" || m[1] === "done" || m[1] === "any") state = m[1];
+      else if (m[1] === "recurring") w.push("t.repeat IS NOT NULL");
+      else if (m[1] === "overdue") { w.push("t.due < ?"); a.push(t); }
+      else { w.push("t.status=?"); a.push(m[1]); }
+    }
+    else if ((m = low.match(/^due:(.+)$/))) {
+      const v = m[1];
+      if (v === "today") { w.push("t.due=?"); a.push(t); }
+      else if (v === "tomorrow") { w.push("t.due=?"); a.push(addDays(t, 1)); }
+      else if (v === "overdue") { w.push("t.due<?"); a.push(t); }
+      else if (v === "week") { w.push("t.due BETWEEN ? AND ?"); a.push(t, addDays(t, 7)); }
+      else if (v === "none") w.push("t.due IS NULL");
+      else if (v === "any") w.push("t.due IS NOT NULL");
+      else if (/^\d{4}-\d{2}-\d{2}$/.test(v)) { w.push("t.due=?"); a.push(v); }
+    }
+    else if ((m = low.match(/^(before|after):(\d{4}-\d{2}-\d{2})$/))) { w.push(m[1] === "before" ? "t.due<?" : "t.due>?"); a.push(m[2]); }
+    else if ((m = low.match(/^no:(date|project|tag)$/))) w.push(m[1] === "date" ? "t.due IS NULL" : m[1] === "project" ? "t.project_id IS NULL" : "NOT EXISTS (SELECT 1 FROM task_tags x WHERE x.task_id=t.id)");
+    else if ((m = low.match(/^has:(subtasks|notes|link|time|estimate)$/))) w.push({ subtasks: "(SELECT count(*) FROM tasks s WHERE s.parent_id=t.id AND s.deleted_at IS NULL)>0", notes: "t.notes!=''", link: "(t.notes LIKE '%http%' OR t.title LIKE '%http%')", time: "t.due_time IS NOT NULL", estimate: "t.estimate IS NOT NULL" }[m[1]]!);
+    else if ((m = low.match(/^source:(\w+)$/))) { w.push("t.source=?"); a.push(m[1]); }
+    else { w.push("(t.title LIKE ? ESCAPE '\\' OR t.notes LIKE ? ESCAPE '\\')"); a.push(`%${esc(tok)}%`, `%${esc(tok)}%`); }
+  }
+  if (state === "open") w.push("t.done_at IS NULL"); else if (state === "done") w.push("t.done_at IS NOT NULL");
+  const sql = `${SELECT} WHERE ${w.join(" AND ")} ORDER BY t.done_at IS NOT NULL, t.priority DESC, t.due IS NULL, t.due, t.id LIMIT ?`;
+  return (db.prepare(sql).all(...a, limit) as Raw[]).map(hydrate);
 }

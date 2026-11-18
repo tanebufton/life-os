@@ -2,7 +2,7 @@
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { quickAdd } from "@/lib/actions";
-import { nice } from "@/lib/dates";
+import { fmtMinutes, fmtTime, nice } from "@/lib/dates";
 import { describeRepeat, parseQuickAdd } from "@/lib/parse";
 import { Icon } from "./Icon";
 import { Pill } from "./Pill";
@@ -10,19 +10,21 @@ import { Pill } from "./Pill";
 const SYNTAX: [string, string][] = [["#tag", "label it"], ["@project", "file it in a project"], ["!high  !low  !doing", "priority or status"], ["tomorrow · friday · in 3 days", "due date"], ["daily · weekdays · every 2 weeks", "repeat"]];
 
 function Preview({ v, parsed, today, empty }: { v: string; parsed: ReturnType<typeof parseQuickAdd> | null; today: string; empty: boolean }) {
-  const due = parsed?.due ? (parsed.due === today ? "Today" : nice(parsed.due)) : null;
+  const effDue = parsed?.due ?? (parsed?.due_time || parsed?.repeat ? today : null);
+  const due = effDue ? (effDue === today ? "Today" : nice(effDue)) : null;
   if (parsed?.title) return (
     <div className="space-y-2">
       <div className="text-[15px] font-medium">{parsed.title}</div>
       <div className="flex flex-wrap items-center gap-1.5 text-xs text-mute">
-        {due && <span className="inline-flex items-center gap-1 rounded bg-warn/10 px-1.5 py-0.5 font-medium text-warn"><Icon name="calendar" size={12} />{due}</span>}
+        {due && <span className="inline-flex items-center gap-1 rounded bg-warn/10 px-1.5 py-0.5 font-medium text-warn"><Icon name="calendar" size={12} />{due}{parsed?.due_time && <span className="font-normal"> · {fmtTime(parsed.due_time)}</span>}</span>}
+        {parsed?.estimate ? <span className="inline-flex items-center gap-1 rounded bg-raise px-1.5 py-0.5"><Icon name="clock" size={12} />{fmtMinutes(parsed.estimate)}</span> : null}
         {parsed.repeat && <span className="inline-flex items-center gap-1 rounded bg-raise px-1.5 py-0.5"><Icon name="repeat" size={12} />{describeRepeat(parsed.repeat)}</span>}
         {parsed.project && <span className="rounded bg-raise px-1.5 py-0.5 font-medium text-fg">{parsed.project}</span>}
         {parsed.tags?.map((t) => <Pill key={t} name={t} />)}
         {parsed.priority === 1 && <span className="inline-flex items-center gap-0.5 rounded bg-danger/10 px-1.5 py-0.5 font-medium text-danger"><Icon name="chevUp2" size={12} />High</span>}
         {parsed.priority === -1 && <span className="rounded bg-raise px-1.5 py-0.5">Low priority</span>}
         {parsed.status === "doing" && <span className="lozenge bg-accent/15 text-accent">In progress</span>}
-        {!due && !parsed.repeat && !parsed.project && !parsed.tags && <span className="inline-flex items-center gap-1"><Icon name="inbox" size={12} />Goes to your inbox</span>}
+        {!due && !parsed.repeat && !parsed.project && !parsed.tags && !parsed.estimate && <span className="inline-flex items-center gap-1"><Icon name="inbox" size={12} />Goes to your inbox</span>}
       </div>
     </div>
   );

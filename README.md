@@ -1,45 +1,46 @@
 # LifeOS
 
-Personal, single-user life dashboard. Next.js 15 + SQLite (better-sqlite3), plus an MCP server so Claude can drive it.
-
-## What's in it
-- **Tasks** with projects, tags, priorities, due dates and **repeating** tasks (daily, weekdays, weekly, monthly, yearly, every N days).
-  Completing a repeating task logs a history copy and rolls the original to its next date (overdue repeats skip forward, no pile-up).
-- **Quick add** understands plain text: `Pay rent every month #bills @home !high tomorrow`
-  (`#tag`, `@project`, `!high` `!low` `!doing`, `today` `tomorrow` `friday` `in 3 days` `2026-12-01`, `daily` `weekdays` `every 2 weeks`).
-- **Kanban board** (To do / Doing / Done): drag and drop on desktop, arrow buttons on touch.
-- **Focus**: pomodoro (editable durations, logs sessions, tab-title countdown, survives reloads) and free timers, with weekly stats.
-- **Weather** (Open-Meteo, no key), **News** (RSS/Atom feeds you manage), **Spotify** controller (needs your own Spotify app + Premium).
-- **MCP server** exposing all of the above (see below).
-
-## Design
-Light/dark theme (follows your system, toggle in the sidebar). Inter, Lucide icons, Sonner toasts. Patterns borrowed from Notion (page layout, task properties), Todoist (task rows, undo toast), Jira (board, issue keys, lozenges), Stripe (settings, cards) and WhatsApp/Messenger (chat-list news, mobile tab bar + floating action button).
-Press `⌘K` for the command palette, `C` to capture a task, `g` then `t/l/b/f/n/s` to jump between pages.
+A personal, single-user life dashboard: tasks, habits, journal, focus, news, weather and music in one place.
+Next.js 15 + SQLite (better-sqlite3). Self-hosted, with a REST API, an MCP server and a background worker.
 
 ## Run
 ```bash
 npm install
 npm run dev                      # http://127.0.0.1:3000
 npm run build && npm start       # production, binds 127.0.0.1
+npm run worker                   # reminders, morning brief, IMAP email import (optional, keep it running)
+npm run mcp                      # MCP server for Claude and other bots (optional)
+LIFEOS_DB=data/demo.db npm run seed   # fill a demo database
 ```
-Then open **Settings**: set your city (also sets the timezone, which decides what "today" means) and manage feeds.
-Data lives in `data/lifeos.db` (override with `LIFEOS_DB`). Back that file up.
+Data lives in `data/lifeos.db` (override with `LIFEOS_DB`). Back it up from **Settings → Your data**.
+
+## Switch features on and off
+**Settings → Features.** Everything except Today, Inbox, My tasks and Settings can be turned off: Upcoming, Board, Plan & review,
+Insights, Habits, Journal, Focus, News, Weather, Music, Email import, Reminders, REST API. A switched-off feature disappears from the
+sidebar, mobile nav, command palette, shortcuts, Today, the MCP tools, the REST API and the worker. Data is kept if you turn it back on.
+
+## What's in it
+**Tasks:** projects, tags, priority, due date **and time**, **estimates**, repeats, **subtasks/checklists** (recurring checklists reset),
+quick-add syntax (`Pay rent every month #bills @home !high 31 march at 9am ~30m`), soft-delete with **Undo** (30 days), duplicate.
+**Views:** Today (with workload meter), **Inbox**, **Upcoming** (agenda + month), My tasks, Board, **Search** with operators
+(`#tag @project due:week is:done no:date has:link source:email`), **Plan your day / weekly review** (one-tap triage), **Insights**
+(heatmap, streaks, focus), **Habits** (streaks that skip unscheduled days), **Journal** (mood + daily note).
+**Speed:** `⌘K` palette (searches tasks too), `C` capture, `J/K/X/E/T/W/#` in lists, `?` for help, hover quick-reschedule.
+**Phone:** installable PWA, share-sheet "Share to LifeOS", bottom tab bar, floating `+`.
+
+## Integrations
+| What | How |
+|---|---|
+| **Claude / MCP** | `LIFEOS_MCP_TOKEN=$(openssl rand -hex 24) npm run mcp`, then `tailscale serve --bg --https=8443 http://127.0.0.1:3737` and `claude mcp add --transport http lifeos https://<machine>.<tailnet>.ts.net:8443/mcp --header "Authorization: Bearer <token>"`. 30 tools; they follow the feature switches. Never use `tailscale funnel`. |
+| **REST API** | Settings → API & calendar feed → create a token. `POST /api/v1/tasks {"text":"Call mum tomorrow at 5pm"}`, `GET /api/v1/tasks?q=`, `PATCH/DELETE /api/v1/tasks/:id`, `POST /api/v1/tasks/:id/complete`, `/search`, `/brief`, `/habits`, `/journal`. Good for iOS Shortcuts and scripts. |
+| **Email to tasks** | Webhook: POST any email (Postmark, Mailgun, SendGrid, JSON, or raw RFC 822 from a Cloudflare Email Worker) to the URL in Settings. Or IMAP: set `LIFEOS_IMAP_HOST/USER/PASS` (+ `_MAILBOX`, `_FLAGGED_ONLY=1`) and run the worker. Subject accepts quick-add syntax; `tasks+work@` adds the tag `work`; duplicates are skipped. |
+| **Calendar** | Subscribe to the iCal URL in Settings from Google/Apple/Outlook. Repeats come through as RRULEs. |
+| **Push** | ntfy topic and/or any webhook in Settings; due-time reminders, morning brief, evening habit nudge. Needs `npm run worker` and `LIFEOS_BASE_URL` for tap-through links. |
+| **Spotify** | `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `LIFEOS_BASE_URL`; Premium needed for control. |
 
 ## Auth
-None in-app. Put it behind Cloudflare Tunnel + Access. Set `LIFEOS_REQUIRE_CF_ACCESS=1` to 403 any request that lacks the Access identity header.
+No login in the app: put it behind Cloudflare Tunnel + Access and set `LIFEOS_REQUIRE_CF_ACCESS=1` to 403 anything without the Access
+identity header. `/api/v1`, `/api/inbound` and `/api/ical` use their own token/secret, so add an Access bypass policy for those paths.
 
-## Spotify
-1. Create an app at developer.spotify.com and add the redirect URI shown on the Settings page (`$LIFEOS_BASE_URL/api/spotify/callback`; must be https or 127.0.0.1).
-2. Set `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `LIFEOS_BASE_URL`, restart, then Settings → Connect Spotify.
-Playback control requires Premium and an active device. (Implemented but not yet tested against the live Spotify API.)
-
-## MCP server (Tailscale)
-```bash
-LIFEOS_MCP_TOKEN=$(openssl rand -hex 24) npm run mcp          # 127.0.0.1:3737/mcp
-tailscale serve --bg --https=8443 http://127.0.0.1:3737       # tailnet-only HTTPS
-claude mcp add --transport http lifeos https://<machine>.<tailnet>.ts.net:8443/mcp --header "Authorization: Bearer <token>"
-```
-Never use `tailscale funnel` for this; that makes it public.
-
-Tools: `quick_add` `add_task` `list_tasks` `update_task` `move_task` `complete_task` `delete_task` `list_projects` `add_project` `list_tags`
-`get_weather` `get_news` `spotify_now_playing` `spotify_control` `log_focus` `focus_stats` `daily_brief`
+## Design
+Light/dark (follows your system), Inter, Lucide icons, Sonner toasts. Patterns from Notion, Todoist, Jira, Stripe, WhatsApp/Messenger.

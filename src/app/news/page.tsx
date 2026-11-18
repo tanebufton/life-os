@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Suspense } from "react";
+import { FeatureGate } from "@/components/FeatureGate";
 import { Avatar } from "@/components/Pill";
 import { Panel } from "@/components/Panel";
 import { PageHead } from "@/components/tasks";
@@ -31,6 +32,6 @@ async function Items({ src }: { src?: string }) {
 }
 export default async function News({ searchParams }: { searchParams: Promise<{ src?: string }> }) {
   const { src } = await searchParams;
-  return (<div className="mx-auto max-w-3xl"><PageHead title="News" sub="Headlines from your feeds, refreshed every 10 minutes" />
-    <Suspense fallback={<Panel className="h-72 animate-pulse">{null}</Panel>}><Items src={src} /></Suspense></div>);
+  return (<FeatureGate feature="news"><div className="mx-auto max-w-3xl"><PageHead title="News" sub="Headlines from your feeds, refreshed every 10 minutes" />
+    <Suspense fallback={<Panel className="h-72 animate-pulse">{null}</Panel>}><Items src={src} /></Suspense></div></FeatureGate>);
 }
