@@ -17,6 +17,7 @@
     "@modelcontextprotocol/sdk": "^1.32.2",
     "better-sqlite3": "^13.2.0",
     "drizzle-orm": "^0.45.4",
+    "fast-xml-parser": "^5.12.1",
     "next": "^15.5.29",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",

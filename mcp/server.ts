@@ -1,93 +1,112 @@
-// LifeOS MCP server (streamable HTTP, stateless). Run alongside the web app; shares the same SQLite file.
-//   LIFEOS_MCP_HOST  bind address (default 127.0.0.1; set to your Tailscale IP, or use `tailscale serve`)
-//   LIFEOS_MCP_PORT  default 3737
-//   LIFEOS_MCP_TOKEN optional bearer token (defence in depth on top of tailnet ACLs)
+// LifeOS MCP server (streamable HTTP, stateless). Shares the SQLite file with the web app.
+//   LIFEOS_MCP_HOST   bind address (default 127.0.0.1; front it with `tailscale serve`)
+//   LIFEOS_MCP_PORT   default 3737
+//   LIFEOS_MCP_TOKEN  bearer token (strongly recommended on top of tailnet ACLs)
 import http from "node:http";
 import crypto from "node:crypto";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
-import { db, Project, Task } from "../src/lib/db";
+import { db } from "../src/lib/db";
+import { focusStats, focusToday, logFocus } from "../src/lib/focus";
+import { getNews } from "../src/lib/news";
+import { control, nowPlaying } from "../src/lib/spotify";
+import { completeTask, createTask, deleteTask, describeRepeat, doneToday, listTags, parseQuickAdd, queryTasks, setStatus, updateTask, type TaskRow } from "../src/lib/tasks";
+import { today } from "../src/lib/time";
+import { getWeather } from "../src/lib/weather";
 
-const text = (v: unknown) => ({ content: [{ type: "text" as const, text: typeof v === "string" ? v : JSON.stringify(v, null, 2) }] });
-const projectId = (name?: string) => {
-  if (!name) return null;
-  const p = db.prepare("SELECT id FROM projects WHERE lower(name)=lower(?) AND archived=0").get(name) as { id: number } | undefined;
-  return p ? p.id : db.prepare("INSERT INTO projects (name) VALUES (?)").run(name).lastInsertRowid as number;
-};
-const TASKS = `SELECT t.id,t.title,t.notes,t.priority,t.due,t.done_at,p.name AS project FROM tasks t LEFT JOIN projects p ON p.id=t.project_id`;
+const json = (v: unknown) => ({ content: [{ type: "text" as const, text: typeof v === "string" ? v : JSON.stringify(v, null, 2) }] });
+const fail = (e: unknown) => ({ isError: true, content: [{ type: "text" as const, text: (e as Error).message }] });
+const safe = <A,>(fn: (a: A) => unknown | Promise<unknown>) => async (a: A) => { try { return json(await fn(a)); } catch (e) { return fail(e); } };
+const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "YYYY-MM-DD");
+const status = z.enum(["todo", "doing", "done"]);
+const brief = (t: TaskRow) => ({ id: t.id, title: t.title, status: t.status, project: t.project_name, due: t.due, priority: t.priority, tags: t.tags, repeat: t.repeat ? describeRepeat(t.repeat) : null, notes: t.notes || undefined });
 
 function buildServer() {
-  const s = new McpServer({ name: "lifeos", version: "0.1.0" });
+  const s = new McpServer({ name: "lifeos", version: "0.2.0" });
+  const tool = s.registerTool.bind(s) as (name: string, cfg: { description: string; inputSchema: Record<string, z.ZodTypeAny> }, cb: (a: any) => Promise<unknown>) => void;
 
-  s.registerTool("add_task", {
-    description: "Add a task. Project is matched by name (case-insensitive) and created if missing. Omit project for the inbox.",
-    inputSchema: { title: z.string().min(1), project: z.string().optional(), due: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("YYYY-MM-DD"), priority: z.number().int().min(-1).max(1).optional().describe("-1 low, 0 normal, 1 high"), notes: z.string().optional() },
-  }, ({ title, project, due, priority, notes }) => {
-    const r = db.prepare("INSERT INTO tasks (title, notes, project_id, due, priority) VALUES (?,?,?,?,?)").run(title, notes ?? "", projectId(project), due ?? null, priority ?? 0);
-    return text({ id: r.lastInsertRowid, title });
-  });
+  tool("quick_add", { description: "Add a task from natural text. Syntax: #tag @project !high|!low|!doing, today|tomorrow|friday|in 3 days|YYYY-MM-DD, daily|weekdays|weekly|monthly|every 2 weeks. Example: 'Pay rent every month #bills @home !high tomorrow'.", inputSchema: { text: z.string().min(1) } },
+    safe(({ text }: { text: string }) => { const p = parseQuickAdd(text); const id = createTask(p); return { id, parsed: p }; }));
 
-  s.registerTool("list_tasks", {
-    description: "List tasks. Defaults to open tasks.",
-    inputSchema: { project: z.string().optional(), status: z.enum(["open", "done", "all"]).optional(), due_before: z.string().optional().describe("YYYY-MM-DD, inclusive"), limit: z.number().int().max(200).optional() },
-  }, ({ project, status = "open", due_before, limit = 50 }) => {
-    const w: string[] = [], a: unknown[] = [];
-    if (status === "open") w.push("t.done_at IS NULL"); else if (status === "done") w.push("t.done_at IS NOT NULL");
-    if (project) { w.push("lower(p.name)=lower(?)"); a.push(project); }
-    if (due_before) { w.push("t.due IS NOT NULL AND t.due <= ?"); a.push(due_before); }
-    const rows = db.prepare(`${TASKS} ${w.length ? "WHERE " + w.join(" AND ") : ""} ORDER BY t.priority DESC, t.due IS NULL, t.due, t.id LIMIT ?`).all(...a, limit);
-    return text(rows);
-  });
+  tool("add_task", { description: "Add a task with explicit fields. Project is matched by name (created if missing); omit for the inbox. repeat: daily, weekdays, weekly, monthly, yearly, or 'every 3 days'.", inputSchema: {
+    title: z.string().min(1), project: z.string().optional(), due: date.optional(), priority: z.number().int().min(-1).max(1).optional().describe("-1 low, 0 normal, 1 high"),
+    notes: z.string().optional(), tags: z.array(z.string()).optional(), repeat: z.string().optional(), status: status.optional() } },
+    safe((a: any) => ({ id: createTask(a), title: a.title })));
 
-  s.registerTool("update_task", {
-    description: "Update fields on a task by id.",
-    inputSchema: { id: z.number().int(), title: z.string().optional(), notes: z.string().optional(), project: z.string().optional(), due: z.string().nullable().optional(), priority: z.number().int().min(-1).max(1).optional() },
-  }, ({ id, title, notes, project, due, priority }) => {
-    const sets: string[] = [], a: unknown[] = [];
-    if (title !== undefined) { sets.push("title=?"); a.push(title); }
-    if (notes !== undefined) { sets.push("notes=?"); a.push(notes); }
-    if (project !== undefined) { sets.push("project_id=?"); a.push(projectId(project)); }
-    if (due !== undefined) { sets.push("due=?"); a.push(due); }
-    if (priority !== undefined) { sets.push("priority=?"); a.push(priority); }
-    if (!sets.length) return text("nothing to update");
-    const r = db.prepare(`UPDATE tasks SET ${sets.join(",")} WHERE id=?`).run(...a, id);
-    return text(r.changes ? "updated" : "no such task");
-  });
+  tool("list_tasks", { description: "List tasks. Defaults to open tasks (todo + doing).", inputSchema: {
+    project: z.string().optional(), tag: z.string().optional(), column: z.enum(["todo", "doing"]).optional(), state: z.enum(["open", "done", "all"]).optional(),
+    due_by: date.optional().describe("only tasks due on/before this date (includes overdue)"), limit: z.number().int().min(1).max(200).optional() } },
+    safe((a: any) => {
+      const proj = a.project ? (db.prepare("SELECT id FROM projects WHERE lower(name)=lower(?)").get(a.project) as { id: number } | undefined) : undefined;
+      if (a.project && !proj) return [];
+      return queryTasks({ project: proj?.id, tag: a.tag, status: a.column, state: a.state, dueBy: a.due_by, limit: a.limit ?? 50 }).map(brief);
+    }));
 
-  s.registerTool("complete_task", { description: "Mark a task done (or reopen with done=false).", inputSchema: { id: z.number().int(), done: z.boolean().optional() } },
-    ({ id, done = true }) => {
-      const r = db.prepare(`UPDATE tasks SET done_at = ${done ? "COALESCE(done_at, datetime('now'))" : "NULL"} WHERE id=?`).run(id);
-      return text(r.changes ? (done ? "done" : "reopened") : "no such task");
-    });
+  tool("update_task", { description: "Update fields on a task. Pass due:null / repeat:null to clear. tags replaces the whole tag set.", inputSchema: {
+    id: z.number().int(), title: z.string().optional(), notes: z.string().optional(), project: z.string().optional(), due: date.nullable().optional(),
+    priority: z.number().int().min(-1).max(1).optional(), tags: z.array(z.string()).optional(), repeat: z.string().nullable().optional(), status: status.optional() } },
+    safe(({ id, ...patch }: any) => (updateTask(id, patch) ? "updated" : "no such task")));
 
-  s.registerTool("delete_task", { description: "Delete a task by id.", inputSchema: { id: z.number().int() } },
-    ({ id }) => text(db.prepare("DELETE FROM tasks WHERE id=?").run(id).changes ? "deleted" : "no such task"));
+  tool("move_task", { description: "Move a task on the kanban board. Moving to done completes it (repeating tasks roll to their next date).", inputSchema: { id: z.number().int(), column: status } },
+    safe(({ id, column }: any) => setStatus(id, column) ?? "no such task"));
+  tool("complete_task", { description: "Mark a task done. Repeating tasks roll forward to the next occurrence and the response includes next_due.", inputSchema: { id: z.number().int() } },
+    safe(({ id }: any) => completeTask(id) ?? "no such task"));
+  tool("delete_task", { description: "Delete a task permanently.", inputSchema: { id: z.number().int() } }, safe(({ id }: any) => (deleteTask(id) ? "deleted" : "no such task")));
 
-  s.registerTool("list_projects", { description: "List active projects with open task counts.", inputSchema: {} }, () =>
-    text(db.prepare("SELECT p.id,p.name,p.color,(SELECT count(*) FROM tasks t WHERE t.project_id=p.id AND t.done_at IS NULL) AS open_tasks FROM projects p WHERE archived=0 ORDER BY name").all()));
+  tool("list_projects", { description: "List active projects with open task counts.", inputSchema: {} }, safe(() =>
+    db.prepare("SELECT p.id,p.name,p.color,(SELECT count(*) FROM tasks t WHERE t.project_id=p.id AND t.done_at IS NULL) AS open_tasks FROM projects p WHERE archived=0 ORDER BY name").all()));
+  tool("add_project", { description: "Create a project.", inputSchema: { name: z.string().min(1), color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional() } },
+    safe(({ name, color }: any) => ({ id: db.prepare("INSERT INTO projects (name, color) VALUES (?,?)").run(name, color ?? "#6366f1").lastInsertRowid, name })));
+  tool("list_tags", { description: "List tags with open task counts.", inputSchema: {} }, safe(() => listTags()));
 
-  s.registerTool("add_project", { description: "Create a project.", inputSchema: { name: z.string().min(1), color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional() } },
-    ({ name, color }) => text({ id: db.prepare("INSERT INTO projects (name, color) VALUES (?,?)").run(name, color ?? "#6366f1").lastInsertRowid, name }));
+  tool("get_weather", { description: "Current weather and 5-day forecast for the configured location.", inputSchema: {} },
+    safe(async () => (await getWeather()) ?? "No location configured. Set one in LifeOS settings."));
+  tool("get_news", { description: "Latest headlines from the configured RSS/Atom feeds.", inputSchema: { limit: z.number().int().min(1).max(50).optional() } },
+    safe(async ({ limit }: any) => { const n = await getNews(limit ?? 10); return { items: n.items.map((i) => ({ title: i.title, source: i.source, link: i.link, published: i.date ? new Date(i.date).toISOString() : null })), errors: n.errors }; }));
 
+  tool("spotify_now_playing", { description: "What's playing on Spotify right now.", inputSchema: {} }, safe(() => nowPlaying()));
+  tool("spotify_control", { description: "Control Spotify playback (needs Premium and an active device).", inputSchema: { action: z.enum(["play", "pause", "toggle", "next", "previous"]), volume: z.number().int().min(0).max(100).optional() } },
+    safe(({ action, volume }: any) => control(action, volume)));
+
+  tool("log_focus", { description: "Record a completed focus session (e.g. a pomodoro done away from the app).", inputSchema: { minutes: z.number().min(1).max(360), label: z.string().optional(), task_id: z.number().int().optional() } },
+    safe(({ minutes, label, task_id }: any) => ({ id: logFocus({ seconds: minutes * 60, label, task_id }) })));
+  tool("focus_stats", { description: "Focus minutes per day for the last N days.", inputSchema: { days: z.number().int().min(1).max(60).optional() } }, safe(({ days }: any) => focusStats(days ?? 7)));
+
+  tool("daily_brief", { description: "One-call morning briefing: overdue/due-today/in-progress tasks, inbox count, weather, top headlines, focus so far.", inputSchema: {} },
+    safe(async () => {
+      const t = today();
+      const [weather, news] = await Promise.allSettled([getWeather(), getNews(5)]);
+      const due = queryTasks({ dueBy: t });
+      return {
+        today: t,
+        overdue: due.filter((x) => x.due! < t).map(brief),
+        due_today: due.filter((x) => x.due === t).map(brief),
+        in_progress: queryTasks({ status: "doing" }).map(brief),
+        inbox_count: queryTasks({ inbox: true }).length,
+        done_today: doneToday(), focus_today: focusToday(),
+        weather: weather.status === "fulfilled" ? weather.value : "unavailable",
+        headlines: news.status === "fulfilled" ? news.value.items.map((i) => `${i.title} (${i.source})`) : "unavailable",
+      };
+    }));
   return s;
 }
 
 const token = process.env.LIFEOS_MCP_TOKEN;
-const eq = (a: string, b: string) => a.length === b.length && crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
+const eq = (a: string, b: string) => { const A = Buffer.from(a), B = Buffer.from(b); return A.length === B.length && crypto.timingSafeEqual(A, B); };
+const host = process.env.LIFEOS_MCP_HOST ?? "127.0.0.1", port = Number(process.env.LIFEOS_MCP_PORT ?? 3737);
 
 http.createServer(async (req, res) => {
   if (req.url !== "/mcp") { res.writeHead(404).end(); return; }
   if (token && !eq(req.headers.authorization ?? "", `Bearer ${token}`)) { res.writeHead(401).end("unauthorized"); return; }
   if (req.method !== "POST") { res.writeHead(405, { Allow: "POST" }).end(); return; }
-  const chunks: Buffer[] = [];
-  for await (const c of req) chunks.push(c as Buffer);
+  const chunks: Buffer[] = []; let size = 0;
+  for await (const c of req) { size += (c as Buffer).length; if (size > 1_000_000) { res.writeHead(413).end(); return; } chunks.push(c as Buffer); }
   let body: unknown;
   try { body = JSON.parse(Buffer.concat(chunks).toString()); } catch { res.writeHead(400).end("bad json"); return; }
   const server = buildServer();
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
-  res.on("close", () => { transport.close(); server.close(); });
+  res.on("close", () => { void transport.close(); void server.close(); });
   await server.connect(transport);
   await transport.handleRequest(req, res, body);
-}).listen(Number(process.env.LIFEOS_MCP_PORT ?? 3737), process.env.LIFEOS_MCP_HOST ?? "127.0.0.1", () =>
-  console.log(`lifeos mcp on ${process.env.LIFEOS_MCP_HOST ?? "127.0.0.1"}:${process.env.LIFEOS_MCP_PORT ?? 3737}/mcp${token ? " (token required)" : " (NO TOKEN)"}`));
+}).listen(port, host, () => console.log(`lifeos mcp on ${host}:${port}/mcp${token ? " (token required)" : " (NO TOKEN — set LIFEOS_MCP_TOKEN)"}`));
