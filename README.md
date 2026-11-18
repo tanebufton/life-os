@@ -12,6 +12,10 @@ Personal, single-user life dashboard. Next.js 15 + SQLite (better-sqlite3), plus
 - **Weather** (Open-Meteo, no key), **News** (RSS/Atom feeds you manage), **Spotify** controller (needs your own Spotify app + Premium).
 - **MCP server** exposing all of the above (see below).
 
+## Design
+Light/dark theme (follows your system, toggle in the sidebar). Inter, Lucide icons, Sonner toasts. Patterns borrowed from Notion (page layout, task properties), Todoist (task rows, undo toast), Jira (board, issue keys, lozenges), Stripe (settings, cards) and WhatsApp/Messenger (chat-list news, mobile tab bar + floating action button).
+Press `⌘K` for the command palette, `C` to capture a task, `g` then `t/l/b/f/n/s` to jump between pages.
+
 ## Run
 ```bash
 npm install

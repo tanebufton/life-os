@@ -1,7 +1,8 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { logFocus } from "@/lib/actions";
-import { btn, btn2, card, input } from "./ui";
+import { Icon } from "./Icon";
+import { Panel } from "./Panel";
 
 // ---- shared helpers ----
 let audio: AudioContext | null = null;
@@ -69,44 +70,52 @@ export function Pomodoro({ tasks }: { tasks: { id: number; title: string }[] }) 
   const pause = () => setP({ ...p, endsAt: null, left: Math.max(1, Math.ceil((p.endsAt! - Date.now()) / 1000)) });
   const reset = () => setP({ ...p, endsAt: null, left: p.total });
   const pick = (m: Mode) => setP({ ...p, mode: m, total: mins[m] * 60, left: mins[m] * 60, endsAt: null });
-  const pct = p.total ? ((p.total - p.left) / p.total) * 100 : 0;
+  const frac = p.total ? (p.total - p.left) / p.total : 0;
+  const R = 116, C = 2 * Math.PI * R;
+  const round = (p.cycles % 4) + 1;
 
   return (
-    <div className={`${card} text-center`}>
-      <div className="mb-3 flex justify-center gap-1">
-        {(Object.keys(LABEL) as Mode[]).map((m) => (
-          <button key={m} onClick={() => pick(m)} className={`rounded-full px-3 py-1 text-sm ${p.mode === m ? "bg-indigo-600 text-white" : "text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800"}`}>{LABEL[m]}</button>
-        ))}
-      </div>
-      <div className="relative mx-auto my-2 grid h-52 w-52 place-items-center rounded-full"
-        style={{ background: `conic-gradient(rgb(99 102 241) ${pct}%, rgba(128,128,128,.2) 0)` }}>
-        <div className="grid h-44 w-44 place-items-center rounded-full bg-white dark:bg-neutral-900">
-          <div><div className="text-5xl font-semibold tabular-nums">{mmss(p.left)}</div><div className="text-xs text-neutral-500">{ready ? `round ${(p.cycles % 4) + 1} of 4` : " "}</div></div>
-        </div>
-      </div>
-      {p.mode === "focus" && (
-        <select value={p.taskId ?? ""} onChange={(e) => setP({ ...p, taskId: Number(e.target.value) || null })} className={`${input} mt-2 w-full max-w-xs`} aria-label="Task to focus on">
-          <option value="">No specific task</option>
-          {tasks.map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}
-        </select>
-      )}
-      <div className="mt-4 flex justify-center gap-2">
-        {running ? <button className={btn} onClick={pause}>Pause</button> : <button className={btn} onClick={start}>{p.left < p.total ? "Resume" : "Start"}</button>}
-        <button className={btn2} onClick={reset}>Reset</button>
-        <button className={btn2} onClick={() => finish({ ...p, total: p.total - p.left || p.total })} title="Finish early and log elapsed time" disabled={p.left === p.total}>Done</button>
-      </div>
-      <details className="mt-4 text-left text-sm text-neutral-500">
-        <summary className="cursor-pointer text-center">Durations</summary>
-        <div className="mt-2 flex justify-center gap-3">
+    <Panel title="Pomodoro" i={0} right={<span>{p.cycles} completed</span>}>
+      <div className="flex flex-col items-center px-4 pb-7 pt-3">
+        <div className="mb-6 inline-flex rounded-full bg-raise p-1">
           {(Object.keys(LABEL) as Mode[]).map((m) => (
-            <label key={m} className="flex flex-col items-center gap-1">{LABEL[m]}
-              <input type="number" min={1} max={180} value={mins[m]} className={`${input} w-20 text-center`}
-                onChange={(e) => { const v = Math.max(1, Math.min(180, Number(e.target.value) || 1)); const n = { ...mins, [m]: v }; setMins(n); save("lifeos.pomo.mins", n); if (!running && p.mode === m) setP({ ...p, total: v * 60, left: v * 60 }); }} />
-            </label>
+            <button key={m} onClick={() => pick(m)} className={`rounded-full px-4 py-1.5 text-[13px] font-medium transition ${p.mode === m ? "bg-panel shadow-sm" : "text-mute hover:text-fg"}`}>{LABEL[m]}</button>
           ))}
         </div>
-      </details>
-    </div>
+        <div className="relative grid place-items-center">
+          <svg width="268" height="268" viewBox="0 0 268 268" className="-rotate-90">
+            <circle cx="134" cy="134" r={R} fill="none" stroke="rgb(var(--fg) / .08)" strokeWidth="8" />
+            <circle cx="134" cy="134" r={R} fill="none" stroke="rgb(var(--accent))" strokeWidth="8" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={C * (1 - frac)} style={{ transition: running ? "stroke-dashoffset .5s linear" : "none" }} />
+          </svg>
+          <div className="absolute text-center">
+            <div className="text-[60px] font-light leading-none tabular-nums tracking-tight">{mmss(p.left)}</div>
+            <div className="mt-2 text-[13px] text-mute">{ready ? (running ? LABEL[p.mode] : p.left < p.total ? "Paused" : "Ready to start") : " "} · Round {round} of 4</div>
+          </div>
+        </div>
+        {p.mode === "focus" && (
+          <select value={p.taskId ?? ""} onChange={(e) => setP({ ...p, taskId: Number(e.target.value) || null })} className="field mt-6 max-w-xs" aria-label="Task to focus on">
+            <option value="">No specific task</option>
+            {tasks.map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}
+          </select>
+        )}
+        <div className="mt-6 flex items-center gap-2.5">
+          {running ? <button className="btn-primary !h-11 min-w-32 !rounded-full !text-[15px]" onClick={pause}><Icon name="pause" size={14} />Pause</button> : <button className="btn-primary !h-11 min-w-32 !rounded-full !text-[15px]" onClick={start}><Icon name="play" size={14} />{p.left < p.total ? "Resume" : "Start"}</button>}
+          <button className="btn !h-11 !rounded-full !px-5" onClick={reset}>Reset</button>
+          <button className="btn !h-11 !rounded-full !px-5" onClick={() => finish({ ...p, total: p.total - p.left || p.total })} title="Finish early and log elapsed time" disabled={p.left === p.total}>Finish</button>
+        </div>
+        <details className="mt-6 w-full max-w-xs text-sm text-mute">
+          <summary className="cursor-pointer text-center text-[13px] hover:text-fg">Durations</summary>
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            {(Object.keys(LABEL) as Mode[]).map((m) => (
+              <label key={m} className="flex flex-col gap-1 text-center text-xs">{LABEL[m]}
+                <input type="number" min={1} max={180} value={mins[m]} className="field text-center"
+                  onChange={(e) => { const v = Math.max(1, Math.min(180, Number(e.target.value) || 1)); const n = { ...mins, [m]: v }; setMins(n); save("lifeos.pomo.mins", n); if (!running && p.mode === m) setP({ ...p, total: v * 60, left: v * 60 }); }} />
+              </label>
+            ))}
+          </div>
+        </details>
+      </div>
+    </Panel>
   );
 }
 
@@ -142,31 +151,34 @@ export function Timers() {
   };
 
   return (
-    <div className={card}>
-      <h2 className="mb-3 font-semibold">Timers</h2>
-      <div className="mb-3 flex flex-wrap gap-1.5">
-        {[1, 3, 5, 10, 15, 30].map((m) => <button key={m} onClick={() => add(m, "")} className={`${btn2} !px-2.5 !py-1 text-sm`}>{m}m</button>)}
+    <Panel title="Timers" count={timers.length || undefined} i={1}>
+      <div className="space-y-3 px-4 pb-4 pt-1">
+        <div className="flex flex-wrap gap-1.5">
+          {[1, 3, 5, 10, 15, 30].map((m) => <button key={m} onClick={() => add(m, "")} className="btn !h-7 !rounded-full !px-3 text-xs">{m} min</button>)}
+        </div>
+        <form onSubmit={(e) => { e.preventDefault(); add(Number(mins)); }} className="flex gap-2">
+          <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Label (tea, laundry…)" className="field min-w-0 flex-1" />
+          <input value={mins} onChange={(e) => setMins(e.target.value)} inputMode="decimal" aria-label="Minutes" className="field w-16 text-center" />
+          <button className="btn-primary">Start</button>
+        </form>
+        <ul className="space-y-1.5">
+          {timers.map((t) => {
+            const left = Math.max(0, Math.ceil((t.endsAt - now) / 1000));
+            const pct = t.done ? 100 : ((t.total - left) / t.total) * 100;
+            return (
+              <li key={t.id} className={`relative overflow-hidden rounded-lg border px-3 py-2.5 ${t.done ? "border-warn/50 bg-warn/10" : ""}`}>
+                <div className="absolute inset-y-0 left-0 bg-accent/10" style={{ width: `${pct}%` }} />
+                <div className="relative flex items-center justify-between">
+                  <span className="truncate text-sm font-medium">{t.label || mmss(t.total)}</span>
+                  <span className="flex items-center gap-3"><span className={`text-xl font-light tabular-nums ${t.done ? "font-medium text-warn" : ""}`}>{t.done ? "Time's up" : mmss(left)}</span>
+                    <button onClick={() => setTimers((ts) => ts.filter((x) => x.id !== t.id))} aria-label="Remove timer" className="text-dim hover:text-danger"><Icon name="x" size={15} /></button></span>
+                </div>
+              </li>
+            );
+          })}
+          {ready && !timers.length && <li className="text-[13px] text-dim">No timers running. Tap a preset to start one.</li>}
+        </ul>
       </div>
-      <form onSubmit={(e) => { e.preventDefault(); add(Number(mins)); }} className="mb-3 flex gap-2">
-        <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Label (tea, laundry…)" className={`${input} min-w-0 flex-1`} />
-        <input value={mins} onChange={(e) => setMins(e.target.value)} inputMode="decimal" aria-label="Minutes" className={`${input} w-16 text-center`} />
-        <button className={btn}>Start</button>
-      </form>
-      <ul className="space-y-2">
-        {timers.map((t) => {
-          const left = Math.max(0, Math.ceil((t.endsAt - now) / 1000));
-          return (
-            <li key={t.id} className={`flex items-center justify-between rounded-lg px-3 py-2 ${t.done ? "bg-amber-100 dark:bg-amber-950" : "bg-neutral-100 dark:bg-neutral-800"}`}>
-              <span className="truncate">{t.label || mmss(t.total)}</span>
-              <span className="flex items-center gap-3">
-                <span className="text-lg font-semibold tabular-nums">{t.done ? "Done!" : mmss(left)}</span>
-                <button onClick={() => setTimers((ts) => ts.filter((x) => x.id !== t.id))} aria-label="Remove timer" className="text-neutral-500 hover:text-red-500">×</button>
-              </span>
-            </li>
-          );
-        })}
-        {ready && !timers.length && <li className="text-sm text-neutral-500">No timers running.</li>}
-      </ul>
-    </div>
+    </Panel>
   );
 }

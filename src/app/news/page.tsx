@@ -1,27 +1,36 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import { card } from "@/components/ui";
+import { Avatar } from "@/components/Pill";
+import { Panel } from "@/components/Panel";
+import { PageHead } from "@/components/tasks";
+import { ago } from "@/components/widgets";
 import { getNews } from "@/lib/news";
 
 export const dynamic = "force-dynamic";
-const ago = (t: number) => { if (!t) return ""; const m = Math.round((Date.now() - t) / 60000); return m < 60 ? `${Math.max(m, 1)}m ago` : m < 1440 ? `${Math.round(m / 60)}h ago` : `${Math.round(m / 1440)}d ago`; };
-
-async function Items() {
-  const { items, errors } = await getNews(60);
+async function Items({ src }: { src?: string }) {
+  const { items, errors } = await getNews(100);
+  const sources = [...new Set(items.map((i) => i.source))];
+  const shown = src ? items.filter((i) => i.source === src) : items;
+  const chip = (on: boolean) => `inline-flex h-7 items-center rounded-full border px-3 text-[13px] font-medium transition ${on ? "border-accent/40 bg-accent/10 text-accent" : "text-mute hover:bg-raise"}`;
   return (
     <>
-      <div className={card}>
-        <ul className="divide-y divide-neutral-200 dark:divide-neutral-800">
-          {items.map((i) => (
-            <li key={i.link} className="py-2.5"><a href={i.link} target="_blank" rel="noreferrer noopener" className="hover:underline">{i.title}</a>
-              <div className="text-xs text-neutral-500">{i.source} · {ago(i.date)}</div></li>))}
-          {!items.length && <li className="py-2 text-sm text-neutral-500">No stories. Add feeds in <Link className="text-indigo-600 underline" href="/settings">settings</Link>.</li>}
+      <div className="mb-4 flex flex-wrap gap-1.5"><Link href="/news" className={chip(!src)}>All</Link>{sources.map((s) => <Link key={s} href={`/news?src=${encodeURIComponent(s)}`} className={chip(src === s)}>{s}</Link>)}</div>
+      <Panel i={1}>
+        <ul className="divide-y">
+          {shown.map((i) => (
+            <li key={i.link}><a href={i.link} target="_blank" rel="noreferrer noopener" className="flex items-center gap-3.5 px-4 py-3 transition-colors hover:bg-raise/70">
+              <Avatar name={i.source} size={44} />
+              <div className="min-w-0 flex-1"><div className="line-clamp-2 text-[15px] font-medium leading-snug">{i.title}</div><div className="mt-0.5 text-[13px] text-mute">{i.source}</div></div>
+              <span className="self-start pt-1 text-xs text-dim">{ago(i.date)}</span></a></li>))}
+          {!shown.length && <li className="px-4 py-12 text-center text-sm text-mute">No stories. Add feeds in <Link className="font-medium text-accent hover:underline" href="/settings">settings</Link>.</li>}
         </ul>
-      </div>
-      {errors.length > 0 && <p className="mt-3 text-sm text-red-500">Some feeds failed: {errors.join(" · ")}</p>}
+        {errors.length > 0 && <p className="border-t px-4 py-2 text-xs text-danger">{errors.join(" · ")}</p>}
+      </Panel>
     </>
   );
 }
-export default function News() {
-  return (<><h1 className="mb-4 text-2xl font-semibold">News</h1><Suspense fallback={<div className={`${card} h-64 animate-pulse`} />}><Items /></Suspense></>);
+export default async function News({ searchParams }: { searchParams: Promise<{ src?: string }> }) {
+  const { src } = await searchParams;
+  return (<div className="mx-auto max-w-3xl"><PageHead title="News" sub="Headlines from your feeds, refreshed every 10 minutes" />
+    <Suspense fallback={<Panel className="h-72 animate-pulse">{null}</Panel>}><Items src={src} /></Suspense></div>);
 }

@@ -1,38 +1,34 @@
 import { Suspense } from "react";
-import { QuickAdd, QuickAddHint, TaskList } from "@/components/tasks";
-import { NewsCard, StatsCard, WeatherCard } from "@/components/widgets";
-import { SpotifyWidget } from "@/components/spotify";
-import { card } from "@/components/ui";
-import { queryTasks } from "@/lib/tasks";
-import { addDays, today, tz } from "@/lib/time";
+import { AddTaskRow } from "@/components/addrow";
+import { Panel } from "@/components/Panel";
+import { SpotifyPanel } from "@/components/spotify";
+import { PageHead, TaskGroups, bucket } from "@/components/tasks";
+import { NewsPanel, OverviewCard, WeatherPanel } from "@/components/widgets";
+import { focusToday } from "@/lib/focus";
+import { doneToday, queryTasks } from "@/lib/tasks";
+import { today, tz } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
-const Skeleton = ({ h = "h-40" }: { h?: string }) => <div className={`${card} ${h} animate-pulse`} />;
+const Skeleton = ({ h = "h-44", i = 0 }: { h?: string; i?: number }) => <Panel i={i} className={`${h} animate-pulse`}>{null}</Panel>;
 
 export default function Today() {
   const t = today();
-  const due = queryTasks({ dueBy: t });
-  const doing = queryTasks({ status: "doing" }).filter((x) => !due.some((d) => d.id === x.id));
-  const inbox = queryTasks({ inbox: true });
-  const soon = queryTasks().filter((x) => x.due && x.due > t && x.due <= addDays(t, 7));
-  const heading = new Intl.DateTimeFormat("en-NZ", { timeZone: tz(), weekday: "long", day: "numeric", month: "long" }).format(new Date());
+  const open = queryTasks();
+  const overdue = open.filter((x) => x.due && x.due < t).length;
+  const toDo = open.filter((x) => x.due && x.due <= t).length;
+  const groups = bucket(open).filter((g) => g.label !== "Later").map((g) => (g.label === "No date" ? { ...g, label: "Inbox", tasks: g.tasks.slice(0, 6) } : g));
+  const date = new Intl.DateTimeFormat("en-NZ", { timeZone: tz(), weekday: "long", day: "numeric", month: "long" }).format(new Date());
   return (
     <>
-      <h1 className="mb-4 text-2xl font-semibold">{heading}</h1>
-      <QuickAdd autoFocus /><QuickAddHint />
-      <div className="grid gap-4 lg:grid-cols-5">
-        <div className="space-y-4 lg:col-span-3">
-          <div className={card}><h2 className="font-semibold">Due &amp; overdue</h2><TaskList tasks={due} empty="Nothing due. 🎉" /></div>
-          {doing.length > 0 && <div className={card}><h2 className="font-semibold">In progress</h2><TaskList tasks={doing} /></div>}
-          {soon.length > 0 && <div className={card}><h2 className="font-semibold">Next 7 days</h2><TaskList tasks={soon} /></div>}
-          <div className={card}><h2 className="font-semibold">Inbox</h2><TaskList tasks={inbox} empty="Inbox zero." /></div>
-          <Suspense fallback={<Skeleton h="h-64" />}><NewsCard /></Suspense>
-        </div>
-        <div className="space-y-4 lg:col-span-2">
-          <Suspense fallback={<Skeleton />}><WeatherCard /></Suspense>
-          <StatsCard />
-          <SpotifyWidget />
-        </div>
+      <PageHead title="Today" sub={<>{date} · {toDo ? `${toDo} ${toDo === 1 ? "task" : "tasks"} to do` : "nothing due"}</>} />
+      <div className="grid items-start gap-x-12 gap-y-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div><TaskGroups groups={groups} empty={<>You&apos;re all caught up. Enjoy the day.</>} /><AddTaskRow /></div>
+        <aside className="space-y-4">
+          <OverviewCard i={1} done={doneToday()} focus={focusToday().minutes} overdue={overdue} />
+          <Suspense fallback={<Skeleton i={2} />}><WeatherPanel i={2} /></Suspense>
+          <SpotifyPanel i={3} />
+          <Suspense fallback={<Skeleton h="h-64" i={4} />}><NewsPanel i={4} limit={5} /></Suspense>
+        </aside>
       </div>
     </>
   );

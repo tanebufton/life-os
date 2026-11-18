@@ -1,2 +1,43 @@
-@tailwind base;@tailwind components;@tailwind utilities;
-body{@apply bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100;}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --bg: 255 255 255; --side: 247 247 245; --panel: 255 255 255; --raise: 241 241 239; --line: 55 53 47;
+  --fg: 55 53 47; --mute: 120 119 116; --dim: 155 154 151;
+  --accent: 24 119 242; --ink: 255 255 255; --ok: 31 132 90; --warn: 203 117 20; --danger: 201 55 44;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: 25 25 25; --side: 32 32 32; --panel: 37 37 37; --raise: 50 50 50; --line: 255 255 255;
+  --fg: 236 236 234; --mute: 157 157 154; --dim: 112 112 109;
+  --accent: 82 156 255; --ink: 255 255 255; --ok: 77 171 154; --warn: 255 163 68; --danger: 255 120 110;
+}
+
+@layer base {
+  * { border-color: rgb(var(--line) / 0.1); }
+  html, body { height: 100%; }
+  body { @apply bg-bg font-sans text-[14px] text-fg antialiased; font-feature-settings: "cv11", "ss03"; }
+  ::selection { background: rgb(var(--accent) / 0.25); }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: rgb(var(--fg) / 0.15); border-radius: 8px; border: 2px solid transparent; background-clip: content-box; }
+  :focus-visible { outline: 2px solid rgb(var(--accent) / 0.6); outline-offset: 1px; }
+  button { cursor: pointer; }
+}
+
+@layer components {
+  .card { @apply rounded-xl border bg-panel; box-shadow: 0 1px 2px rgb(16 24 40 / 0.05); }
+  .btn { @apply inline-flex h-8 items-center justify-center gap-1.5 whitespace-nowrap rounded-md border bg-panel px-3 text-[13px] font-medium transition hover:bg-raise active:scale-[0.98] disabled:opacity-40; }
+  .btn-primary { @apply inline-flex h-8 items-center justify-center gap-1.5 whitespace-nowrap rounded-md bg-accent px-3.5 text-[13px] font-semibold text-ink transition hover:brightness-95 active:scale-[0.98] disabled:opacity-40; }
+  .field { @apply w-full rounded-md border bg-panel px-3 py-1.5 text-sm outline-none transition placeholder:text-dim hover:border-fg/25 focus:border-accent focus:ring-2 focus:ring-accent/25; }
+  .ghost { @apply w-full rounded-md border border-transparent bg-transparent px-2 py-1 text-sm outline-none transition placeholder:text-dim hover:bg-raise focus:bg-raise focus:ring-2 focus:ring-accent/25; }
+  .pill { display: inline-flex; align-items: center; border-radius: 4px; padding: 0 6px; font-size: 12px; line-height: 20px; white-space: nowrap; background: rgb(var(--c) / 0.15); color: rgb(var(--c)); }
+  :root[data-theme="dark"] .pill { color: color-mix(in srgb, rgb(var(--c)) 65%, white); }
+  .lozenge { @apply inline-flex items-center rounded-[3px] px-1.5 text-[11px] font-bold uppercase leading-4 tracking-wide; }
+  .rise { animation: rise 0.35s cubic-bezier(0.2, 0.7, 0.2, 1) both; animation-delay: calc(var(--i, 0) * 30ms); }
+}
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+.pulse-dot { animation: pulse-dot 1.6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .rise, .pulse-dot { animation: none; } }

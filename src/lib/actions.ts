@@ -23,10 +23,14 @@ export async function quickAdd(fd: FormData) {
   createTask(t);
   refresh();
 }
-export async function toggleTask(id: number) {
+export async function toggleTask(id: number): Promise<{ title: string; done: boolean; next_due?: string } | null> {
   const t = getTask(id);
-  if (t) (t.done_at ? reopenTask(id) : completeTask(id));
+  if (!t) return null;
+  let out: { title: string; done: boolean; next_due?: string };
+  if (t.done_at) { reopenTask(id); out = { title: t.title, done: false }; }
+  else { const r = completeTask(id); out = { title: t.title, done: true, next_due: r?.next_due }; }
   refresh();
+  return out;
 }
 export async function moveTask(id: number, status: Status) {
   setStatus(id, Status.parse(status));

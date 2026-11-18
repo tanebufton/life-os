@@ -1,25 +1,24 @@
 import { cached } from "./cache";
 import { getSetting } from "./settings";
 
-const WMO: Record<number, [string, string]> = {
-  0: ["Clear", "☀️"], 1: ["Mostly clear", "🌤️"], 2: ["Partly cloudy", "⛅"], 3: ["Overcast", "☁️"],
-  45: ["Fog", "🌫️"], 48: ["Rime fog", "🌫️"], 51: ["Light drizzle", "🌦️"], 53: ["Drizzle", "🌦️"], 55: ["Heavy drizzle", "🌧️"],
-  56: ["Freezing drizzle", "🌧️"], 57: ["Freezing drizzle", "🌧️"], 61: ["Light rain", "🌦️"], 63: ["Rain", "🌧️"], 65: ["Heavy rain", "🌧️"],
-  66: ["Freezing rain", "🌧️"], 67: ["Freezing rain", "🌧️"], 71: ["Light snow", "🌨️"], 73: ["Snow", "🌨️"], 75: ["Heavy snow", "❄️"],
-  77: ["Snow grains", "🌨️"], 80: ["Light showers", "🌦️"], 81: ["Showers", "🌧️"], 82: ["Heavy showers", "⛈️"],
-  85: ["Snow showers", "🌨️"], 86: ["Heavy snow showers", "❄️"], 95: ["Thunderstorm", "⛈️"], 96: ["Thunderstorm, hail", "⛈️"], 99: ["Thunderstorm, hail", "⛈️"],
-};
-export const wmo = (c: number) => WMO[c] ?? ["Unknown", "🌡️"];
+const KIND = (c: number) => c === 0 ? "sun" : c <= 2 ? "partly" : c === 3 ? "cloud" : c <= 48 ? "fog" : c <= 67 || (c >= 80 && c <= 82) ? "rain" : c <= 77 || c === 85 || c === 86 ? "snow" : "storm";
+const NAME: Record<number, string> = { 0: "Clear", 1: "Mostly clear", 2: "Partly cloudy", 3: "Overcast", 45: "Fog", 48: "Rime fog", 51: "Light drizzle", 53: "Drizzle", 55: "Heavy drizzle", 56: "Freezing drizzle", 57: "Freezing drizzle", 61: "Light rain", 63: "Rain", 65: "Heavy rain", 66: "Freezing rain", 67: "Freezing rain", 71: "Light snow", 73: "Snow", 75: "Heavy snow", 77: "Snow grains", 80: "Light showers", 81: "Showers", 82: "Heavy showers", 85: "Snow showers", 86: "Heavy snow showers", 95: "Thunderstorm", 96: "Thunderstorm, hail", 99: "Thunderstorm, hail" };
+/** [description, icon kind] — icon kind maps to an SVG in the UI. */
+export const wmo = (c: number): [string, string] => [NAME[c] ?? "Unknown", KIND(c)];
 
 export type Weather = {
   place: string; temp: number; feels: number; wind: number; description: string; icon: string;
   daily: { date: string; hi: number; lo: number; rain: number; description: string; icon: string }[];
 };
 
-async function getJson(url: string): Promise<any> {
-  const r = await fetch(url, { signal: AbortSignal.timeout(8000) });
-  if (!r.ok) throw new Error(`${new URL(url).hostname} returned ${r.status}`);
-  return r.json();
+async function getJson(url: string, attempts = 2): Promise<any> {
+  for (let i = 1; ; i++) {
+    try {
+      const r = await fetch(url, { signal: AbortSignal.timeout(8000) });
+      if (!r.ok) throw new Error(`${new URL(url).hostname} returned ${r.status}`);
+      return await r.json();
+    } catch (e) { if (i >= attempts) throw e; await new Promise((res) => setTimeout(res, 400)); }
+  }
 }
 
 export async function geocode(name: string) {

@@ -1,57 +1,82 @@
 import Link from "next/link";
-import { quickAdd, toggleTask } from "@/lib/actions";
+import type { ReactNode } from "react";
+import { diffDays, nice } from "@/lib/dates";
 import { describeRepeat, type TaskRow } from "@/lib/tasks";
-import { addDays, nice, today } from "@/lib/time";
-import { input, btn } from "./ui";
+import { today } from "@/lib/time";
+import { CheckButton } from "./check";
+import { Icon } from "./Icon";
+import { Pill } from "./Pill";
 
-export function QuickAdd({ projectId, autoFocus }: { projectId?: number; autoFocus?: boolean }) {
+export function PageHead({ title, sub, icon, right }: { title: string; sub?: ReactNode; icon?: ReactNode; right?: ReactNode }) {
   return (
-    <form action={quickAdd} className="mb-1 flex gap-2">
-      {projectId ? <input type="hidden" name="project_id" value={projectId} /> : null}
-      <input name="text" required autoFocus={autoFocus} autoComplete="off" enterKeyHint="done"
-        placeholder="Add a task…  e.g. Pay rent every month #bills !high tomorrow"
-        className={`${input} min-w-0 flex-1`} />
-      <button className={btn}>Add</button>
-    </form>
+    <div className="rise mb-6 flex flex-wrap items-end justify-between gap-3">
+      <div className="flex min-w-0 items-center gap-3">{icon}<div className="min-w-0"><h1 className="truncate text-[28px] font-bold leading-tight tracking-tight md:text-[32px]">{title}</h1>{sub && <p className="mt-0.5 text-[14px] text-mute">{sub}</p>}</div></div>
+      {right && <div className="flex flex-wrap items-center gap-2">{right}</div>}
+    </div>
   );
 }
-export const QuickAddHint = () => (
-  <p className="mb-5 text-xs text-neutral-500">
-    <code>#tag</code> <code>@project</code> <code>!high</code> <code>!low</code> <code>!doing</code> · <code>today</code> <code>tomorrow</code> <code>friday</code> <code>in 3 days</code> <code>2026-12-01</code> · <code>daily</code> <code>weekdays</code> <code>every 2 weeks</code>
-  </p>
-);
 
-function dueLabel(due: string, done: boolean) {
-  const t = today();
-  if (due === t) return <span className="text-amber-600 dark:text-amber-400">today</span>;
-  if (due === addDays(t, 1)) return <span>tomorrow</span>;
-  return <span className={!done && due < t ? "text-red-500" : ""}>{nice(due)}</span>;
+export function dueInfo(due: string, done: boolean): { text: string; cls: string } {
+  const d = diffDays(due, today());
+  const [wd, md] = nice(due).split(", ");
+  if (done) return { text: md, cls: "text-dim" };
+  if (d < 0) return { text: d === -1 ? "Yesterday" : md, cls: "text-danger" };
+  if (d === 0) return { text: "Today", cls: "text-ok" };
+  if (d === 1) return { text: "Tomorrow", cls: "text-warn" };
+  return { text: d < 7 ? wd : md, cls: "text-mute" };
 }
 
-export function TaskList({ tasks, empty = "Nothing here." }: { tasks: TaskRow[]; empty?: string }) {
-  if (!tasks.length) return <p className="py-2 text-sm text-neutral-500">{empty}</p>;
+export function TaskRow({ t }: { t: TaskRow }) {
+  const done = !!t.done_at;
+  const due = t.due ? dueInfo(t.due, done) : null;
+  const ring = t.priority > 0 ? "border-danger bg-danger/10 hover:bg-danger/20" : t.priority < 0 ? "border-accent/70 hover:bg-accent/10" : "border-fg/35 hover:bg-fg/5";
   return (
-    <ul className="divide-y divide-neutral-200 dark:divide-neutral-800">
-      {tasks.map((t) => (
-        <li key={t.id} className="flex items-start gap-3 py-2.5">
-          <form action={toggleTask.bind(null, t.id)} className="pt-0.5">
-            <button aria-label={t.done_at ? "Reopen" : "Complete"}
-              className={`h-6 w-6 rounded-full border-2 ${t.done_at ? "border-indigo-600 bg-indigo-600" : t.priority > 0 ? "border-red-400" : "border-neutral-400"}`} />
-          </form>
-          <div className="min-w-0 flex-1">
-            <Link href={`/tasks/${t.id}`} className={`block break-words ${t.done_at ? "text-neutral-400 line-through" : ""}`}>
-              {t.status === "doing" && <span className="mr-1.5 rounded bg-indigo-100 px-1.5 text-xs text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">doing</span>}
-              {t.title}
-            </Link>
-            <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-neutral-500">
-              {t.project_name && <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full" style={{ background: t.project_color ?? "#999" }} />{t.project_name}</span>}
-              {t.due && dueLabel(t.due, !!t.done_at)}
-              {t.repeat && <span title="Repeats">↻ {describeRepeat(t.repeat)}</span>}
-              {t.tags.map((g) => <Link key={g} href={`/tasks?tag=${encodeURIComponent(g)}`} className="text-indigo-600 hover:underline dark:text-indigo-400">#{g}</Link>)}
-            </div>
-          </div>
-        </li>
+    <li className="group flex items-start gap-3 border-b px-2 py-2.5 transition-colors last:border-b-0 hover:bg-raise/60">
+      <div className="flex pt-px"><CheckButton id={t.id} done={done} ring={ring} /></div>
+      <div className="min-w-0 flex-1">
+        <Link href={`/tasks/${t.id}`} className={`block truncate text-[14.5px] leading-[18px] ${done ? "text-dim line-through" : ""}`}>{t.title}</Link>
+        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+          {due && <span className={`inline-flex items-center gap-1 ${due.cls}`}><Icon name="calendar" size={12} />{due.text}</span>}
+          {t.repeat && <span className="inline-flex items-center gap-1 text-mute" title="Repeats"><Icon name="repeat" size={12} />{describeRepeat(t.repeat)}</span>}
+          {t.status === "doing" && !done && <span className="lozenge bg-accent/15 text-accent">In progress</span>}
+          {t.tags.map((g) => <Pill key={g} name={g} href={`/tasks?tag=${encodeURIComponent(g)}`} />)}
+        </div>
+      </div>
+      {t.project_name && <span className="mt-px hidden shrink-0 items-center gap-1.5 text-xs text-mute sm:inline-flex"><span className="h-2 w-2 rounded-[3px]" style={{ background: t.project_color ?? "#888" }} />{t.project_name}</span>}
+    </li>
+  );
+}
+
+export type Group = { label: string; tone?: "danger" | "warn" | "accent" | "ok"; tasks: TaskRow[] };
+const TONE = { danger: "text-danger", warn: "text-warn", accent: "text-accent", ok: "text-ok", none: "" };
+export function TaskGroups({ groups, empty }: { groups: Group[]; empty: ReactNode }) {
+  const shown = groups.filter((g) => g.tasks.length);
+  if (!shown.length) return (
+    <div className="flex flex-col items-center gap-2 py-14 text-center"><span className="grid h-14 w-14 place-items-center rounded-full bg-ok/10 text-ok"><Icon name="circleCheck" size={28} /></span><p className="max-w-xs text-[14px] text-mute">{empty}</p></div>
+  );
+  return (
+    <div>
+      {shown.map((g) => (
+        <section key={g.label} className="rise">
+          <h3 className="flex items-baseline gap-2 border-b px-2 pb-1.5 pt-5 text-[13px] font-semibold first:pt-0"><span className={TONE[g.tone ?? "none"]}>{g.label}</span><span className="font-normal text-dim">{g.tasks.length}</span></h3>
+          <ul>{g.tasks.map((t) => <TaskRow key={t.id} t={t} />)}</ul>
+        </section>
       ))}
-    </ul>
+    </div>
   );
+}
+
+/** Bucket open tasks by urgency. */
+export function bucket(tasks: TaskRow[]): Group[] {
+  const t = today();
+  const used = new Set<number>();
+  const take = (f: (x: TaskRow) => boolean) => tasks.filter((x) => !used.has(x.id) && f(x) && used.add(x.id));
+  return [
+    { label: "Overdue", tone: "danger", tasks: take((x) => !!x.due && x.due < t) },
+    { label: "Today", tone: "ok", tasks: take((x) => x.due === t) },
+    { label: "In progress", tone: "accent", tasks: take((x) => x.status === "doing") },
+    { label: "Next 7 days", tasks: take((x) => !!x.due && diffDays(x.due, t) <= 7) },
+    { label: "Later", tasks: take((x) => !!x.due) },
+    { label: "No date", tasks: take(() => true) },
+  ];
 }
