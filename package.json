@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start -H 127.0.0.1",
     "typecheck": "tsc --noEmit",
-    "mcp": "tsx mcp/server.ts"
+    "mcp": "tsx mcp/server.ts",
+    "seed": "tsx scripts/seed-demo.ts"
   },
   "keywords": [],
   "author": "",
