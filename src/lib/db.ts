@@ -99,10 +99,12 @@ function migrate(d: Database.Database) {
 const g = globalThis as unknown as { __db?: Database.Database };
 export const db = (g.__db ??= (() => {
   const d = new Database(file);
+  d.pragma("busy_timeout = 15000"); // web app, worker and MCP server (and parallel build workers) share this file
   d.pragma("journal_mode = WAL");
   d.pragma("foreign_keys = ON");
-  d.pragma("busy_timeout = 5000"); // web app + MCP server share this file
-  migrate(d);
+  // Exclusive lock for the whole migration: when several processes start at once on a new database (e.g. `next build`
+  // workers, or web + worker + mcp booting together) the others wait, then see the finished schema instead of racing on ALTER TABLE.
+  d.transaction(() => migrate(d)).immediate();
   return d;
 })());
 
