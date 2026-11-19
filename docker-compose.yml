@@ -1,0 +1,47 @@
+# docker compose up -d --build         (add --profile mcp to also run the MCP server)
+x-app: &app
+  image: ${LIFEOS_IMAGE:-life-os:local}
+  build: .
+  restart: unless-stopped
+  env_file: .env
+  environment:
+    LIFEOS_DB: /data/lifeos.db
+    TZ: ${TZ:-Pacific/Auckland}
+  volumes:
+    - lifeos-data:/data
+
+services:
+  web:
+    <<: *app
+    expose: ["3000"]
+
+  # Reminders, scheduled backups, calendar sync, subscription auto-logging, email polling.
+  worker:
+    <<: *app
+    command: ["node_modules/.bin/tsx", "scripts/worker.ts"]
+    healthcheck: { disable: true }
+    depends_on: { web: { condition: service_healthy } }
+
+  # Optional: for Claude and other MCP clients. Published on the host's loopback only; put Tailscale in front (tailscale serve).
+  mcp:
+    <<: *app
+    profiles: ["mcp"]
+    command: ["node_modules/.bin/tsx", "mcp/server.ts"]
+    environment:
+      LIFEOS_DB: /data/lifeos.db
+      LIFEOS_MCP_HOST: 0.0.0.0
+      LIFEOS_MCP_PORT: "3737"
+    ports: ["127.0.0.1:3737:3737"]
+    healthcheck: { disable: true }
+
+  # Outbound-only tunnel to Cloudflare, so no ports are opened. Public hostname -> http://web:3000 is set in the Cloudflare dashboard.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?set CLOUDFLARE_TUNNEL_TOKEN in .env}
+    depends_on: { web: { condition: service_healthy } }
+
+volumes:
+  lifeos-data:

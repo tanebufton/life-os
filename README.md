@@ -3,6 +3,9 @@
 A personal, single-user life dashboard: tasks, habits, journal, focus, news, weather and music in one place.
 Next.js 15 + SQLite (better-sqlite3). Self-hosted, with a REST API, an MCP server and a background worker.
 
+## Deploy
+Docker Compose + Cloudflare Tunnel + Access: see **[docs/DEPLOY.md](docs/DEPLOY.md)** (specs, setup, updates, recovery).
+
 ## Run
 ```bash
 npm install

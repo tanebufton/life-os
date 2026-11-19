@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "mcp": "tsx mcp/server.ts",
     "seed": "tsx scripts/seed-demo.ts",
-    "worker": "tsx scripts/worker.ts"
+    "worker": "tsx scripts/worker.ts",
+    "test": "node tests/run.mjs"
   },
   "keywords": [],
   "author": "",
