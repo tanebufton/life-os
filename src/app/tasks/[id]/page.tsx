@@ -37,7 +37,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
           <span>{t.status_name}</span>{t.done_at && <span className="lozenge bg-ok/15 text-ok">Done</span>}
           {t.source === "email" && <span className="inline-flex items-center gap-1"><Icon name="mail" size={12} />Imported from email</span>}
           {t.source === "share" && <span className="inline-flex items-center gap-1"><Icon name="share" size={12} />Shared to LifeOS</span>}
-          <span className="ml-auto"><FavouriteButton kind="task" id={t.id} on={isFavourite("task", t.id)} /></span>
+          <span className="ml-1"><FavouriteButton kind="task" id={t.id} on={isFavourite("task", t.id)} /></span>
         </div>
         {meta?.from && <p className="mb-2 text-xs text-mute">From {meta.from}{meta.subject ? <> · “{meta.subject}”</> : null}</p>}
         </>} task={{ id: t.id, title: t.title, notes: t.notes, status: t.status, priority: t.priority, project_id: t.project_id, due: t.due, due_time: t.due_time, estimate: t.estimate, repeat: t.repeat ? describeRepeat(t.repeat) : "", tags: t.tags.join(" ") }}>

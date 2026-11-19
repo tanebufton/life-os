@@ -150,7 +150,7 @@ export function Sidebar({ counts, projects, features, filters = [], favourites =
         <button onClick={openPalette} className={`${row} w-full text-mute hover:bg-raise`}><Icon name="search" size={16} />Search<span className="ml-auto text-xs text-dim">⌘K</span></button>
         <button onClick={focusCapture} className={`${row} w-full font-medium text-accent hover:bg-accent/10`}><span className="grid h-4 w-4 place-items-center rounded-full bg-accent text-ink"><Icon name="plus" size={12} /></span>New task</button>
       </div>
-      <div className="mt-2 min-h-0 flex-1 overflow-y-auto pb-2">
+      <div className="mt-2 min-h-0 flex-1 overflow-y-auto pb-6 [mask-image:linear-gradient(to_bottom,#000_calc(100%-24px),transparent)]">
         {sections}
         {editing && <div className="mx-3 mt-3 rounded-lg border border-dashed p-2.5 text-xs text-mute">Drag pages (or use the arrows) to reorder them. The eye hides a page from this list; it stays reachable from search (⌘K) and the LifeOS menu. <button className="mt-1.5 block font-medium text-accent hover:underline" onClick={() => setEditing(false)}>Done</button></div>}
         {filters.length > 0 && <div className="mt-3"><button onClick={() => toggle("filters")} aria-expanded={!collapsed.includes("filters")} className="mx-3 flex items-center gap-1 rounded px-1 py-0.5 text-xs font-semibold text-mute hover:bg-raise hover:text-fg">{chev(!collapsed.includes("filters"))}Saved filters</button>{!collapsed.includes("filters") && <div className="mt-1 space-y-px px-2">{filters.map((f) => <Link key={f.id} href={`/search?q=${encodeURIComponent(f.query)}`} className={`${row} text-fg/80 hover:bg-raise/70`}><Icon name="search" size={16} className="text-mute" /><span className="truncate">{f.name}</span></Link>)}</div>}</div>}
@@ -168,6 +168,8 @@ function crumbs(path: string, projects: NavProject[]): string[] {
   if (path.startsWith("/projects/")) return ["Projects", projects.find((p) => `/projects/${p.id}` === path)?.name ?? "Project"];
   if (path.startsWith("/tasks/")) return ["My tasks", "Task"];
   if (path === "/more") return ["More"];
+  if (path === "/search") return ["Search"];
+  if (path.startsWith("/notes/")) return ["Notes", "Page"];
   return [[...NAV, SETTINGS_PAGE].find((p) => isActive(path, p.href))?.label ?? "LifeOS"];
 }
 export function Topbar({ today, projects, money }: { today: string; projects: NavProject[]; money?: MoneyCtx }) {

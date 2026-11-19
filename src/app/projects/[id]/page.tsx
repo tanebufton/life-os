@@ -74,7 +74,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
       )}
       {tab === "list" && <div className="max-w-4xl"><TaskGroups groups={bucket(open)} empty="No open tasks here yet. New tasks you add from this page land in this project." /><AddTaskRow /></div>}
       {tab === "board" && <BoardView sp={sp} lockProject={id} base={href("board")} />}
-      {tab === "table" && <TaskTable rows={open} sort={sort} dir={dir} base={(o) => href("table", Object.entries(o).filter(([, v]) => v).map(([k, v]) => `&${k}=${encodeURIComponent(v as string)}`).join(""))} />}
+      {tab === "table" && <TaskTable hideProject rows={open} sort={sort} dir={dir} base={(o) => href("table", Object.entries(o).filter(([, v]) => v).map(([k, v]) => `&${k}=${encodeURIComponent(v as string)}`).join(""))} />}
       {tab === "notes" && (
         <div className="max-w-4xl"><Panel i={0} right={<form action={newNoteInProjectAction.bind(null, id)}><button className="font-medium text-accent hover:underline">New note</button></form>}>
           <ul>{noteTree(notes).map((n) => <li key={n.id} className="border-b last:border-b-0"><Link href={`/notes/${n.id}`} style={{ paddingLeft: 16 + n.depth * 22 }} className="flex items-center gap-2 py-2.5 pr-4 text-[14px] hover:bg-raise/50">{n.icon ? <span aria-hidden>{n.icon}</span> : <Icon name="notes" size={15} className="text-mute" />}<span className="truncate">{n.title || "Untitled"}</span><span className="ml-auto text-xs text-dim">{n.updated_at.slice(0, 10)}</span></Link></li>)}

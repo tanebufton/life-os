@@ -71,7 +71,7 @@ export function TaskGroups({ groups, empty }: { groups: Group[]; empty: ReactNod
     <div>
       {shown.map((g) => (
         <section key={g.label} className="rise">
-          <h3 className="flex items-baseline gap-2 border-b px-2 pb-1.5 pt-5 text-[13px] font-semibold first:pt-0"><span className={TONE[g.tone ?? "none"]}>{g.label}</span><span className="font-normal text-dim">{g.tasks.length}</span></h3>
+          {g.label ? <h3 className="flex items-baseline gap-2 border-b px-2 pb-1.5 pt-5 text-[13px] font-semibold first:pt-0"><span className={TONE[g.tone ?? "none"]}>{g.label}</span><span className="font-normal text-dim">{g.tasks.length}</span></h3> : null}
           <ReorderList>{g.tasks.map((t) => <TaskRow key={t.id} t={t} />)}</ReorderList>
         </section>
       ))}
