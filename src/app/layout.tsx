@@ -6,6 +6,7 @@ import { CaptureFab } from "@/components/capture";
 import { ListKeys, ShortcutsHelp } from "@/components/keys";
 import { Palette } from "@/components/palette";
 import { PwaRegister } from "@/components/pwa";
+import { TaskMenu } from "@/components/taskmenu";
 import { ReminderWatcher } from "@/components/reminderwatcher";
 import { browserNotifyConfig } from "@/lib/browsernotify";
 import { listFilters } from "@/lib/misc";
@@ -56,6 +57,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Palette projects={projects} features={features} />
         <Hotkeys features={features} />
         <ListKeys />
+        <TaskMenu today={t} projects={projects.map((p) => ({ id: p.id, name: p.name, color: p.color }))} />
         <ShortcutsHelp />
       </body>
     </html>
