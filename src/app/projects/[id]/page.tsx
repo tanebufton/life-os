@@ -8,9 +8,10 @@ import { ProjectAvatar } from "@/components/Pill";
 import { ProjectEditor } from "@/components/projectedit";
 import { TaskTable } from "@/components/tasktable";
 import { TaskGroups, bucket } from "@/components/tasks";
+import { MemoList } from "@/components/memolist";
 import { VoiceRecorder } from "@/components/voice";
 import { archiveProject } from "@/lib/actions";
-import { addGoalAction, convertMemoAction, deleteMemoAction } from "@/lib/actions3";
+import { addGoalAction } from "@/lib/actions3";
 import { newNoteInProjectAction } from "@/lib/actions5";
 import { db, Project } from "@/lib/db";
 import { isOn } from "@/lib/features";
@@ -81,14 +82,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
             {!notes.length && <li className="px-4 py-10 text-center text-sm text-mute">No notes in this project yet.</li>}</ul></Panel></div>
       )}
       {tab === "memos" && (
-        <div className="max-w-4xl space-y-4"><Panel title="Record" i={0}><VoiceRecorder projectId={id} /></Panel>
-          <Panel title="Memos" count={memos.length} i={1}><ul>{memos.map((m) => (
-            <li key={m.id} className="border-b px-4 py-3 last:border-b-0"><p className="whitespace-pre-wrap text-[14px] leading-relaxed">{m.text}</p>
-              <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-mute"><span>{m.created_at.slice(0, 16).replace("T", " ")}</span>
-                {m.task_id ? <Link href={`/tasks/${m.task_id}`} className="text-accent hover:underline">Task #{m.task_id}</Link> : <form action={convertMemoAction.bind(null, m.id, "task")}><button className="hover:text-fg">Make task</button></form>}
-                {m.note_id ? <Link href={`/notes/${m.note_id}`} className="text-accent hover:underline">Note</Link> : <form action={convertMemoAction.bind(null, m.id, "note")}><button className="hover:text-fg">Make note</button></form>}
-                <form action={deleteMemoAction.bind(null, m.id)} className="ml-auto"><button className="text-dim hover:text-danger">Delete</button></form></div></li>))}
-            {!memos.length && <li className="px-4 py-10 text-center text-sm text-mute">No memos in this project yet. Anything you record here is filed under it.</li>}</ul></Panel></div>
+        <div className="max-w-2xl space-y-8"><div className="rounded-2xl border bg-panel"><VoiceRecorder projectId={id} /></div><MemoList memos={memos} /></div>
       )}
       {tab === "goals" && (
         <div className="max-w-4xl space-y-3">{goals.map((g) => { const pr = goalProgress(g).pct; return <Panel key={g.id} i={0} bodyClass="p-4"><div className="flex items-baseline justify-between gap-3"><Link href="/goals" className="font-semibold hover:underline">{g.title}</Link><span className="tabular-nums text-mute">{pr}%</span></div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-raise"><div className="h-full rounded-full bg-accent" style={{ width: `${pr}%` }} /></div></Panel>; })}

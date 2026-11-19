@@ -1,7 +1,22 @@
 # LifeOS
 
-A personal, single-user life dashboard: tasks, habits, journal, focus, news, weather and music in one place.
+A personal, single-user workspace that mixes Trello, Notion and Confluence: tasks and boards, projects with their own views, wiki-style notes, voice memos, habits, journal and more. Everything is switchable.
 Next.js 15 + SQLite (better-sqlite3). Self-hosted, with a REST API, an MCP server and a background worker.
+
+## Screenshots
+
+| | |
+|---|---|
+| ![Today](docs/screenshots/today.png) **Today**: tasks, calendar, habits and journal in one place | ![Project board](docs/screenshots/board.png) **Project board**: each project has its own columns, filters and bulk edit |
+| ![Project overview](docs/screenshots/project.png) **Project workspace**: overview, list, board, table, notes, voice memos and goals per project | ![Notes](docs/screenshots/notes.png) **Notes**: pages and sub-pages, backlinks, history and links to tasks |
+| ![Voice memos](docs/screenshots/voice.png) **Voice memos**: hold to talk, let go and it becomes a task, note or memo | ![Week view](docs/screenshots/week.png) **Week view**: drag tasks between days |
+| ![Task](docs/screenshots/task.png) **Task**: markdown notes, subtasks, links, comments and history | ![Dark board](docs/screenshots/board-dark.png) **Dark mode** |
+
+On a phone it uses a bottom bar and one board column at a time:
+
+<img src="docs/screenshots/mobile-today.png" alt="Mobile" width="260">
+
+(The screenshots use made-up demo data.)
 
 ## Deploy
 Docker Compose + Cloudflare Tunnel + Access: see **[docs/DEPLOY.md](docs/DEPLOY.md)** (specs, setup, updates, recovery).
