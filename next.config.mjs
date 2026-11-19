@@ -5,7 +5,7 @@ try { if (base) allowed.push(new URL(base).host); } catch { /* ignore a malforme
 const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "no-referrer" }, // keeps secret URLs (calendar feed etc.) out of Referer headers
-  { key: "X-Frame-Options", value: "DENY" },
+  { key: "X-Frame-Options", value: "SAMEORIGIN" },
   { key: "Permissions-Policy", value: "camera=(), geolocation=(), microphone=(self)" }, // microphone only for voice memos
   { key: "Cross-Origin-Opener-Policy", value: "same-origin-allow-popups" }, // allows the re-login popup
 ];

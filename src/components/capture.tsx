@@ -81,7 +81,7 @@ export function CaptureFab({ today, money }: { today: string; money?: MoneyCtx }
   useEffect(() => { const f = () => setOpen(true); window.addEventListener("lifeos:capture", f); return () => window.removeEventListener("lifeos:capture", f); }, []);
   return (
     <>
-      <button onClick={() => setOpen(true)} aria-label="New task" className="fixed bottom-[76px] right-4 z-40 grid h-14 w-14 place-items-center rounded-full bg-accent text-ink shadow-[0_6px_18px_rgb(24_119_242/0.45)] transition active:scale-95 md:hidden"><Icon name="plus" size={26} /></button>
+      <button onClick={() => setOpen(true)} aria-label="New task" className="fab fixed bottom-[76px] right-4 z-40 grid h-14 w-14 place-items-center rounded-full bg-accent text-ink shadow-[0_6px_18px_rgb(24_119_242/0.45)] transition active:scale-95 md:hidden"><Icon name="plus" size={26} /></button>
       {open && (
         <div className="fixed inset-0 z-50 flex items-end bg-black/40 md:hidden" onMouseDown={(e) => e.target === e.currentTarget && setOpen(false)}>
           <div className="w-full rounded-t-2xl bg-bg p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl">

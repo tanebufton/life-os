@@ -79,6 +79,14 @@ export function TaskEditor({ task, projects, focus, columns, head, children }: {
   );
 }
 
+/** A subtask's title, editable right where it is: click, type, Enter to save, Esc to cancel. */
+function SubtaskTitle({ id, title, done, onSaved }: { id: number; title: string; done: boolean; onSaved: (t: string) => void }) {
+  const [v, setV] = useState(title), [, go] = useTransition();
+  useEffect(() => setV(title), [title]);
+  const commit = () => { const t = v.trim(); if (!t) { setV(title); return; } if (t === title || id < 0) return; onSaved(t); go(async () => { const r = await patchTask(id, { title: t }); if (!r.ok) { toast(r.error); setV(title); onSaved(title); } }); };
+  return <input value={v} readOnly={id < 0} aria-label="Subtask title" onChange={(e) => setV(e.target.value)} onBlur={commit} onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); e.currentTarget.blur(); } if (e.key === "Escape") { setV(title); e.currentTarget.blur(); } }}
+    className={`min-w-0 flex-1 truncate rounded bg-transparent px-1 py-0.5 text-[14px] outline-none hover:bg-raise/60 focus:bg-raise focus:ring-2 focus:ring-accent/30 ${done ? "text-dim line-through" : ""}`} />;
+}
 export function SubtaskList({ parentId, items }: { parentId: number; items: { id: number; title: string; done: boolean }[] }) {
   const [list, setList] = useState(items), [text, setText] = useState(""), [, start] = useTransition();
   useEffect(() => setList(items), [items]);
@@ -91,7 +99,8 @@ export function SubtaskList({ parentId, items }: { parentId: number; items: { id
         <li key={s.id} className="group flex items-center gap-3 border-b px-1 py-2 last:border-b-0">
           <button aria-label={s.done ? "Reopen" : "Complete"} onClick={() => { setList((l) => l.map((x) => (x.id === s.id ? { ...x, done: !x.done } : x))); start(async () => { await toggleTask(s.id); }); }}
             className={`grid h-[17px] w-[17px] place-items-center rounded-full border-[1.5px] ${s.done ? "border-ok bg-ok text-white" : "border-fg/35 hover:bg-fg/5"}`}><Icon name="check" size={11} className={s.done ? "" : "opacity-0"} /></button>
-          <Link href={`/tasks/${s.id}`} className={`flex-1 truncate text-[14px] ${s.done ? "text-dim line-through" : ""}`}>{s.title}</Link>
+          <SubtaskTitle id={s.id} title={s.title} done={s.done} onSaved={(t) => setList((l) => l.map((x) => (x.id === s.id ? { ...x, title: t } : x)))} />
+          {s.id > 0 && <Link href={`/tasks/${s.id}`} aria-label={`Open ${s.title}`} title="Open" className="rounded p-1 text-dim opacity-0 hover:bg-raise hover:text-fg focus:opacity-100 group-hover:opacity-100"><Icon name="chevRight" size={14} /></Link>}
         </li>))}</ul>
       <form onSubmit={(e) => { e.preventDefault(); const t = text.trim(); if (!t) return; setList((l) => [...l, { id: -Date.now(), title: t, done: false }]); setText(""); start(async () => { await addSubtask(parentId, t); }); }} className="mt-1 flex items-center gap-2.5 px-1">
         <span className="grid h-[17px] w-[17px] place-items-center text-accent"><Icon name="plus" size={15} /></span>

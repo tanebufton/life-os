@@ -3,7 +3,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useOptimistic, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { moveTask } from "@/lib/actions";
+import { deleteTaskInline, moveTask, restoreTaskAction } from "@/lib/actions";
+import { TaskLightbox } from "./lightbox";
 import { addCardAction, bulkBoardAction, moveCardAction, type BulkOp } from "@/lib/actions5";
 import { nice } from "@/lib/dates";
 import { issueKey } from "@/lib/ui";
@@ -32,10 +33,16 @@ export function Board({ columns, cards, today, projectId = null, hiddenNote }: {
     const r = await moveCardAction(id, status, col); if (!r.ok) toast(r.error);
   });
   // The whole card opens the task (not just the title). Buttons and links inside keep their own behaviour; a drag never counts as a click.
-  const open = (e: React.MouseEvent | React.KeyboardEvent, id: number) => { if ((e.target as HTMLElement).closest("button, a, input")) return; if (selecting) { toggle(id); return; } router.push(`/tasks/${id}`); };
+  const [lightbox, setLightbox] = useState<number | null>(null);
+  const open = (e: React.MouseEvent | React.KeyboardEvent, id: number) => { if ((e.target as HTMLElement).closest("button, a, input")) return; if (selecting) { toggle(id); return; } setLightbox(id); };
+  const closeLightbox = () => { setLightbox(null); router.refresh(); };
+  /** Tick a card: it moves to the first Done column; ticking a finished one puts it back in the first To do column. */
+  const complete = (c: Card) => { const toDone = kindOf(c.status) !== "done", dest = columns.find((x) => x.kind === (toDone ? "done" : "todo")) ?? columns[0]; if (dest) move(c.id, dest.key); };
+  const remove = (c: Card) => start(async () => { const r = await deleteTaskInline(c.id); if (r) toast(`Deleted “${r.title}”`, { action: { label: "Undo", onClick: () => void restoreTaskAction(c.id).then(() => router.refresh()) } }); else toast("Couldn't delete that"); router.refresh(); });
 
   return (
     <>
+    {lightbox !== null && <TaskLightbox id={lightbox} onClose={closeLightbox} />}
     <div className="mb-3 flex flex-wrap items-center gap-2">
       <button className={selecting ? "btn-primary !h-8 text-xs" : "btn !h-8 text-xs"} onClick={() => { setSelecting((v) => !v); setSel(new Set()); }}>{selecting ? "Done selecting" : "Select cards"}</button>
       {selecting && <span className="text-xs text-mute">{sel.size} selected. Click cards to pick them.</span>}
@@ -57,7 +64,9 @@ export function Board({ columns, cards, today, projectId = null, hiddenNote }: {
                   <li key={c.id} draggable onDragStart={(e) => { e.dataTransfer.setData("text/plain", String(c.id)); e.dataTransfer.setData("application/x-lifeos-task", String(c.id)); }} onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); e.stopPropagation(); setOver(null); const id = Number(e.dataTransfer.getData("text/plain")); if (!id || id === c.id) return; const r = e.currentTarget.getBoundingClientRect(), after = e.clientY > r.top + r.height / 2, i = list.findIndex((x) => x.id === c.id), next = after ? list[i + 1]?.id ?? null : c.id; place(id, col.key, next); }} onClick={(e) => open(e, c.id)} onKeyDown={(e) => { if (e.key === "Enter") open(e, c.id); }} tabIndex={0} role="link" aria-label={`Open ${c.title}`}
                     className={`group relative cursor-pointer rounded-lg bg-panel p-3 outline-none transition hover:bg-raise/40 focus-visible:ring-2 focus-visible:ring-accent/50 active:cursor-grabbing ${lift}`}>
                     {selecting && <input type="checkbox" checked={sel.has(c.id)} onChange={() => toggle(c.id)} aria-label={`Select ${c.title}`} className="absolute left-2.5 top-3.5 h-4 w-4" />}
-                    <Link href={`/tasks/${c.id}`} draggable={false} className={`block ${selecting ? "pl-6" : ""} pr-12 text-[14px] leading-snug ${done ? "text-dim line-through" : ""}`}>{c.title}</Link>
+                    <div className={`flex items-start gap-2 ${selecting ? "pl-6" : ""} pr-14`}>
+                      {!selecting && <button type="button" aria-label={done ? `Reopen ${c.title}` : `Complete ${c.title}`} title={done ? "Reopen" : "Mark done"} onClick={() => complete(c)} className={`mt-[1px] grid h-[17px] w-[17px] shrink-0 place-items-center rounded-full border-[1.5px] transition ${done ? "border-ok bg-ok text-white" : "border-fg/35 text-transparent hover:border-ok hover:text-ok"}`}><Icon name="check" size={11} /></button>}
+                      <Link href={`/tasks/${c.id}`} draggable={false} onClick={(e) => { if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return; e.preventDefault(); if (selecting) toggle(c.id); else setLightbox(c.id); }} className={`block text-[14px] leading-snug ${done ? "text-dim line-through" : ""}`}>{c.title}</Link></div>
                     {c.tags.length > 0 && <div className="mt-2 flex flex-wrap gap-1">{c.tags.map((g) => <Pill key={g} name={g} />)}</div>}
                     <div className="mt-3 flex items-center gap-2 text-xs text-mute">
                       <StatusIcon status={kindOf(c.status)} size={15} />
@@ -69,9 +78,9 @@ export function Board({ columns, cards, today, projectId = null, hiddenNote }: {
                         {c.priority > 0 && <Icon name="chevUp2" size={15} className="text-danger" />}{c.priority < 0 && <Icon name="chevDown1" size={15} className="text-accent" />}
                       </span>
                     </div>
-                    <div className="absolute right-1.5 top-1.5 flex text-mute [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:transition-opacity [@media(hover:hover)]:group-hover:opacity-100">
-                      <button disabled={ci === 0} onClick={() => move(c.id, columns[ci - 1].key)} aria-label={`Move to ${columns[ci - 1]?.name}`} className="grid h-6 w-6 place-items-center rounded hover:bg-raise disabled:invisible"><Icon name="chevRight" size={14} className="rotate-180" /></button>
-                      <button disabled={ci === columns.length - 1} onClick={() => move(c.id, columns[ci + 1].key)} aria-label={`Move to ${columns[ci + 1]?.name}`} className="grid h-6 w-6 place-items-center rounded hover:bg-raise disabled:invisible"><Icon name="chevRight" size={14} /></button>
+                    <div className="absolute right-1.5 top-1.5 flex text-mute [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:transition-opacity [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-within:opacity-100">
+                      <button onClick={() => setLightbox(c.id)} aria-label={`Open ${c.title}`} title="Open" className="grid h-6 w-6 place-items-center rounded hover:bg-raise hover:text-fg"><Icon name="ext" size={13} /></button>
+                      <button onClick={() => remove(c)} aria-label={`Delete ${c.title}`} title="Delete" className="grid h-6 w-6 place-items-center rounded hover:bg-raise hover:text-danger"><Icon name="trash" size={13} /></button>
                     </div>
                   </li>
                 );

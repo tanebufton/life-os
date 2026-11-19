@@ -1,16 +1,16 @@
 import { db } from "./db";
 import { record, type Entity } from "./activity";
-import { cleanTag, parseTags } from "./tasks";
+import { cleanTag, ensureTag, parseTags, uniqueTags } from "./tasks";
 
 export type TagKind = "note" | "goal" | "person";
 export { parseTags };
 export const entityTags = (kind: TagKind, id: number): string[] => (db.prepare("SELECT g.name FROM entity_tags e JOIN tags g ON g.id=e.tag_id WHERE e.kind=? AND e.entity_id=? ORDER BY g.name").all(kind, id) as { name: string }[]).map((r) => r.name);
 export function setEntityTags(kind: TagKind, id: number, names: string[]) {
-  const clean = [...new Set(names.map(cleanTag).filter(Boolean))].slice(0, 20), was = entityTags(kind, id).join(" ");
+  const clean = uniqueTags(names.map(cleanTag)).slice(0, 20), was = entityTags(kind, id).join(" ");
   if (was !== [...clean].sort().join(" ")) record(kind as Entity, id, "changed", { field: "Tags", old: was, new: [...clean].sort().join(" ") });
   db.transaction(() => {
     db.prepare("DELETE FROM entity_tags WHERE kind=? AND entity_id=?").run(kind, id);
-    for (const n of clean) { db.prepare("INSERT OR IGNORE INTO tags (name) VALUES (?)").run(n); const t = db.prepare("SELECT id FROM tags WHERE name=?").get(n) as { id: number }; db.prepare("INSERT OR IGNORE INTO entity_tags (kind, entity_id, tag_id) VALUES (?,?,?)").run(kind, id, t.id); }
+    for (const n of clean) db.prepare("INSERT OR IGNORE INTO entity_tags (kind, entity_id, tag_id) VALUES (?,?,?)").run(kind, id, ensureTag(n, true));
   })();
 }
 /** Tags in use for one kind of item, with how many items carry each. */

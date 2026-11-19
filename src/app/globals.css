@@ -81,3 +81,7 @@ html[data-sidebar="collapsed"] .ptabs { display: flex !important; }
 @keyframes save-pop { from { opacity: 0; transform: translateY(2px) scale(.94); } to { opacity: 1; transform: none; } }
 .save-pop { animation: save-pop .16s ease-out; }
 @media (prefers-reduced-motion: reduce) { .save-pop { animation: none; } }
+
+/* A task shown inside the board's pop-up: just the task, none of the app around it */
+html[data-embed] .side, html[data-embed] .topbar, html[data-embed] .mobilenav, html[data-embed] .fab { display: none !important; }
+html[data-embed] .page { max-width: none; padding-top: 1rem; padding-bottom: 2rem; }

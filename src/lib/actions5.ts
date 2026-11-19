@@ -109,6 +109,13 @@ export async function reorderProjectsAction(ids: number[]): Promise<R> {
   return run(() => { const clean = ids.filter((n) => Number.isInteger(n)); const st = db.prepare("UPDATE projects SET position=? WHERE id=?"); db.transaction(() => clean.forEach((id, i) => st.run(i + 1, id)))(); });
 }
 /** Nudge one project up or down within its area (for keyboards and phones, where dragging is awkward). */
+/** Put a project in an area (empty = "Other"), just before another project there, or at the end. */
+export async function moveProjectToAreaAction(id: number, area: string, beforeId: number | null): Promise<R> {
+  return run(() => { const a = area.replace(/\s+/g, " ").trim().slice(0, 40); if (!db.prepare("SELECT 1 FROM projects WHERE id=?").get(id)) throw new Error("That project is gone");
+    db.transaction(() => { db.prepare("UPDATE projects SET area=? WHERE id=?").run(a, id);
+      const ids = (db.prepare("SELECT id FROM projects WHERE archived=0 AND area=? AND id!=? ORDER BY position, name COLLATE NOCASE").all(a, id) as { id: number }[]).map((r) => r.id), at = beforeId ? ids.indexOf(beforeId) : -1; ids.splice(at < 0 ? ids.length : at, 0, id);
+      const st = db.prepare("UPDATE projects SET position=? WHERE id=?"); ids.forEach((pid, i) => st.run(i + 1, pid)); })(); });
+}
 export async function moveProjectAction(id: number, dir: -1 | 1): Promise<R> {
   return run(() => { const p = db.prepare("SELECT area FROM projects WHERE id=?").get(id) as { area: string } | undefined; if (!p) throw new Error("That project is gone");
     const peers = (db.prepare("SELECT id FROM projects WHERE archived=0 AND area=? ORDER BY position, name COLLATE NOCASE").all(p.area) as { id: number }[]).map((r) => r.id), i = peers.indexOf(id), j = i + dir;

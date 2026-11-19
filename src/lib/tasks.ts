@@ -56,17 +56,25 @@ export const getTask = (id: number, withDeleted = false): TaskRow | undefined =>
 export const subtasks = (id: number) => queryTasks({ parent: id, state: "all" }).sort((a, b) => a.id - b.id);
 
 // ---------- tags ----------
+/** A tag keeps the capital letters you typed. Matching ignores case (the tags table is NOCASE), so "Work" and "work" are one tag. */
 export const cleanTag = (s: string) =>
-  s.trim().replace(/^#/, "").toLowerCase().replace(/[^\p{L}\p{N}_-]+/gu, "-").replace(/^-+|-+$/g, "");
-export const parseTags = (s: string) => [...new Set(s.split(/[\s,]+/).map(cleanTag).filter(Boolean))];
-export function setTaskTags(id: number, names: string[]) {
-  const clean = [...new Set(names.map(cleanTag).filter(Boolean))];
+  s.trim().replace(/^#/, "").replace(/[^\p{L}\p{N}_-]+/gu, "-").replace(/^-+|-+$/g, "");
+/** Drop repeats that differ only by case, keeping the first spelling. */
+export const uniqueTags = (names: string[]) => { const seen = new Set<string>(), out: string[] = []; for (const n of names) { const k = n.toLowerCase(); if (n && !seen.has(k)) { seen.add(k); out.push(n); } } return out; };
+export const parseTags = (s: string) => uniqueTags(s.split(/[\s,]+/).map(cleanTag));
+/** Find or create a tag. When `adopt` is set (you typed it in a tags field) and it exists in a different case, it takes the case you typed. */
+export function ensureTag(name: string, adopt = false): number {
+  db.prepare("INSERT OR IGNORE INTO tags (name) VALUES (?)").run(name);
+  const row = db.prepare("SELECT id, name FROM tags WHERE name=?").get(name) as { id: number; name: string };
+  if (adopt && row.name !== name) db.prepare("UPDATE tags SET name=? WHERE id=?").run(name, row.id);
+  return row.id;
+}
+export function setTaskTags(id: number, names: string[], adopt = false) {
+  const clean = uniqueTags(names.map(cleanTag));
   db.transaction(() => {
     db.prepare("DELETE FROM task_tags WHERE task_id=?").run(id);
     for (const n of clean) {
-      db.prepare("INSERT OR IGNORE INTO tags (name) VALUES (?)").run(n);
-      const t = db.prepare("SELECT id FROM tags WHERE name=?").get(n) as { id: number };
-      db.prepare("INSERT OR IGNORE INTO task_tags (task_id, tag_id) VALUES (?,?)").run(id, t.id);
+      db.prepare("INSERT OR IGNORE INTO task_tags (task_id, tag_id) VALUES (?,?)").run(id, ensureTag(n, adopt));
     }
   })();
 }
@@ -202,7 +210,7 @@ export function updateTask(id: number, p: Patch): boolean {
   db.transaction(() => {
     if (sets.length) db.prepare(`UPDATE tasks SET ${sets.join(",")} WHERE id=?`).run(...a, id);
     if (p.project !== undefined || p.project_id !== undefined) remapTaskStatus(id); // a task moved to another project lands in the matching column there
-    if (p.tags) setTaskTags(id, p.tags);
+    if (p.tags) setTaskTags(id, p.tags, true);
     if (p.status) setStatus(id, p.status);
     const after = getTask(id)!;
     recordDiff("task", id, { ...before, tags: before.tags.join(" ") }, { ...after, tags: after.tags.join(" ") }, { title: "Title", project_name: "Project", due: "Due", due_time: "Time", estimate: "Estimate", priority: "Priority", repeat: "Repeat", tags: "Tags" });

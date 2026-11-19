@@ -21,6 +21,8 @@ export function renameTag(from: string, to: string): { merged: boolean; moved: n
   const a = cleanTag(from), b = cleanTag(to); if (!b) throw new Error("A tag needs a name");
   const src = db.prepare("SELECT id, color FROM tags WHERE name=?").get(a) as { id: number; color: string | null } | undefined; if (!src) throw new Error("No such tag");
   if (a === b) return { merged: false, moved: 0 };
+  // Only the capital letters changed: it is the same tag, so just restyle it (not a merge).
+  if (a.toLowerCase() === b.toLowerCase()) { db.prepare("UPDATE tags SET name=? WHERE id=?").run(b, src.id); return { merged: false, moved: 0 }; }
   const dst = db.prepare("SELECT id, color FROM tags WHERE name=?").get(b) as { id: number; color: string | null } | undefined;
   if (!dst) { db.prepare("UPDATE tags SET name=? WHERE id=?").run(b, src.id); return { merged: false, moved: 0 }; }
   return db.transaction(() => {
@@ -42,5 +44,5 @@ export const pruneUnusedTags = () => { let n = 0; for (const t of unusedTags()) 
 /** CSS that gives coloured tags their chosen colour everywhere a tag pill is drawn. */
 export function tagColorCss(): string {
   return (db.prepare("SELECT name, color FROM tags WHERE color IS NOT NULL").all() as { name: string; color: string }[])
-    .filter((t) => HEX.test(t.color) && /^[\p{L}\p{N}_-]+$/u.test(t.name)).map((t) => `.pill[data-tag="${t.name}"]{--c:${parseInt(t.color.slice(1, 3), 16)} ${parseInt(t.color.slice(3, 5), 16)} ${parseInt(t.color.slice(5, 7), 16)} !important}`).join("");
+    .filter((t) => HEX.test(t.color) && /^[\p{L}\p{N}_-]+$/u.test(t.name)).map((t) => `.pill[data-tag="${t.name.toLowerCase()}"]{--c:${parseInt(t.color.slice(1, 3), 16)} ${parseInt(t.color.slice(3, 5), 16)} ${parseInt(t.color.slice(5, 7), 16)} !important}`).join("");
 }

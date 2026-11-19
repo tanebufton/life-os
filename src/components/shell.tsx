@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { addProject } from "@/lib/actions";
-import { moveTaskToProjectAction, reorderProjectsAction, resetSidebarAction, saveSidebarAction } from "@/lib/actions5";
+import { moveProjectToAreaAction, moveTaskToProjectAction, reorderProjectsAction, resetSidebarAction, saveSidebarAction } from "@/lib/actions5";
 import type { Fav } from "@/lib/favourites";
 import { arrange, withVisibility, EMPTY_PREFS, type SidebarPrefs } from "@/lib/sidebar";
 import { toast } from "sonner";
@@ -56,7 +56,8 @@ export function Sidebar({ counts, projects, features, filters = [], favourites =
   /** Drop a project onto another in the same area: it takes that spot and the rest shuffle down. */
   const dropProject = (target: NavProject) => {
     const from = projects.find((x) => x.id === dragProj); setBefore(null); setDragProj(null);
-    if (!from || from.id === target.id || (from.area ?? "") !== (target.area ?? "")) return;
+    if (!from || from.id === target.id) return;
+    if ((from.area ?? "") !== (target.area ?? "")) { void moveProjectToAreaAction(from.id, target.area ?? "", target.id).then((r) => { toast(r.ok ? `Moved to ${target.area || "Other"}` : r.error); router.refresh(); }); return; } // dropped on a project in another area: join that area, just above it
     const ids = projects.filter((x) => (x.area ?? "") === (from.area ?? "")).map((x) => x.id).filter((i) => i !== from.id); ids.splice(ids.indexOf(target.id), 0, from.id);
     void reorderProjectsAction(ids).then((r) => { if (!r.ok) toast(r.error); router.refresh(); });
   };
@@ -126,7 +127,8 @@ export function Sidebar({ counts, projects, features, filters = [], favourites =
           const here = path === `/projects/${p.id}`, showArea = projects.some((x) => x.area) && (i === 0 || projects[i - 1].area !== p.area);
           return (
             <div key={p.id}>
-              {showArea && <div className="px-2 pb-0.5 pt-2 text-[11px] font-medium uppercase tracking-wide text-dim">{p.area || "Other"}</div>}
+              {showArea && <div onDragOver={(e) => { if (isProjDrag(e)) { e.preventDefault(); setBefore(p.id); } }} onDragLeave={() => setBefore((d) => (d === p.id ? null : d))} onDrop={(e) => { if (isProjDrag(e)) { e.preventDefault(); dropProject(p); } }}
+                className={`rounded px-2 pb-0.5 pt-2 text-[11px] font-medium uppercase tracking-wide text-dim ${dragProj !== null && before === p.id ? "text-accent" : ""}`}>{p.area || "Other"}</div>}
               <Link href={`/projects/${p.id}`} draggable onDragStart={(e) => { e.dataTransfer.setData("application/x-lifeos-project", String(p.id)); e.dataTransfer.effectAllowed = "move"; setDragProj(p.id); }} onDragEnd={() => { setDragProj(null); setBefore(null); }}
                 onDragOver={(e) => { if (isTaskDrag(e)) { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDropOn(p.id); } else if (isProjDrag(e) && dragProj !== null && dragProj !== p.id) { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setBefore(p.id); } }} onDragLeave={() => { setDropOn((d) => (d === p.id ? null : d)); setBefore((d) => (d === p.id ? null : d)); }}
                 onDrop={(e) => { if (isProjDrag(e)) { e.preventDefault(); dropProject(p); return; } if (!isTaskDrag(e)) return; e.preventDefault(); setDropOn(null); const id = Number(e.dataTransfer.getData("application/x-lifeos-task")); void moveTaskToProjectAction(id, p.id).then((r) => { toast(r.ok ? (r.message ?? "Moved") : r.error); router.refresh(); }); }}
@@ -164,10 +166,6 @@ export function Sidebar({ counts, projects, features, filters = [], favourites =
       <div className="px-2 pb-1 pt-2.5">
         <WorkspaceMenu editing={editing} onEdit={() => setEditing((e) => !e)} onReset={() => void resetSidebarAction().then((r) => toast(r.ok ? (r.message ?? "Done") : r.error))} hiddenPages={arranged.flatMap((g) => g.items).filter((i) => i.hidden).map((i) => i.page)} />
       </div>
-      <div className="space-y-px px-2">
-        <button onClick={openPalette} className={`${row} w-full text-mute hover:bg-raise`}><Icon name="search" size={16} />Search<span className="ml-auto text-xs text-dim">⌘K</span></button>
-        <button onClick={focusCapture} className={`${row} w-full font-medium text-accent hover:bg-accent/10`}><span className="grid h-4 w-4 place-items-center rounded-full bg-accent text-ink"><Icon name="plus" size={12} /></span>New task</button>
-      </div>
       <div className="mt-2 min-h-0 flex-1 overflow-y-auto pb-6 [mask-image:linear-gradient(to_bottom,#000_calc(100%-24px),transparent)]">
         {sections}
         {editing && <div className="mx-3 mt-3 rounded-lg border border-dashed p-2.5 text-xs text-mute">Drag pages (or use the arrows) to reorder them. The eye hides a page from this list; it stays reachable from search (⌘K) and the LifeOS menu. <button className="mt-1.5 block font-medium text-accent hover:underline" onClick={() => setEditing(false)}>Done</button></div>}
@@ -194,13 +192,13 @@ export function Topbar({ today, projects, money }: { today: string; projects: Na
   const path = usePathname();
   const c = crumbs(path, projects);
   return (
-    <header className="sticky top-0 z-20 shrink-0 border-b bg-bg/85 backdrop-blur"><div className="flex h-12 items-center gap-4 px-4 md:px-8">
+    <header className="topbar sticky top-0 z-20 shrink-0 border-b bg-bg/85 backdrop-blur"><div className="flex h-12 items-center gap-4 px-4 md:px-8">
       <button onClick={toggleSidebar} aria-label="Show or hide the sidebar" title="Show or hide the sidebar ([)" className="-ml-1 hidden rounded-md p-1.5 text-mute hover:bg-raise hover:text-fg md:block"><Icon name="sidebar" size={17} /></button>
-      <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-1.5 text-[14px] md:w-48">
+      <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-1.5 text-[14px] md:w-40">
         {c.map((x, i) => (<span key={i} className="flex min-w-0 items-center gap-1.5">{i > 0 && <span className="text-dim">/</span>}<span className={`truncate ${i === c.length - 1 ? "font-semibold" : "text-mute"}`}>{x}</span></span>))}
       </nav>
       <div className="mx-auto hidden w-full max-w-xl md:block"><CaptureForm today={today} variant="pill" money={money} /></div>
-      <div className="ml-auto flex items-center md:w-48 md:justify-end"><button onClick={openPalette} aria-label="Search" className="rounded-md p-1.5 text-mute hover:bg-raise md:hidden"><Icon name="search" size={18} /></button></div>
+      <div className="ml-auto flex items-center gap-1.5 md:justify-end"><button onClick={openPalette} aria-label="Search" title="Search (⌘K)" className="rounded-md p-1.5 text-mute hover:bg-raise hover:text-fg"><Icon name="search" size={18} /></button><button onClick={focusCapture} className="btn-primary hidden !h-8 md:inline-flex"><Icon name="plus" size={14} />New task</button></div>
     </div></header>
   );
 }
@@ -210,7 +208,7 @@ export function MobileNav({ counts, tabs }: { counts: Counts; tabs: NavPage[] })
   const badge: Record<string, number> = { "/": counts.due, "/inbox": counts.inbox };
   const items = [...tabs, { href: "/more", label: "More", icon: "more", key: "", group: "main" } as NavPage];
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 flex border-t bg-bg/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden" aria-label="Main">
+    <nav className="mobilenav fixed inset-x-0 bottom-0 z-40 flex border-t bg-bg/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden" aria-label="Main">
       {items.map((p) => {
         const on = isActive(path, p.href) || (p.href === "/more" && !tabs.some((t) => isActive(path, t.href)));
         return (

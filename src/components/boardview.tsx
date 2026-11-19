@@ -27,7 +27,7 @@ export function BoardView({ sp, lockProject, base }: { sp: BoardParams; lockProj
   const allDone = queryTasks({ project: pid ?? undefined, state: "done", limit: 400 }).filter(keep), done = allDone.filter((t) => !cutoff || (t.done_at ?? "") >= cutoff).slice(0, showAll || !days ? 200 : 150), hidden = allDone.length - done.length;
   // filters and sort (manual order is the default; the others are for looking, so dragging within them is just for this view)
   const t0 = today(), q = (sp.q ?? "").trim().toLowerCase(), week = new Date(Date.parse(t0) + 7 * 864e5).toISOString().slice(0, 10);
-  const pass = (t: { title: string; tags: string[]; priority: number; due: string | null }) => (!q || t.title.toLowerCase().includes(q) || t.tags.some((g) => g.includes(q))) && (!sp.tag || t.tags.includes(sp.tag))
+  const pass = (t: { title: string; tags: string[]; priority: number; due: string | null }) => (!q || t.title.toLowerCase().includes(q) || t.tags.some((g) => g.toLowerCase().includes(q))) && (!sp.tag || t.tags.some((g) => g.toLowerCase() === sp.tag!.toLowerCase()))
     && (!sp.priority || (sp.priority === "high" ? t.priority > 0 : sp.priority === "low" ? t.priority < 0 : t.priority === 0))
     && (!sp.due || (sp.due === "overdue" ? !!t.due && t.due < t0 : sp.due === "today" ? t.due === t0 : sp.due === "week" ? !!t.due && t.due >= t0 && t.due <= week : !t.due));
   const sorted = (list: typeof open) => sp.sort === "due" ? [...list].sort((a, b) => (a.due ?? "9999").localeCompare(b.due ?? "9999")) : sp.sort === "priority" ? [...list].sort((a, b) => b.priority - a.priority) : sp.sort === "newest" ? [...list].sort((a, b) => b.id - a.id) : sp.sort === "oldest" ? [...list].sort((a, b) => a.id - b.id) : byPosition(list);
