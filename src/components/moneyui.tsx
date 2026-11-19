@@ -58,7 +58,7 @@ export function SubMenu({ id, status, autoLog }: { id: number; status: string; a
       {status === "active" && !autoLog && <button className="btn !h-7 text-xs" onClick={() => go(() => markPaidAction(id), "Logged and moved to next renewal")}>Mark paid</button>}
       {status === "active" && <button className="btn !h-7 text-xs" onClick={() => go(() => setSubStatusAction(id, "paused"), "Paused")}>Pause</button>}
       {status !== "active" && <button className="btn !h-7 text-xs" onClick={() => go(() => setSubStatusAction(id, "active"), "Reactivated")}>Reactivate</button>}
-      {status !== "cancelled" && <button className="btn !h-7 text-xs text-danger" onClick={() => { if (confirm("Mark as cancelled? It stops counting toward your monthly total.")) go(() => setSubStatusAction(id, "cancelled"), "Marked cancelled"); }}>Cancelled it</button>}
+      {status !== "cancelled" && <button className="btn !h-7 text-xs text-danger" onClick={() => { if (confirm("Mark as cancelled? It stops counting toward your monthly total.")) go(() => setSubStatusAction(id, "cancelled"), "Marked cancelled"); }}>Mark cancelled</button>}
       <button className="btn !h-7 text-xs text-mute" onClick={() => { if (confirm("Delete this subscription and its history?")) go(() => deleteSubAction(id), "Deleted"); }}>Delete</button>
     </div>
   );

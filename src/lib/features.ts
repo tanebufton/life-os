@@ -8,6 +8,7 @@ export const FEATURES = [
   { key: "insights", label: "Insights", desc: "Completion heatmap, streaks and focus stats.", group: "Views" },
   { key: "planner", label: "Day planner", desc: "A time-blocking timeline with auto-schedule and calendar events.", group: "Views" },
   { key: "templates", label: "Templates", desc: "Reusable checklists and routines, one click to create.", group: "Views" },
+  { key: "voice", label: "Voice memos", desc: "Speak a thought; it becomes a memo, task or note. Works with the Chrome extension.", group: "Life" },
   { key: "habits", label: "Habits", desc: "Daily habits with streaks and heatmaps.", group: "Life" },
   { key: "goals", label: "Goals", desc: "Goals by life area, tied to projects and key results.", group: "Life" },
   { key: "people", label: "People", desc: "Stay in touch: catch-up cadence and birthdays.", group: "Life" },

@@ -41,7 +41,7 @@ export default function Subscriptions() {
     <FeatureGate feature="subscriptions">
       <PageHead title="Subscriptions" sub="Everything that renews, in one place" />
       <Panel i={0} className="mb-4" bodyClass="grid grid-cols-2 divide-x sm:grid-cols-4">
-        {[["Per month", f(sum.monthly_cents), ""], ["Per year", f(sum.yearly_cents, { compact: true }), ""], ["Active", String(sum.active), ""], ["Still to pay this month", f(sum.remaining_this_month_cents), ""]].map(([l, v], i) => <div key={l} className={`px-4 py-4 ${i > 1 ? "border-t sm:border-t-0" : ""}`}><div className="text-xs text-mute">{l}</div><div className="mt-1 text-[26px] font-semibold leading-none tracking-tight tabular-nums">{v}</div></div>)}
+        {[["Per month", f(sum.monthly_cents), ""], ["Per year", f(sum.yearly_cents, { compact: true }), ""], ["Active", String(sum.active), ""], ["Still to pay this month", f(sum.remaining_this_month_cents), ""]].map(([l, v], i) => <div key={l} className={`px-4 py-4 ${i > 1 ? "border-t sm:border-t-0" : ""}`}><div className="text-xs text-mute">{l}</div><div className="mt-1 text-[20px] font-semibold leading-none sm:text-[26px] tracking-tight tabular-nums">{v}</div></div>)}
         {top && <div className="col-span-2 border-t px-4 py-2.5 text-[13px] text-mute sm:col-span-4">Your biggest is <b className="text-fg">{top.name}</b> at {f(monthlyCents(top))}/month ({Math.round((monthlyCents(top) / Math.max(1, sum.monthly_cents)) * 100)}% of the total).</div>}
       </Panel>
       {(sum.trials.length > 0 || sum.dueSoon.length > 0) && (
@@ -59,7 +59,8 @@ export default function Subscriptions() {
             <label className="block text-xs text-mute">Next payment<input type="date" name="next_due" className="field mt-1" /></label>
             <label className="block text-xs text-mute">Free trial ends (optional)<input type="date" name="trial_ends" className="field mt-1" /></label>
             <select name="category_id" className="field" aria-label="Category"><option value="">Category: Subscriptions</option>{cats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
-            <div className="flex items-center justify-between gap-2 text-[13px]"><label className="flex items-center gap-1.5"><input type="checkbox" name="auto_log" defaultChecked />Log payments automatically</label><label className="flex items-center gap-1.5 text-mute">Remind <input name="remind_days" type="number" min={0} max={30} defaultValue={3} className="field !h-7 !w-14 !px-2 text-center" /> days before</label></div>
+            <label className="flex items-center gap-2 text-[13px]"><input type="checkbox" name="auto_log" defaultChecked />Log payments automatically</label>
+            <label className="flex items-center gap-2 text-[13px] text-mute">Remind me <input name="remind_days" type="number" min={0} max={30} defaultValue={3} className="field !h-7 !w-14 !px-2 text-center" /> days before renewal</label>
             <button className="btn-primary w-full">Add subscription</button>
           </form>
         </Panel>

@@ -31,6 +31,7 @@ import { createNote, getNote, listNotes, updateNote } from "../src/lib/notes";
 import { createGoal, goalProgress, listGoals, setKeyResult, keyResults } from "../src/lib/goals";
 import { createPerson, listPeople, logContact, catchUpIn, upcomingBirthdays } from "../src/lib/people";
 import { listTemplates, useTemplate } from "../src/lib/templates";
+import { listMemos, saveMemo } from "../src/lib/voice";
 import { nextBest } from "../src/lib/misc";
 import { today } from "../src/lib/time";
 import { getWeather } from "../src/lib/weather";
@@ -155,6 +156,10 @@ function buildServer() {
   if (isOn("templates")) {
     tool("list_templates", { description: "Task templates (checklists/routines).", inputSchema: {} }, safe(() => listTemplates().map((t) => ({ id: t.id, name: t.name, steps: t.data.subtasks.length }))));
     tool("use_template", { description: "Create a task (with its subtasks) from a template. Optional due date.", inputSchema: { id: z.number().int(), due: date.optional() } }, safe(({ id, due }: any) => ({ task_id: useTemplate(id, due ? { due } : {}) })));
+  }
+  if (isOn("voice")) {
+    tool("add_voice_memo", { description: "Save a transcribed voice memo. as=task also creates a task (quick-add syntax applies), as=note creates a note.", inputSchema: { text: z.string().min(1), as: z.enum(["memo", "task", "note"]).optional() } }, safe(({ text, as }: any) => { const m = saveMemo(text, as ?? "memo", "mcp"); return { id: m.id, task_id: m.task_id, note_id: m.note_id }; }));
+    tool("list_voice_memos", { description: "Recent voice memos.", inputSchema: { limit: z.number().int().min(1).max(50).optional() } }, safe(({ limit }: any) => listMemos(limit ?? 10)));
   }
   tool("next_task", { description: "The single best thing to do right now (overdue and high priority first, short tasks break ties). Pass skip ids to get the next one.", inputSchema: { skip: z.array(z.number().int()).optional() } }, safe(({ skip }: any) => { const t = nextBest(skip ?? []); return t ? briefTask(t) : "Nothing to do."; }));
   return s;

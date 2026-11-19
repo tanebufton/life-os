@@ -14,6 +14,7 @@ import { tgConfigured, tgLinkCode, tgSecret, tgSend, tgSetWebhook, tgToken } fro
 import { createTask, getTask, reschedule, restoreTask, updateTask } from "./tasks";
 import { createTemplate, deleteTemplate, installStarterTemplates, templateFromTask, useTemplate } from "./templates";
 import { today } from "./time";
+import { convertMemo, deleteMemo, saveMemo, type MemoAs } from "./voice";
 
 const refresh = () => revalidatePath("/", "layout");
 const s = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
@@ -111,3 +112,8 @@ export async function aiApplyPlan(plan: Plan, date: string) {
 }
 export async function aiAsk(q: string) { try { guardAi(); if (!q.trim()) return fail(new Error("Ask something first.")); return ok({ answer: await ask(q) }); } catch (e) { return fail(e); } }
 export const aiStatus = async () => ({ configured: aiConfigured() });
+
+// voice
+export async function saveMemoAction(text: string, as: MemoAs) { try { const m = saveMemo(text, as, "web"); refresh(); return ok({ id: m.id, task_id: m.task_id, note_id: m.note_id }); } catch (e) { return fail(e); } }
+export async function convertMemoAction(id: number, as: "task" | "note") { convertMemo(id, as); refresh(); }
+export async function deleteMemoAction(id: number) { deleteMemo(id); refresh(); }

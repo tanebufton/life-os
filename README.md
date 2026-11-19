@@ -43,6 +43,7 @@ quick-add syntax (`Pay rent every month #bills @home !high 31 march at 9am ~30m`
 | **Calendar sync** | Settings → Calendar sync: paste a private `.ics` link (Google: "Secret address in iCal format"). Read-only, refreshed by the worker every ~15 min. |
 | **Telegram** | Create a bot with @BotFather, paste the token in Settings → Telegram, press Connect webhook (needs a public HTTPS URL), send the shown `/start <code>` to link your chat. Only that chat is answered. Free text adds a task; `/today /inbox /done 12 /search /brief /habits /spent 12 coffee /subs`. |
 | **AI assistant** | Off by default. Set `ANTHROPIC_API_KEY`, switch it on in Settings; smart paste, plan-my-day and ask. Model `claude-opus-5-5` (override `LIFEOS_AI_MODEL`). Text is sent to Anthropic only when you press a button. |
+| **Voice memos / Chrome extension** | `/voice` records speech (browser speech recognition) into a memo, task or note. `extension/` is an unpacked Chrome extension: toolbar icon or Alt+Shift+V opens a recorder window that POSTs text to `/api/v1/voice`. See `extension/README.md`. |
 | **Spotify** | `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `LIFEOS_BASE_URL`; Premium needed for control. |
 
 ## Auth

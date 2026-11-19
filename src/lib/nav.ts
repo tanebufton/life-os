@@ -7,6 +7,7 @@ export const NAV: NavPage[] = [
   { href: "/tasks", label: "My tasks", icon: "list", key: "l", group: "main" },
   { href: "/board", label: "Board", icon: "board", key: "b", feature: "board", group: "main" },
   { href: "/planner", label: "Planner", icon: "planner", key: "p", feature: "planner", group: "main" },
+  { href: "/voice", label: "Voice memos", icon: "mic", key: "v", feature: "voice", group: "life" },
   { href: "/habits", label: "Habits", icon: "habits", key: "h", feature: "habits", group: "life" },
   { href: "/journal", label: "Journal", icon: "journal", key: "j", feature: "journal", group: "life" },
   { href: "/focus", label: "Focus", icon: "focus", key: "f", feature: "focus", group: "life" },

@@ -16,6 +16,10 @@ export default async function Planner({ searchParams }: { searchParams: Promise<
   const t = today(), sp = await searchParams, date = sp.d && /^\d{4}-\d{2}-\d{2}$/.test(sp.d) ? sp.d : t;
   const { blocks, allDay } = dayBlocks(date), w = workHours(), un = unscheduled(date, t);
   const lo = Math.floor(Math.min(w.start, ...blocks.map((b) => b.start)) / 60) * 60, hi = Math.ceil(Math.max(w.end, ...blocks.map((b) => b.end)) / 60) * 60, hours = Array.from({ length: (hi - lo) / 60 + 1 }, (_, i) => lo + i * 60);
+  // Overlapping blocks sit side by side instead of on top of each other.
+  const lane = new Map<string, { col: number; cols: number }>();
+  { const sorted = [...blocks].sort((a, b) => a.start - b.start || a.end - b.end); let cluster: typeof blocks = [], end = -1; const flush = () => { const lastEnd: number[] = []; const asg = cluster.map((b) => { let c = lastEnd.findIndex((e) => e <= b.start); if (c < 0) c = lastEnd.length; lastEnd[c] = b.end; return [b, c] as const; }); for (const [b, c] of asg) lane.set(b.key, { col: c, cols: lastEnd.length }); cluster = []; };
+    for (const b of sorted) { if (cluster.length && b.start >= end) { flush(); end = -1; } cluster.push(b); end = Math.max(end, b.end); } if (cluster.length) flush(); }
   const nowMin = date === t ? new Date().getHours() * 60 + new Date().getMinutes() : null;
   return (
     <FeatureGate feature="planner">
@@ -29,7 +33,7 @@ export default async function Planner({ searchParams }: { searchParams: Promise<
             <div className="absolute inset-y-0 left-14 right-0">
               {blocks.map((b) => { const h = Math.max(22, ((b.end - b.start) / 60) * PX - 2), ev = b.kind === "event", c = b.color ?? "#6366f1";
                 return (
-                  <div key={b.key} className={`absolute inset-x-0 overflow-hidden rounded-md border px-2 py-1 text-[12.5px] leading-tight ${b.conflict ? "ring-1 ring-danger" : ""} ${b.done ? "opacity-50" : ""}`} style={{ top: ((b.start - lo) / 60) * PX + 1, height: h, background: c + (ev ? "1f" : "2e"), borderColor: c + "66", borderLeft: `3px solid ${c}` }}>
+                  <div key={b.key} className={`absolute overflow-hidden rounded-md border px-2 py-1 text-[12.5px] leading-tight ${b.conflict ? "ring-1 ring-danger" : ""} ${b.done ? "opacity-50" : ""}`} style={{ top: ((b.start - lo) / 60) * PX + 1, height: h, left: `${((lane.get(b.key)?.col ?? 0) / (lane.get(b.key)?.cols ?? 1)) * 100}%`, width: `calc(${100 / (lane.get(b.key)?.cols ?? 1)}% - 3px)`, background: c + (ev ? "1f" : "2e"), borderColor: c + "66", borderLeft: `3px solid ${c}` }}>
                     <div className="flex items-start justify-between gap-1"><span className={`min-w-0 truncate font-medium ${b.done ? "line-through" : ""}`}>{b.id ? <Link href={`/tasks/${b.id}`} className="hover:underline">{b.title}</Link> : b.title}</span>
                       {!ev && b.id && <form action={unscheduleTaskAction.bind(null, b.id)}><button className="text-dim hover:text-fg" title="Unschedule" aria-label="Unschedule"><Icon name="x" size={12} /></button></form>}</div>
                     {h > 34 && <div className="text-[11px] text-mute">{toHm(b.start)}–{toHm(b.end)}{b.conflict ? " · overlaps" : ""}</div>}

@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export default async function Now({ searchParams }: { searchParams: Promise<{ skip?: string }> }) {
   const skip = ((await searchParams).skip ?? "").split(",").map(Number).filter(Boolean), t = nextBest(skip);
   return (
-    <div className="mx-auto max-w-xl pt-6 text-center">
+    <div className="max-w-xl">
       <PageHead title="Do this now" sub="One thing. Everything else can wait." />
       {t ? (
         <div className="card rise p-6 text-left"><div className="text-xs font-medium uppercase tracking-wide text-dim">{t.project_name ?? "No project"}{t.due ? ` · ${dueInfo(t.due, false).text}` : ""}{t.estimate ? ` · ${t.estimate} min` : ""}</div>

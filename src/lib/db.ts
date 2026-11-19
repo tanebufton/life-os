@@ -82,6 +82,7 @@ function migrate(d: Database.Database) {
     CREATE TABLE IF NOT EXISTS cal_feeds (id INTEGER PRIMARY KEY, name TEXT NOT NULL, url TEXT NOT NULL UNIQUE, color TEXT NOT NULL DEFAULT '#8b5cf6', enabled INTEGER NOT NULL DEFAULT 1, last_synced TEXT, last_error TEXT);
     CREATE TABLE IF NOT EXISTS cal_events (id INTEGER PRIMARY KEY, feed_id INTEGER NOT NULL REFERENCES cal_feeds(id) ON DELETE CASCADE, uid TEXT NOT NULL, title TEXT NOT NULL, date TEXT NOT NULL, start_time TEXT, end_date TEXT, end_time TEXT, all_day INTEGER NOT NULL DEFAULT 0, location TEXT NOT NULL DEFAULT '');
     CREATE INDEX IF NOT EXISTS cal_events_date ON cal_events(date);
+    CREATE TABLE IF NOT EXISTS voice_memos (id INTEGER PRIMARY KEY, text TEXT NOT NULL, source TEXT NOT NULL DEFAULT 'web', task_id INTEGER, note_id INTEGER, created_at TEXT NOT NULL DEFAULT (datetime('now')), deleted_at TEXT);
     CREATE TABLE IF NOT EXISTS task_comments (id INTEGER PRIMARY KEY, task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE, body TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')));
     CREATE TABLE IF NOT EXISTS saved_filters (id INTEGER PRIMARY KEY, name TEXT NOT NULL, query TEXT NOT NULL);
   `);
