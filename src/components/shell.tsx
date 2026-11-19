@@ -129,7 +129,7 @@ export function Sidebar({ counts, projects, features, filters = [], favourites =
           return (
             <div key={p.id}>
               {showArea && <div onDragOver={(e) => { if (isProjDrag(e)) { e.preventDefault(); setBefore(p.id); } }} onDragLeave={() => setBefore((d) => (d === p.id ? null : d))} onDrop={(e) => { if (isProjDrag(e)) { e.preventDefault(); dropProject(p); } }}
-                className={`rounded px-2 pb-0.5 pt-2 text-[11px] font-medium uppercase tracking-wide text-dim ${dragProj !== null && before === p.id ? "text-accent" : ""}`}>{p.area || "Other"}</div>}
+                className={`rounded px-2 pb-0.5 pt-2 text-[11px] font-medium text-dim ${dragProj !== null && before === p.id ? "text-accent" : ""}`}>{p.area || "Other"}</div>}
               <Link href={`/projects/${p.id}`} draggable onDragStart={(e) => { e.dataTransfer.setData("application/x-lifeos-project", String(p.id)); e.dataTransfer.effectAllowed = "move"; setDragProj(p.id); }} onDragEnd={() => { setDragProj(null); setBefore(null); }}
                 onDragOver={(e) => { if (isTaskDrag(e)) { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDropOn(p.id); } else if (isProjDrag(e) && dragProj !== null && dragProj !== p.id) { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setBefore(p.id); } }} onDragLeave={() => { setDropOn((d) => (d === p.id ? null : d)); setBefore((d) => (d === p.id ? null : d)); }}
                 onDrop={(e) => { if (isProjDrag(e)) { e.preventDefault(); dropProject(p); return; } if (!isTaskDrag(e)) return; e.preventDefault(); setDropOn(null); const id = Number(e.dataTransfer.getData("application/x-lifeos-task")); void moveTaskToProjectAction(id, p.id).then((r) => { toast(r.ok ? (r.message ?? "Moved") : r.error); router.refresh(); }); }}
@@ -241,7 +241,7 @@ function WorkspaceMenu({ editing, onEdit, onReset, hiddenPages }: { editing: boo
           <button role="menuitem" className={item} onClick={() => { onReset(); setOpen(false); }}><Icon name="undo" size={15} className="text-mute" />Reset sidebar order</button>
           <Link role="menuitem" href="/settings" onClick={() => setOpen(false)} className={item}><Icon name="settings" size={15} className="text-mute" />Settings</Link>
           <button role="menuitem" className={item} onClick={() => { openHelp(); setOpen(false); }}><Icon name="keyboard" size={15} className="text-mute" />Keyboard shortcuts</button>
-          {hiddenPages.length > 0 && <><div className="mx-2 my-1.5 border-t" /><div className="px-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wide text-dim">More pages</div>
+          {hiddenPages.length > 0 && <><div className="mx-2 my-1.5 border-t" /><div className="px-2.5 pb-1 text-[11px] font-semibold text-dim">More pages</div>
             {hiddenPages.map((p) => <Link key={p.href} role="menuitem" href={p.href} onClick={() => setOpen(false)} className={item}><Icon name={p.icon} size={15} className="text-mute" />{p.label}</Link>)}</>}
         </div>
       )}

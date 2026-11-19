@@ -15,7 +15,7 @@ export function MemoList({ memos, projects }: { memos: Memo[]; projects?: Map<nu
     <div className="space-y-6">
       {groups.map((g) => (
         <section key={g.label}>
-          <h3 className="mb-1.5 px-1 text-xs font-semibold uppercase tracking-wide text-dim">{g.label}</h3>
+          <h3 className="mb-1.5 px-1 text-xs font-semibold text-dim">{g.label}</h3>
           <ul className="divide-y rounded-xl border bg-panel">
             {g.items.map((m) => (
               <li key={m.id} className="group px-4 py-3">

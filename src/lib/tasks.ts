@@ -1,10 +1,10 @@
 import { db } from "./db";
 import { addDays, addMonths, weekday } from "./dates";
-import { describeRepeat, normalizeRepeat, parseQuickAdd as parseQuick } from "./parse";
+import { describeRepeat, normalizeRepeat, repeatLabel, parseQuickAdd as parseQuick } from "./parse";
 import { localDate, today } from "./time";
 import { record, recordDiff } from "./activity";
 import { defaultColumn, kindOf, remapTaskStatus, resolveStatus, type Kind } from "./statuses";
-export { describeRepeat, normalizeRepeat };
+export { describeRepeat, normalizeRepeat, repeatLabel };
 
 /** A column key. The default columns use "todo", "doing" and "done"; projects can have their own. */
 export type Status = string;

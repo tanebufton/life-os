@@ -12,7 +12,7 @@ export default async function Now({ searchParams }: { searchParams: Promise<{ sk
     <div className="max-w-xl">
       <PageHead title="Do this now" sub="One thing. Everything else can wait." />
       {t ? (
-        <div className="card rise p-6 text-left"><div className="text-xs font-medium uppercase tracking-wide text-dim">{t.project_name ?? "No project"}{t.due ? ` · ${dueInfo(t.due, false).text}` : ""}{t.estimate ? ` · ${t.estimate} min` : ""}</div>
+        <div className="card rise p-6 text-left"><div className="text-xs font-medium text-dim">{t.project_name ?? "No project"}{t.due ? ` · ${dueInfo(t.due, false).text}` : ""}{t.estimate ? ` · ${t.estimate} min` : ""}</div>
           <h2 className="mt-2 text-[22px] font-semibold leading-snug">{t.title}</h2>{t.notes && <p className="mt-2 line-clamp-4 text-[14px] text-mute">{t.notes}</p>}
           <div className="mt-5 flex flex-wrap gap-2"><Link href={`/focus?task=${t.id}`} className="btn-primary"><Icon name="focus" size={14} />Start focus</Link>
             <form action={async () => { "use server"; await toggleTask(t.id); }}><button className="btn">Mark done</button></form>

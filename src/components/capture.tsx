@@ -3,13 +3,13 @@ import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { quickAdd } from "@/lib/actions";
 import { fmtMinutes, fmtTime, nice } from "@/lib/dates";
-import { describeRepeat, parseQuickAdd } from "@/lib/parse";
+import { parseQuickAdd, repeatLabel } from "@/lib/parse";
 import { Icon } from "./Icon";
 import { clearDraft as dropDraft, peekDraft as getDraft } from "@/lib/drafts";
 import { useSession } from "./session";
 import { Pill } from "./Pill";
 
-const SYNTAX: [string, string][] = [["#tag", "label it"], ["@project", "file it in a project"], ["!high  !low  !doing", "priority or status"], ["tomorrow · friday · in 3 days", "due date"], ["daily · weekdays · every 2 weeks", "repeat"]];
+const SYNTAX: [string, string][] = [["#tag", "Label it"], ["@project", "File it in a project"], ["!high  !low  !doing", "Priority or status"], ["tomorrow · friday · in 3 days", "Due date"], ["daily · weekdays · every 2 weeks", "Repeat"]];
 
 function Preview({ parsed, today, empty }: { parsed: ReturnType<typeof parseQuickAdd> | null; today: string; empty: boolean }) {
   const effDue = parsed?.due ?? (parsed?.due_time || parsed?.repeat ? today : null);
@@ -20,7 +20,7 @@ function Preview({ parsed, today, empty }: { parsed: ReturnType<typeof parseQuic
       <div className="flex flex-wrap items-center gap-1.5 text-xs text-mute">
         {due && <span className="inline-flex items-center gap-1 rounded bg-warn/10 px-1.5 py-0.5 font-medium text-warn"><Icon name="calendar" size={12} />{due}{parsed?.due_time && <span className="font-normal"> · {fmtTime(parsed.due_time)}</span>}</span>}
         {parsed?.estimate ? <span className="inline-flex items-center gap-1 rounded bg-raise px-1.5 py-0.5"><Icon name="clock" size={12} />{fmtMinutes(parsed.estimate)}</span> : null}
-        {parsed.repeat && <span className="inline-flex items-center gap-1 rounded bg-raise px-1.5 py-0.5"><Icon name="repeat" size={12} />{describeRepeat(parsed.repeat)}</span>}
+        {parsed.repeat && <span className="inline-flex items-center gap-1 rounded bg-raise px-1.5 py-0.5"><Icon name="repeat" size={12} />{repeatLabel(parsed.repeat)}</span>}
         {parsed.project && <span className="rounded bg-raise px-1.5 py-0.5 font-medium text-fg">{parsed.project}</span>}
         {parsed.tags?.map((t) => <Pill key={t} name={t} />)}
         {parsed.priority === 1 && <span className="inline-flex items-center gap-0.5 rounded bg-danger/10 px-1.5 py-0.5 font-medium text-danger"><Icon name="chevUp2" size={12} />High</span>}

@@ -6,7 +6,7 @@ import { StatusIcon } from "@/components/StatusIcon";
 import { db, Project } from "@/lib/db";
 import { isOn } from "@/lib/features";
 import { today } from "@/lib/time";
-import { describeRepeat, getTask, subtasks } from "@/lib/tasks";
+import { repeatLabel, getTask, subtasks } from "@/lib/tasks";
 import { issueKey } from "@/lib/ui";
 import { addCommentAction, deleteCommentAction, saveTemplateFromTask } from "@/lib/actions3";
 import { listComments } from "@/lib/misc";
@@ -41,7 +41,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
           <span className="ml-1"><FavouriteButton kind="task" id={t.id} on={isFavourite("task", t.id)} /></span>
         </div>
         {meta?.from && <p className="mb-2 text-xs text-mute">From {meta.from}{meta.subject ? <> · “{meta.subject}”</> : null}</p>}
-        </>} task={{ id: t.id, title: t.title, notes: t.notes, status: t.status, priority: t.priority, project_id: t.project_id, due: t.due, due_time: t.due_time, estimate: t.estimate, repeat: t.repeat ? describeRepeat(t.repeat) : "", tags: t.tags.join(" ") }}>
+        </>} task={{ id: t.id, title: t.title, notes: t.notes, status: t.status, priority: t.priority, project_id: t.project_id, due: t.due, due_time: t.due_time, estimate: t.estimate, repeat: t.repeat ? repeatLabel(t.repeat) : "", tags: t.tags.join(" ") }}>
           {!t.parent_id && <SubtaskList parentId={t.id} items={kids} />}
           <LinksPanel kind="task" id={t.id} links={listLinks("task", t.id)} />
         </TaskEditor>

@@ -5,7 +5,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { diffDays, fmtMinutes, fmtTime, nice } from "@/lib/dates";
 import { isOn } from "@/lib/features";
-import { describeRepeat, type TaskRow } from "@/lib/tasks";
+import { repeatLabel, type TaskRow } from "@/lib/tasks";
 import { today } from "@/lib/time";
 import { firstUrl, hostOf } from "@/lib/ui";
 import { CheckButton } from "./check";
@@ -46,7 +46,7 @@ export function TaskRow({ t }: { t: TaskRow }) {
         <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
           {due && <span className={`inline-flex items-center gap-1 ${due.cls}`}><Icon name="calendar" size={12} />{due.text}{t.due_time && <span className="text-mute">· {fmtTime(t.due_time)}</span>}</span>}
           {t.estimate ? <span className="inline-flex items-center gap-1 text-mute" title="Estimate"><Icon name="clock" size={12} />{fmtMinutes(t.estimate)}</span> : null}
-          {t.repeat && <span className="inline-flex items-center gap-1 text-mute" title="Repeats"><Icon name="repeat" size={12} />{describeRepeat(t.repeat)}</span>}
+          {t.repeat && <span className="inline-flex items-center gap-1 text-mute" title="Repeats"><Icon name="repeat" size={12} />{repeatLabel(t.repeat)}</span>}
           {t.sub_total > 0 && <span className="inline-flex items-center gap-1 text-mute" title="Subtasks"><Icon name="list" size={12} />{t.sub_done}/{t.sub_total}</span>}
           {t.status_kind === "doing" && !done && <span className="lozenge bg-accent/15 text-accent">{t.status_name}</span>}
           {from !== null && from !== undefined && <span className="inline-flex items-center gap-1 text-mute" title="Imported from email"><Icon name="mail" size={12} />{from || "Email"}</span>}

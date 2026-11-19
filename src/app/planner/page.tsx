@@ -48,7 +48,7 @@ export default async function Planner({ searchParams }: { searchParams: Promise<
               <form action={scheduleTaskAction.bind(null, x.id, date, undefined)}><button className="btn !px-2 !py-1 text-xs">Fit in</button></form></li>)}
               {!un.length && <li className="px-4 py-6 text-center text-sm text-mute">Everything due has a time.</li>}</ul>
           </Panel>
-          <p className="px-1 text-xs text-dim">Working hours {toHm(w.start)}–{toHm(w.end)} <Link href="/settings?tab=reminders#planner" className="underline">change</Link>{isOn("calendar") ? "" : " · Calendar sync is off"}</p>
+          <p className="px-1 text-xs text-dim">Working hours {toHm(w.start)}–{toHm(w.end)} <Link href="/settings?tab=reminders#planner" className="underline">Change</Link>{isOn("calendar") ? "" : " · Calendar sync is off"}</p>
         </div>
       </div>
     </FeatureGate>

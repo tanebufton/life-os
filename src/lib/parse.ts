@@ -23,6 +23,9 @@ export function describeRepeat(r: string): string {
   return n === 1 ? { d: "daily", w: "weekly", m: "monthly", y: "yearly" }[u] : `every ${n} ${{ d: "day", w: "week", m: "month", y: "year" }[u]}s`;
 }
 
+/** How a repeat reads in the app: sentence case, like the rest of the text ("Weekly", "Every 2 weeks"). The API keeps the lowercase form. */
+export const repeatLabel = (r: string) => { const d = describeRepeat(r); return d.charAt(0).toUpperCase() + d.slice(1); };
+
 const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
 const MONTH_RE = "(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)";
 /** "31 march" / "march 31st" / "mar 31 2027" -> YYYY-MM-DD. Without a year it is the next occurrence (this year, or next if already past). */
