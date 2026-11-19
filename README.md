@@ -68,7 +68,7 @@ Data lives in `data/lifeos.db` (override with `LIFEOS_DB`).
 
 Docker Compose + Cloudflare Tunnel + Access is the recommended setup. See **[docs/DEPLOY.md](docs/DEPLOY.md)** for sizing, setup, security and recovery.
 
-**Update:** run `./update.sh` in your checkout. It pulls, builds the image once (web, worker and MCP share it), restarts what changed and tidies old images. The build reuses a compile cache, so the first build after a Dockerfile change is slow and later ones are much quicker. If it is still slow, `docker compose build --progress=plain web` shows which step takes the time.
+**Update:** run `./update.sh` in your checkout. It pulls, builds the image once (web, worker and MCP share it), restarts what changed and tidies old images. If nothing changed it skips the build. The image is built in stages with cached dependencies and no compiler step, so after the first build an update is mostly the Next.js compile. The script prints how long the build took; if it is still slow, `docker compose build --progress=plain web` shows which step.
 
 **Fastest:** run it without Docker. The Next.js build cache stays in the folder, so an update is usually under a minute:
 

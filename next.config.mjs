@@ -9,7 +9,10 @@ const securityHeaders = [
   { key: "Permissions-Policy", value: "camera=(), geolocation=(), microphone=(self)" }, // microphone only for voice memos
   { key: "Cross-Origin-Opener-Policy", value: "same-origin-allow-popups" }, // allows the re-login popup
 ];
+// The Docker build sets LIFEOS_FAST_BUILD: types are already checked by `npm test` / `tsc` before a commit, so the server doesn't repeat that slow step on every update.
+const fast = process.env.LIFEOS_FAST_BUILD === "1";
 export default {
+  ...(fast ? { typescript: { ignoreBuildErrors: true }, eslint: { ignoreDuringBuilds: true } } : {}),
   async headers() { return [{ source: "/:path*", headers: securityHeaders }]; },
   serverExternalPackages: ["better-sqlite3", "node-ical", "imapflow", "mailparser"],
   experimental: { serverActions: { bodySizeLimit: "8mb", ...(allowed.length ? { allowedOrigins: allowed } : {}) } }, // imports upload files through server actions
