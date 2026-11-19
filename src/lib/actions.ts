@@ -137,7 +137,7 @@ export async function resetFeatures() { for (const f of FEATURES) setFeature(f.k
 export async function saveCapacity(fd: FormData) { const h = Number(fd.get("hours")); if (h >= 1 && h <= 16) setSetting("capacity_min", String(Math.round(h * 60))); refresh(); }
 
 // ---------- integrations ----------
-export async function createTokenAction(name: string): Promise<string> { const t = createToken(name); revalidatePath("/settings"); return t; }
+export async function createTokenAction(name: string, o: { level?: "read" | "write"; areas?: string[]; days?: number } = {}): Promise<string> { const t = createToken(name, { level: o.level, areas: o.areas, days: o.days }); revalidatePath("/settings"); return t; }
 export async function revokeTokenAction(id: number) { revokeToken(id); revalidatePath("/settings"); }
 export async function regenerateIcal() { icalSecret(true); revalidatePath("/settings"); }
 export async function regenerateInbound() { inboundSecret(true); revalidatePath("/settings"); }

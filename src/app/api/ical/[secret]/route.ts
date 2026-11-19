@@ -1,11 +1,12 @@
 import { isOn } from "@/lib/features";
 import { buildIcs } from "@/lib/ical";
-import { icalSecret, safeEq } from "@/lib/tokens";
+import { icalSecret } from "@/lib/tokens";
+import { secretGate, noStore } from "@/lib/secretauth";
 
 export const dynamic = "force-dynamic";
-export async function GET(_req: Request, { params }: { params: Promise<{ secret: string }> }) {
+export async function GET(req: Request, { params }: { params: Promise<{ secret: string }> }) {
   if (!isOn("api")) return new Response("Calendar feed is turned off", { status: 404 });
   const s = (await params).secret.replace(/\.ics$/i, "");
-  if (!safeEq(s, icalSecret())) return new Response("Not found", { status: 404 });
-  return new Response(buildIcs((process.env.LIFEOS_BASE_URL ?? "").replace(/\/$/, "")), { headers: { "content-type": "text/calendar; charset=utf-8", "cache-control": "no-store", "content-disposition": 'inline; filename="lifeos.ics"' } });
+  const gate = secretGate(req, s, icalSecret()); if (gate) return gate;
+  return new Response(buildIcs((process.env.LIFEOS_BASE_URL ?? "").replace(/\/$/, "")), { headers: { "content-type": "text/calendar; charset=utf-8", "cache-control": "no-store", "referrer-policy": "no-referrer", "content-disposition": 'inline; filename="lifeos.ics"' } });
 }

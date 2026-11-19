@@ -33,6 +33,7 @@ import { createPerson, listPeople, logContact, catchUpIn, upcomingBirthdays } fr
 import { listTemplates, useTemplate } from "../src/lib/templates";
 import { listMemos, saveMemo } from "../src/lib/voice";
 import { nextBest } from "../src/lib/misc";
+import { authBlocked, authFailed } from "../src/lib/ratelimit";
 import { today } from "../src/lib/time";
 import { getWeather } from "../src/lib/weather";
 
@@ -169,9 +170,14 @@ const token = process.env.LIFEOS_MCP_TOKEN;
 const eq = (a: string, b: string) => { const A = Buffer.from(a), B = Buffer.from(b); return A.length === B.length && crypto.timingSafeEqual(A, B); };
 const host = process.env.LIFEOS_MCP_HOST ?? "127.0.0.1", port = Number(process.env.LIFEOS_MCP_PORT ?? 3737);
 
+const loopback = ["127.0.0.1", "::1", "localhost"].includes(host);
+// Fail closed: without a token the MCP server (which can read and change everything) may only listen on loopback.
+if (!token && !loopback) { console.error(`Refusing to start: LIFEOS_MCP_HOST=${host} is not loopback and LIFEOS_MCP_TOKEN is not set. Set a token (openssl rand -hex 24).`); process.exit(1); }
 http.createServer(async (req, res) => {
   if (req.url !== "/mcp") { res.writeHead(404).end(); return; }
-  if (token && !eq(req.headers.authorization ?? "", `Bearer ${token}`)) { res.writeHead(401).end("unauthorized"); return; }
+  const ip = req.socket.remoteAddress ?? "unknown", blocked = authBlocked(ip);
+  if (blocked.blocked) { res.writeHead(429, { "Retry-After": String(blocked.retryAfter) }).end("too many attempts"); return; }
+  if (token && !eq(req.headers.authorization ?? "", `Bearer ${token}`)) { authFailed(ip); res.writeHead(401).end("unauthorized"); return; }
   if (req.method !== "POST") { res.writeHead(405, { Allow: "POST" }).end(); return; }
   const chunks: Buffer[] = []; let size = 0;
   for await (const c of req) { size += (c as Buffer).length; if (size > 1_000_000) { res.writeHead(413).end(); return; } chunks.push(c as Buffer); }

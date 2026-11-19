@@ -32,7 +32,7 @@ export function buildIcs(baseUrl = ""): string {
     const rr = { weekly: "FREQ=WEEKLY", monthly: "FREQ=MONTHLY", quarterly: "FREQ=MONTHLY;INTERVAL=3", yearly: "FREQ=YEARLY" }[s.cycle];
     L.push("BEGIN:VEVENT", `UID:sub-${s.id}@lifeos`, `DTSTAMP:${stamp}`, `DTSTART;VALUE=DATE:${ymd(s.next_due)}`, `DTEND;VALUE=DATE:${ymd(addDays(s.next_due, 1))}`, fold(`SUMMARY:${esc(`${s.name} renews (${(s.amount_cents / 100).toFixed(2)})`)}`), `RRULE:${rr}`, "TRANSP:TRANSPARENT", "END:VEVENT");
   }
-  if (isOn("people")) for (const p of listPeople()) if (p.birthday) L.push("BEGIN:VEVENT", `UID:bday-${p.id}@lifeos`, `DTSTAMP:${stamp}`, `DTSTART;VALUE=DATE:${ymd(p.birthday)}`, `DTEND;VALUE=DATE:${ymd(addDays(p.birthday, 1))}`, fold(`SUMMARY:${esc(`${p.name}'s birthday`)}`), "RRULE:FREQ=YEARLY", "TRANSP:TRANSPARENT", "END:VEVENT");
+  if (isOn("people")) for (const p of listPeople()) if (p.birthday) { const bd = p.birthday.length === 10 ? p.birthday : `2000-${p.birthday}`; if (Number.isNaN(Date.parse(bd))) continue; /* birthdays may have no year: anchor those to 2000 (a leap year) */ L.push("BEGIN:VEVENT", `UID:bday-${p.id}@lifeos`, `DTSTAMP:${stamp}`, `DTSTART;VALUE=DATE:${ymd(bd)}`, `DTEND;VALUE=DATE:${ymd(addDays(bd, 1))}`, fold(`SUMMARY:${esc(`${p.name}'s birthday`)}`), "RRULE:FREQ=YEARLY", "TRANSP:TRANSPARENT", "END:VEVENT"); }
   L.push("END:VCALENDAR");
   return L.join("\r\n") + "\r\n";
 }

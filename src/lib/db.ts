@@ -94,6 +94,11 @@ function migrate(d: Database.Database) {
     ins.run("https://hnrss.org/frontpage", "Hacker News");
     ins.run("https://feeds.bbci.co.uk/news/world/rss.xml", "BBC World");
   }
+  // API token scopes (added after the table existed in earlier versions)
+  const tcols = (d.prepare("PRAGMA table_info(api_tokens)").all() as { name: string }[]).map((c) => c.name);
+  if (!tcols.includes("level")) d.exec("ALTER TABLE api_tokens ADD COLUMN level TEXT NOT NULL DEFAULT 'write'"); // existing tokens keep read+write
+  if (!tcols.includes("areas")) d.exec("ALTER TABLE api_tokens ADD COLUMN areas TEXT"); // JSON list, null = every area
+  if (!tcols.includes("expires_at")) d.exec("ALTER TABLE api_tokens ADD COLUMN expires_at TEXT");
 }
 
 const g = globalThis as unknown as { __db?: Database.Database };

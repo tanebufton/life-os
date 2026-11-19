@@ -1,15 +1,27 @@
 import { NextResponse } from "next/server";
 import { isOn, type FeatureKey } from "./features";
-import { verifyBearer } from "./tokens";
+import { clientIp, authBlocked, authFailed, hit, RATE } from "./ratelimit";
+import { verifyToken, type Area } from "./tokens";
 import { describeRepeat, parseTags, type TaskRow } from "./tasks";
 
 export const json = (data: unknown, status = 200) => NextResponse.json(data, { status, headers: { "cache-control": "no-store" } });
 export const err = (message: string, status = 400) => json({ error: message }, status);
-/** Returns an error response if the API is off or the bearer token is missing/invalid. */
+const limited = (retryAfter: number) => NextResponse.json({ error: "Too many requests. Slow down." }, { status: 429, headers: { "retry-after": String(retryAfter), "cache-control": "no-store" } });
+/**
+ * Gatekeeper for /api/v1: throttles bad credentials per address, checks the token (valid, unexpired), that it may use this part of the API
+ * and this kind of request (read-only tokens can't write), applies a per-token rate limit, and only then reveals whether a feature is switched off.
+ */
 export function guard(req: Request, feature: FeatureKey = "api"): NextResponse | null {
   if (!isOn("api")) return err("The REST API is turned off in LifeOS settings.", 404);
+  const ip = clientIp(req), b = authBlocked(ip); if (b.blocked) return limited(b.retryAfter);
+  if (Number(req.headers.get("content-length") ?? 0) > 1_000_000) return err("Request too large.", 413);
+  const t = verifyToken(req.headers.get("authorization"));
+  if (!t) { authFailed(ip); return err("Missing or invalid API token. Send `Authorization: Bearer <token>`.", 401); }
+  const rl = hit(`tok:${t.id}`, RATE.perTokenPerMin, 60_000); if (!rl.ok) return limited(rl.retryAfter);
+  if (req.method !== "GET" && req.method !== "HEAD" && t.level === "read") return err("This token is read-only.", 403);
+  const area = (feature === "api" ? "tasks" : feature) as Area;
+  if (t.areas && !t.areas.includes(area)) return err(`This token isn't allowed to use ${area}.`, 403);
   if (feature !== "api" && !isOn(feature)) return err(`The ${feature} feature is turned off in LifeOS settings.`, 404);
-  if (!verifyBearer(req.headers.get("authorization"))) return err("Missing or invalid API token. Send `Authorization: Bearer <token>`.", 401);
   return null;
 }
 export const taskJson = (t: TaskRow) => ({

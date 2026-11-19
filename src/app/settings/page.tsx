@@ -23,7 +23,7 @@ import * as Backup from "@/lib/backup";
 import { addCalFeedAction, removeCalFeedAction, saveQuietHours, saveTelegramToken, saveWorkHours, syncCalendarsAction, telegramRegen, telegramUnlink } from "@/lib/actions3";
 import { listFeeds as listCalFeeds } from "@/lib/calendar";
 import { aiConfigured, aiModel } from "@/lib/ai";
-import { tgChat, tgLinkCode, tgSecret, tgToken } from "@/lib/telegram";
+import { tgChat, tgLinkCode, tgMode, tgSecret, tgToken } from "@/lib/telegram";
 import { icalSecret, inboundSecret, listTokens } from "@/lib/tokens";
 
 export const dynamic = "force-dynamic";
@@ -142,7 +142,7 @@ export default async function Settings({ searchParams }: { searchParams: Promise
             <ol className="list-decimal space-y-1 pl-5 text-[13px] text-mute"><li>In Telegram, message <b className="text-fg">@BotFather</b>, send /newbot, and copy the token.</li><li>Paste it below{process.env.TELEGRAM_BOT_TOKEN ? " (already set by environment)" : ""} and press Connect webhook.</li><li>Send this to your bot to link your chat:</li></ol>
             <CopyBox value={`/start ${tgLinkCode()}`} />
             <form action={saveTelegramToken} className="flex gap-2"><input name="token" type="password" autoComplete="off" placeholder={tgToken() ? "•••••••• (saved)" : "123456:ABC…"} className="field" aria-label="Bot token" /><button className="btn">Save token</button></form>
-            <TelegramButtons origin={origin} />
+            <TelegramButtons origin={origin} mode={tgMode()} />
             <div className="flex flex-wrap items-center gap-3 text-xs text-mute"><span>{tgChat() ? "Linked to a chat." : "Not linked yet."}</span>{tgChat() && <form action={telegramUnlink}><button className="underline">Unlink</button></form>}<form action={telegramRegen}><button className="underline">Regenerate link code &amp; webhook secret</button></form><span className="text-dim">Secret: …{tgSecret().slice(-4)}</span></div>
           </Panel>
         </Section>

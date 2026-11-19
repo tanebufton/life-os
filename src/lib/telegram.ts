@@ -15,14 +15,34 @@ export const tgChat = () => getSetting("telegram_chat_id") ?? "";
 const rand = (n: number) => crypto.randomBytes(n).toString("hex");
 export const tgLinkCode = (regen = false) => { let c = getSetting("telegram_link_code"); if (!c || regen) { c = rand(4); setSetting("telegram_link_code", c); } return c; };
 export const tgSecret = (regen = false) => { let c = getSetting("telegram_secret"); if (!c || regen) { c = rand(16); setSetting("telegram_secret", c); } return c; };
+/** Telegram sends this value back in a header on every webhook call, so a request that only knows the URL is rejected. */
+export const tgHookToken = (regen = false) => { let c = getSetting("telegram_hook_token"); if (!c || regen) { c = rand(24); setSetting("telegram_hook_token", c); } return c; };
+/** "polling" (default): the worker asks Telegram for messages, so nothing public is needed. "webhook": Telegram calls your public URL. */
+export const tgMode = (): "polling" | "webhook" => (getSetting("telegram_mode") === "webhook" ? "webhook" : "polling");
 export const tgConfigured = () => !!(tgToken() && tgChat());
 
-export async function tgCall(method: string, body: unknown): Promise<{ ok: boolean; description?: string; result?: unknown }> {
-  const r = await fetch(`${tgApi()}/bot${tgToken()}/${method}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal: AbortSignal.timeout(10_000) });
+export async function tgCall(method: string, body: unknown, timeoutMs = 10_000): Promise<{ ok: boolean; description?: string; result?: unknown }> {
+  const r = await fetch(`${tgApi()}/bot${tgToken()}/${method}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal: AbortSignal.timeout(timeoutMs) });
   return (await r.json().catch(() => ({ ok: false, description: `HTTP ${r.status}` }))) as { ok: boolean; description?: string };
 }
 export async function tgSend(chatId: string | number, text: string) { const r = await tgCall("sendMessage", { chat_id: chatId, text: text.slice(0, 4000), disable_web_page_preview: true }); if (!r.ok) throw new Error(r.description || "Telegram rejected the message"); }
-export async function tgSetWebhook(url: string) { return tgCall("setWebhook", { url, allowed_updates: ["message"] }); }
+export async function tgSetWebhook(url: string) { return tgCall("setWebhook", { url, allowed_updates: ["message"], secret_token: tgHookToken(), drop_pending_updates: false }); }
+export async function tgDeleteWebhook() { return tgCall("deleteWebhook", { drop_pending_updates: false }); }
+/** Switch how Telegram reaches LifeOS. Leaving webhook mode removes it from Telegram, which refuses polling while one is set. */
+export async function tgUseMode(mode: "polling" | "webhook", origin = ""): Promise<{ ok: boolean; description?: string }> {
+  if (!tgToken()) return { ok: false, description: "Add a bot token first." };
+  if (mode === "polling") { const r = await tgDeleteWebhook(); if (!r.ok) return r; setSetting("telegram_mode", "polling"); return { ok: true }; }
+  const r = await tgSetWebhook(`${origin.replace(/\/$/, "")}/api/telegram/${tgSecret()}`); if (r.ok) setSetting("telegram_mode", "webhook"); return r;
+}
+/** One long-poll round. Returns how many messages were handled. The update offset is saved after each message, so a crash never replays one. */
+export async function pollOnce(waitSeconds = 25, send?: (chat: number, text: string) => Promise<void>): Promise<number> {
+  const offset = Number(getSetting("telegram_offset") || 0);
+  const r = await tgCall("getUpdates", { offset, timeout: waitSeconds, allowed_updates: ["message"] }, waitSeconds * 1000 + 10_000);
+  if (!r.ok) throw new Error(r.description || "Telegram getUpdates failed");
+  const updates = (r.result ?? []) as (Update & { update_id: number })[];
+  for (const u of updates) { try { await handleUpdate(u, send); } catch (e) { console.error("telegram:", (e as Error).message); } setSetting("telegram_offset", String(u.update_id + 1)); }
+  return updates.length;
+}
 
 export type Update = { message?: { chat: { id: number }; text?: string } };
 const list = (ts: { id: number; title: string; due?: string | null }[], empty: string) => (ts.length ? ts.map((x) => `#${x.id} ${x.title}`).join("\n") : empty);

@@ -14,6 +14,7 @@ services:
   web:
     <<: *app
     expose: ["3000"]
+    ports: ["127.0.0.1:3000:3000"] # loopback only, so `tailscale serve` on the host can reach it (see docs/DEPLOY.md). Not exposed to the network.
 
   # Reminders, scheduled backups, calendar sync, subscription auto-logging, email polling.
   worker:

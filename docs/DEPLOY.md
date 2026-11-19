@@ -44,16 +44,26 @@ Zero Trust → **Networks → Tunnels → Create tunnel (Cloudflared)**. Copy th
 Zero Trust → **Access → Applications → Add → Self-hosted**, for the same hostname, with a policy that allows only your email. Then:
 - Copy the **Application Audience (AUD) tag** to `LIFEOS_CF_AUD`, and your team name (`<team>.cloudflareaccess.com`) to `LIFEOS_CF_TEAM_DOMAIN`. With these set, LifeOS verifies the signed Access token on every request, so nothing that reaches the app by another route can pretend to be you.
 - **Session length:** set the application's session duration to what you like. When it ends, LifeOS keeps what you were typing, shows "Your session has expired", and saves automatically once you sign in again (it opens a new tab for that).
-- **Paths that authenticate themselves** need a second Access application (or path rule) with a **Bypass** policy, or a **Service Auth** policy for tokens:
+- **The most secure setup opens nothing.** Leave the Cloudflare hostname fully behind Access, add **no Bypass policies**, and use the options below for everything that can't sign in through a login page:
 
-| Path | Used by | Protected by |
+| Need | Don't open it publicly. Instead |
+|---|---|
+| Chrome extension, iOS Shortcuts, scripts, REST API | Use them over **Tailscale** (see below). `/api/v1/*` is blocked at Cloudflare Access (no policy), and reachable only on your tailnet |
+| Telegram bot | Leave it on **Polling** (the default). The worker asks Telegram for messages, so no inbound URL exists |
+| Email to tasks | Use **IMAP** (`LIFEOS_IMAP_*`), which is outbound only |
+| Claude / MCP | Tailscale (already the recommended route) |
+| Calendar in Google Calendar | Needs a public URL (Google fetches it). Either skip it, or open `/api/ical/*` alone. Apple/Outlook on a device that's on your tailnet can use the tailnet address |
+
+If you do need a public path (Telegram webhook, the inbound email webhook, a public calendar feed), add a Bypass policy for **that one path only**. Every such path is protected as follows:
+
+| Path | Protected by | Extra hardening |
 |---|---|---|
-| `/api/v1/*` | REST API, the Chrome extension, iOS Shortcuts | API token |
-| `/api/inbound/*` | email-to-task webhook | secret in the URL |
-| `/api/ical/*` | calendar subscription | secret in the URL |
-| `/api/telegram/*` | Telegram bot webhook | secret in the URL |
+| `/api/v1/*` | API token: stored hashed, scoped (read-only or read & write, limited to chosen areas), optional expiry, 120 requests/min per token | 10 bad tokens from an address locks it out for 10 minutes; 1 MB body cap; revocable |
+| `/api/telegram/*` | URL secret **and** Telegram's secret-token header (both must match), only the linked chat is obeyed | webhook mode only; throttled; 200 KB cap |
+| `/api/inbound/*` | secret (send it in the `x-lifeos-secret` header, not the URL) or a write-scoped token | throttled; 10 MB cap |
+| `/api/ical/*` | secret in the URL, read-only | throttled; `Referrer-Policy: no-referrer`, `no-store` |
 
-If you don't use one of these, don't open it.
+Responses are generic (a wrong secret is always a plain 404), nothing is allowed cross-origin, and every page sends `nosniff`, `no-referrer`, `frame-deny` and a microphone-only permissions policy.
 
 ## 4. Start
 ```bash
@@ -62,6 +72,14 @@ docker compose ps                     # web should become "healthy"
 docker compose --profile mcp up -d    # optional: the MCP server
 ```
 Open your hostname, sign in through Access, then **Settings**: switch off features you don't want, set your timezone, and set up **Backup to Cloudflare R2** (press *Back up now & verify*). The worker runs the schedule.
+
+## Tailscale for the API, extension and MCP
+Install Tailscale on the host, then:
+```bash
+tailscale serve --bg --https=443 http://127.0.0.1:3000      # the app, on your tailnet only
+```
+Use `https://<machine>.<tailnet>.ts.net` as the address in the Chrome extension and in scripts. Requests that arrive this way carry no Cloudflare login token, so with `LIFEOS_CF_*` set **the web UI refuses them (403) while the token-authenticated `/api/v1/*` paths work**. That is intended: the UI is only reachable through Cloudflare Access, the API only through your tailnet. Use Tailscale ACLs to limit which devices can reach the host.
+Don't skip Cloudflare Access and rely on the tailnet alone for the UI unless you trust every device on it: without `LIFEOS_CF_*` the UI has no login of its own.
 
 ## MCP (Claude and other bots) over Tailscale
 Set `LIFEOS_MCP_TOKEN` (`openssl rand -hex 24`), start the `mcp` profile, then on the host:
@@ -83,6 +101,8 @@ Local copy any time: `docker compose exec web node -e "require('better-sqlite3')
 ## Troubleshooting
 - **403 Forbidden on every page:** the Access token isn't being verified. Check `LIFEOS_CF_TEAM_DOMAIN` (just the team name or the full `team.cloudflareaccess.com`) and `LIFEOS_CF_AUD`, and that the hostname is protected by that Access application.
 - **"Invalid Server Actions request" / saves failing:** `LIFEOS_BASE_URL` must match the public hostname exactly.
-- **Chrome extension can't reach it:** `/api/v1/*` needs the bypass or service-token policy above.
+- **Chrome extension can't reach it:** use the Tailscale address (above), or add a Service Auth policy for `/api/v1/*`.
+- **Telegram bot silent:** the worker must be running (polling mode). Check `docker compose logs worker`.
+- **"Too many requests" (429):** an address was locked out after 10 bad credentials, or a token passed 120 requests a minute (`LIFEOS_RATE_LIMIT_PER_MIN`). It clears by itself.
 - **Container restarts, "unable to open database":** the volume must be writable by uid 1000 (`node`). With a bind mount: `chown 1000:1000 ./data`.
 - **Logs:** `docker compose logs -f web worker`.

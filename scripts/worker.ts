@@ -6,6 +6,7 @@ import { runReminders } from "../src/lib/reminders";
 import { backupIfDue } from "../src/lib/backup";
 import { notify } from "../src/lib/notify";
 import { getSetting, setSetting } from "../src/lib/settings";
+import { pollOnce, tgMode, tgToken } from "../src/lib/telegram";
 import { syncAll } from "../src/lib/calendar";
 import { advanceSubscriptions } from "../src/lib/subs";
 
@@ -24,3 +25,14 @@ async function tick(n: number) {
 }
 log(`LifeOS worker started · reminders ${isOn("reminders") ? "on" : "off"} · IMAP ${imapConfigured() ? "configured" : "not configured"}`);
 let n = 0; void tick(n++); setInterval(() => void tick(n++), 30_000);
+
+// Telegram long-polling runs in its own loop (a poll waits up to ~25 s for a message, which would stall the 30 s tick).
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+void (async () => {
+  let wait = 2000;
+  for (;;) {
+    try {
+      if (isOn("telegram") && tgToken() && tgMode() === "polling") { await pollOnce(25); wait = 2000; } else await sleep(10_000);
+    } catch (e) { log("telegram polling:", (e as Error).message); await sleep(wait); wait = Math.min(wait * 2, 60_000); }
+  }
+})();

@@ -10,7 +10,7 @@ import { createNote, deleteNote, getNote, noteByTitle, updateNote } from "./note
 import { archivePerson, createPerson, followUpTask, logContact, updatePerson } from "./people";
 import { autoSchedule, findSlot, toHm, workHours } from "./planner";
 import { getSetting, setSetting } from "./settings";
-import { tgConfigured, tgLinkCode, tgSecret, tgSend, tgSetWebhook, tgToken } from "./telegram";
+import { tgConfigured, tgHookToken, tgLinkCode, tgSecret, tgSend, tgUseMode } from "./telegram";
 import { createTask, getTask, reschedule, restoreTask, updateTask } from "./tasks";
 import { createTemplate, deleteTemplate, installStarterTemplates, templateFromTask, useTemplate } from "./templates";
 import { today } from "./time";
@@ -88,12 +88,12 @@ export async function saveQuietHours(fd: FormData) { for (const k of ["quiet_sta
 
 // telegram
 export async function saveTelegramToken(fd: FormData) { const t = s(fd, "token"); if (t) setSetting("telegram_token", t); refresh(); }
-export async function telegramConnect(origin: string) {
-  try { if (!tgToken()) return fail(new Error("Add a bot token first.")); const r = await tgSetWebhook(`${origin.replace(/\/$/, "")}/api/telegram/${tgSecret()}`); return r.ok ? ok({ message: "Webhook set. Now send the link command to your bot." }) : fail(new Error(r.description || "Telegram refused the webhook")); } catch (e) { return fail(e); }
+export async function telegramSetMode(mode: "polling" | "webhook", origin: string) {
+  try { const r = await tgUseMode(mode === "webhook" ? "webhook" : "polling", origin); refresh(); return r.ok ? ok({ message: mode === "polling" ? "Using polling: the worker checks Telegram for messages. No public URL needed." : "Webhook set. Telegram will call your public URL." }) : fail(new Error(r.description || "Telegram refused")); } catch (e) { return fail(e); }
 }
 export async function telegramTest() { try { if (!tgConfigured()) return fail(new Error("Link your chat first (send the /start command to the bot).")); await tgSend(getSetting("telegram_chat_id")!, "LifeOS test message ✓"); return ok({ message: "Sent. Check Telegram." }); } catch (e) { return fail(e); } }
 export async function telegramUnlink() { setSetting("telegram_chat_id", null); tgLinkCode(true); refresh(); }
-export async function telegramRegen() { tgLinkCode(true); tgSecret(true); refresh(); }
+export async function telegramRegen() { tgLinkCode(true); tgSecret(true); tgHookToken(true); refresh(); }
 
 // AI
 const guardAi = () => { if (!isOn("ai")) throw new AiError("The AI assistant is switched off in Settings.", "config"); };

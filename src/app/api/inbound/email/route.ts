@@ -1,8 +1,11 @@
+import { NextResponse } from "next/server";
 import { simpleParser } from "mailparser";
 import { err, json } from "@/lib/api";
 import { importEmail, type InboundEmail } from "@/lib/email";
 import { isOn } from "@/lib/features";
-import { inboundSecret, safeEq, verifyBearer } from "@/lib/tokens";
+import { inboundSecret, verifyToken } from "@/lib/tokens";
+import { authBlocked, authFailed, clientIp } from "@/lib/ratelimit";
+import { safeEq } from "@/lib/tokens";
 
 export const dynamic = "force-dynamic";
 const pick = (o: Record<string, any>, ...keys: string[]) => { for (const k of keys) if (typeof o[k] === "string" && o[k]) return o[k] as string; return undefined; };
@@ -19,8 +22,12 @@ const fromFields = (o: Record<string, any>): InboundEmail => ({
  */
 export async function POST(req: Request) {
   if (!isOn("email")) return err("Email import is turned off in LifeOS settings.", 404);
-  const secret = new URL(req.url).searchParams.get("secret") ?? req.headers.get("x-lifeos-secret") ?? "";
-  if (!(secret && safeEq(secret, inboundSecret())) && !verifyBearer(req.headers.get("authorization"))) return err("Unauthorized", 401);
+  const ip = clientIp(req), blocked = authBlocked(ip); if (blocked.blocked) return NextResponse.json({ error: "Too many attempts" }, { status: 429, headers: { "retry-after": String(blocked.retryAfter) } });
+  if (Number(req.headers.get("content-length") ?? 0) > 10_000_000) return err("Message too large", 413);
+  // Prefer the x-lifeos-secret header: a secret in the query string ends up in logs and browser history.
+  const secret = req.headers.get("x-lifeos-secret") ?? new URL(req.url).searchParams.get("secret") ?? "", tok = verifyToken(req.headers.get("authorization"));
+  const tokenOk = !!tok && tok.level === "write" && (!tok.areas || tok.areas.includes("tasks"));
+  if (!(secret && safeEq(secret, inboundSecret())) && !tokenOk) { authFailed(ip); return err("Unauthorized", 401); }
   const ct = (req.headers.get("content-type") ?? "").toLowerCase();
   try {
     let mail: InboundEmail;
