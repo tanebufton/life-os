@@ -18,6 +18,8 @@ import { getSetting } from "@/lib/settings";
 import { redirectUri, spotifyConfigured, spotifyConnected } from "@/lib/spotify";
 import { tz } from "@/lib/time";
 import { TelegramButtons } from "@/components/settingsui";
+import { BackupPanel } from "@/components/backupui";
+import * as Backup from "@/lib/backup";
 import { addCalFeedAction, removeCalFeedAction, saveQuietHours, saveTelegramToken, saveWorkHours, syncCalendarsAction, telegramRegen, telegramUnlink } from "@/lib/actions3";
 import { listFeeds as listCalFeeds } from "@/lib/calendar";
 import { aiConfigured, aiModel } from "@/lib/ai";
@@ -168,6 +170,11 @@ export default async function Settings({ searchParams }: { searchParams: Promise
             : (<div className="flex items-center justify-between text-sm"><span className="text-mute">Not connected</span><a href="/api/spotify/login" className="btn-primary">Connect Spotify</a></div>)}</Panel>
         </Section>
       )}
+
+      <Section id="backup" i={8} title="Backup to Cloudflare R2" desc="An encrypted copy of your database in your own R2 bucket, so losing this machine doesn't lose your data. Each backup is downloaded again and verified before it counts. Your local database stays the live one.">
+        {(() => { const c = Backup.config(), st = Backup.status(); return (
+          <Panel><BackupPanel init={{ account: (getSetting("backup_endpoint") ?? ""), bucket: c.bucket, keyId: c.keyId, prefix: c.prefix, keep: c.keep, hours: c.hours, hasSecret: !!c.secret, hasPass: !!c.passphrase, configured: Backup.configured(c), enabled: c.enabled, lastOk: st.lastOk, lastError: st.lastError, fromEnv: !!process.env.LIFEOS_BACKUP_ENDPOINT }} /></Panel>); })()}
+      </Section>
 
       <Section id="data" i={8} title="Your data" desc="It's yours. Take a copy any time. Deleted tasks stay recoverable for 30 days.">
         <Panel bodyClass="divide-y">

@@ -1,7 +1,7 @@
 import { db } from "./db";
 import { queryTasks } from "./tasks";
 
-const SECRET = /^(spotify_|ntfy_token|ical_secret|inbound_secret|webhook_url|telegram_)/;
+const SECRET = /^(spotify_|ntfy_token|ical_secret|inbound_secret|webhook_url|telegram_|backup_)/;
 export function exportAll() {
   const settings = Object.fromEntries((db.prepare("SELECT key, value FROM settings").all() as { key: string; value: string }[]).filter((r) => !SECRET.test(r.key)).map((r) => [r.key, r.value]));
   return {

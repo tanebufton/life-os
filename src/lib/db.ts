@@ -2,7 +2,8 @@ import Database from "better-sqlite3";
 import path from "node:path";
 import fs from "node:fs";
 
-const file = process.env.LIFEOS_DB ?? path.join(process.cwd(), "data", "lifeos.db");
+export const dbFile = process.env.LIFEOS_DB ?? path.join(process.cwd(), "data", "lifeos.db");
+const file = dbFile;
 fs.mkdirSync(path.dirname(file), { recursive: true });
 
 function migrate(d: Database.Database) {

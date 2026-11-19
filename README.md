@@ -46,6 +46,11 @@ quick-add syntax (`Pay rent every month #bills @home !high 31 march at 9am ~30m`
 | **Voice memos / Chrome extension** | `/voice` records speech (browser speech recognition) into a memo, task or note. `extension/` is an unpacked Chrome extension: toolbar icon or Alt+Shift+V opens a recorder window that POSTs text to `/api/v1/voice`. See `extension/README.md`. |
 | **Spotify** | `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `LIFEOS_BASE_URL`; Premium needed for control. |
 
+## Backup to Cloudflare R2
+Settings → Backup. In Cloudflare: **R2 → Create bucket**, then **Manage R2 API tokens → Create token** with *Object Read & Write* limited to that bucket. Paste the account ID, bucket, access key ID and secret, and choose an **encryption passphrase** (write it down: without it a backup can't be opened). Press *Test connection*, then *Back up now & verify*.
+Each backup is a consistent snapshot (`VACUUM INTO`), integrity-checked, gzip'd, encrypted with AES-256-GCM (key from scrypt) and uploaded, then **downloaded again and verified** before it counts. Nothing is ever deleted unless the new backup verified. The worker (`npm run worker`) repeats it on your schedule, keeps the newest N, and sends a push if one fails.
+**Restore** swaps your data for a backup inside a single SQLite transaction (a failure rolls back completely), after saving your current data as `data/pre-restore-*.db` so you can **Undo**. Your backup credentials are kept across a restore. To recover on a new machine: set `LIFEOS_BACKUP_ENDPOINT/BUCKET/KEY_ID/SECRET/PASSPHRASE` in the environment, start LifeOS, and Restore from Settings.
+
 ## Auth
 No login in the app: put it behind Cloudflare Tunnel + Access and set `LIFEOS_REQUIRE_CF_ACCESS=1` to 403 anything without the Access
 identity header. `/api/v1`, `/api/inbound` and `/api/ical` use their own token/secret, so add an Access bypass policy for those paths.
