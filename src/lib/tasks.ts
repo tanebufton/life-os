@@ -2,14 +2,17 @@ import { db } from "./db";
 import { addDays, addMonths, weekday } from "./dates";
 import { describeRepeat, normalizeRepeat, parseQuickAdd as parseQuick } from "./parse";
 import { localDate, today } from "./time";
+import { record, recordDiff } from "./activity";
+import { defaultColumn, kindOf, remapTaskStatus, resolveStatus, type Kind } from "./statuses";
 export { describeRepeat, normalizeRepeat };
 
-export type Status = "todo" | "doing" | "done";
+/** A column key. The default columns use "todo", "doing" and "done"; projects can have their own. */
+export type Status = string;
 export type TaskRow = {
   id: number; title: string; notes: string; project_id: number | null; priority: number;
   due: string | null; due_time: string | null; estimate: number | null; done_at: string | null; status: Status; repeat: string | null;
   parent_id: number | null; source: string; meta: string | null; deleted_at: string | null;
-  project_name: string | null; project_color: string | null; tags: string[]; sub_total: number; sub_done: number;
+  status_kind: Kind; status_name: string; project_name: string | null; project_color: string | null; tags: string[]; sub_total: number; sub_done: number;
 };
 export type NewTask = {
   title: string; notes?: string; project_id?: number | null; project?: string; due?: string | null; due_time?: string | null; estimate?: number | null;
@@ -17,10 +20,11 @@ export type NewTask = {
 };
 
 const SELECT = `SELECT t.*, p.name AS project_name, p.color AS project_color,
+  COALESCE(st.kind, CASE t.status WHEN 'done' THEN 'done' WHEN 'doing' THEN 'doing' ELSE 'todo' END) AS status_kind, COALESCE(st.name, t.status) AS status_name,
   (SELECT group_concat(g.name, ',') FROM task_tags tt JOIN tags g ON g.id=tt.tag_id WHERE tt.task_id=t.id) AS tags,
   (SELECT count(*) FROM tasks s WHERE s.parent_id=t.id AND s.deleted_at IS NULL) AS sub_total,
   (SELECT count(*) FROM tasks s WHERE s.parent_id=t.id AND s.deleted_at IS NULL AND s.done_at IS NOT NULL) AS sub_done
-  FROM tasks t LEFT JOIN projects p ON p.id=t.project_id`;
+  FROM tasks t LEFT JOIN projects p ON p.id=t.project_id LEFT JOIN statuses st ON st.key=t.status`;
 type Raw = Omit<TaskRow, "tags"> & { tags: string | null };
 const hydrate = (r: Raw): TaskRow => ({ ...r, tags: r.tags ? r.tags.split(",") : [] });
 
@@ -33,7 +37,7 @@ export function queryTasks(f: Filter = {}): TaskRow[] {
   const state = f.state ?? "open";
   if (state === "open") w.push("t.done_at IS NULL"); else if (state === "done") w.push("t.done_at IS NOT NULL");
   if (f.parent) { w.push("t.parent_id=?"); a.push(f.parent); } else if (!f.includeSub) w.push("t.parent_id IS NULL");
-  if (f.status) { w.push("t.status=?"); a.push(f.status); }
+  if (f.status) { if (["todo", "doing", "done"].includes(f.status)) { w.push("t.status IN (SELECT key FROM statuses WHERE kind=?)"); a.push(f.status); } else { w.push("t.status=?"); a.push(f.status); } }
   if (f.project) { w.push("t.project_id=?"); a.push(f.project); }
   if (f.source) { w.push("t.source=?"); a.push(f.source); }
   if (f.tag) { w.push("EXISTS (SELECT 1 FROM task_tags tt JOIN tags g ON g.id=tt.tag_id WHERE tt.task_id=t.id AND g.name=?)"); a.push(cleanTag(f.tag)); }
@@ -99,39 +103,47 @@ export function createTask(n: NewTask): number {
   const parent = n.parent_id ? getTask(n.parent_id) : undefined;
   const pid = n.project_id ?? projectByName(n.project) ?? parent?.project_id ?? null;
   const due = n.due === undefined ? (rep || n.due_time ? today() : null) : n.due; // a time or a repeat with no date means today
-  const status = n.status && n.status !== "done" ? n.status : "todo";
+  const asked = n.status ? resolveStatus(pid, n.status) : null, status = (asked && asked.kind !== "done" ? asked : defaultColumn(pid, "todo")).key; // new tasks are never created finished
   const id = Number(db.prepare("INSERT INTO tasks (title,notes,project_id,due,due_time,estimate,priority,repeat,status,parent_id,source,meta) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)")
     .run(n.title.trim(), n.notes ?? "", pid, due, n.due_time ?? null, n.estimate ?? null, n.priority ?? 0, rep, status, n.parent_id ?? null, n.source ?? "manual", n.meta ? JSON.stringify(n.meta) : null).lastInsertRowid);
   if (n.tags?.length) setTaskTags(id, n.tags);
+  record("task", id, "created", { new: n.title });
   return id;
 }
 
-export function completeTask(id: number): { id: number; next_due?: string } | null {
+export function completeTask(id: number, doneKey?: string): { id: number; next_due?: string } | null {
   const t = getTask(id);
   if (!t) return null;
   if (t.done_at) return { id };
+  const doneCol = (doneKey && resolveStatus(t.project_id, doneKey)?.kind === "done" ? resolveStatus(t.project_id, doneKey)! : defaultColumn(t.project_id, "done")).key, todoCol = defaultColumn(t.project_id, "todo").key;
   if (t.repeat) {
     const next = db.transaction(() => {
-      const h = db.prepare("INSERT INTO tasks (title,notes,project_id,priority,due,due_time,estimate,status,done_at,source) VALUES (?,?,?,?,?,?,?, 'done', datetime('now'), ?)")
-        .run(t.title, t.notes, t.project_id, t.priority, t.due, t.due_time, t.estimate, t.source);
+      const h = db.prepare("INSERT INTO tasks (title,notes,project_id,priority,due,due_time,estimate,status,done_at,source) VALUES (?,?,?,?,?,?,?,?, datetime('now'), ?)")
+        .run(t.title, t.notes, t.project_id, t.priority, t.due, t.due_time, t.estimate, doneCol, t.source);
       db.prepare("INSERT INTO task_tags (task_id, tag_id) SELECT ?, tag_id FROM task_tags WHERE task_id=?").run(h.lastInsertRowid, id);
       const nd = nextDue(t.due, t.repeat!);
-      db.prepare("UPDATE tasks SET due=?, status='todo' WHERE id=?").run(nd, id);
-      db.prepare("UPDATE tasks SET done_at=NULL, status='todo' WHERE parent_id=?").run(id); // recurring checklists reset
+      db.prepare("UPDATE tasks SET due=?, status=? WHERE id=?").run(nd, todoCol, id);
+      db.prepare("UPDATE tasks SET done_at=NULL, status=? WHERE parent_id=?").run(todoCol, id); // recurring checklists reset
       return nd;
     })();
+    record("task", id, "completed"); record("task", id, "changed", { field: "Due", old: t.due, new: next });
     return { id, next_due: next };
   }
   db.transaction(() => {
-    db.prepare("UPDATE tasks SET done_at=datetime('now'), status='done' WHERE id=?").run(id);
-    db.prepare("UPDATE tasks SET done_at=datetime('now'), status='done' WHERE parent_id=? AND done_at IS NULL AND deleted_at IS NULL").run(id);
+    db.prepare("UPDATE tasks SET done_at=datetime('now'), status=? WHERE id=?").run(doneCol, id);
+    db.prepare("UPDATE tasks SET done_at=datetime('now'), status=? WHERE parent_id=? AND done_at IS NULL AND deleted_at IS NULL").run(defaultColumn(t.project_id, "done").key, id);
   })();
+  record("task", id, "completed");
   return { id };
 }
-export const reopenTask = (id: number) => db.prepare("UPDATE tasks SET done_at=NULL, status='todo' WHERE id=?").run(id).changes > 0;
+export function reopenTask(id: number): boolean { const t = getTask(id); if (!t) return false; const ok = db.prepare("UPDATE tasks SET done_at=NULL, status=? WHERE id=?").run(defaultColumn(t.project_id, "todo").key, id).changes > 0; if (ok) record("task", id, "reopened"); return ok; }
+/** Move a task to a column. `status` is a column key or name, or the words todo / doing / done. Landing in a done-kind column completes it (a repeating task rolls to its next date instead). */
 export function setStatus(id: number, status: Status) {
-  if (status === "done") return completeTask(id);
-  const r = db.prepare("UPDATE tasks SET status=?, done_at=NULL WHERE id=?").run(status, id);
+  const t = getTask(id); if (!t) return null;
+  const col = resolveStatus(t.project_id, status); if (!col) throw new Error(`There is no column "${status}" here`);
+  if (col.kind === "done") return completeTask(id, col.key);
+  const r = db.prepare("UPDATE tasks SET status=?, done_at=NULL WHERE id=?").run(col.key, id);
+  if (r.changes && (t.status !== col.key || t.done_at)) record("task", id, "changed", { field: "Status", old: t.status_name, new: col.name });
   return r.changes ? { id } : null;
 }
 /** Soft delete (children too). Recoverable for 30 days via restoreTask. */
@@ -139,6 +151,7 @@ export function deleteTask(id: number): boolean {
   return db.transaction(() => {
     const r = db.prepare("UPDATE tasks SET deleted_at=datetime('now') WHERE id=? AND deleted_at IS NULL").run(id);
     db.prepare("UPDATE tasks SET deleted_at=datetime('now') WHERE parent_id=? AND deleted_at IS NULL").run(id);
+    if (r.changes) record("task", id, "deleted");
     return r.changes > 0;
   })();
 }
@@ -146,6 +159,7 @@ export function restoreTask(id: number): boolean {
   return db.transaction(() => {
     const r = db.prepare("UPDATE tasks SET deleted_at=NULL WHERE id=? AND deleted_at IS NOT NULL").run(id);
     db.prepare("UPDATE tasks SET deleted_at=NULL WHERE parent_id=?").run(id);
+    if (r.changes) record("task", id, "restored");
     return r.changes > 0;
   })();
 }
@@ -159,7 +173,8 @@ export function duplicateTask(id: number): number | null {
 
 export type Patch = Partial<Omit<NewTask, "project_id" | "meta" | "source">> & { project_id?: number | null };
 export function updateTask(id: number, p: Patch): boolean {
-  if (!getTask(id)) return false;
+  const before = getTask(id);
+  if (!before) return false;
   const sets: string[] = [], a: unknown[] = [];
   const set = (c: string, v: unknown) => { sets.push(`${c}=?`); a.push(v); };
   if (p.title !== undefined) set("title", p.title.trim());
@@ -173,8 +188,12 @@ export function updateTask(id: number, p: Patch): boolean {
   if (p.repeat !== undefined) set("repeat", normalizeRepeat(p.repeat));
   db.transaction(() => {
     if (sets.length) db.prepare(`UPDATE tasks SET ${sets.join(",")} WHERE id=?`).run(...a, id);
+    if (p.project !== undefined || p.project_id !== undefined) remapTaskStatus(id); // a task moved to another project lands in the matching column there
     if (p.tags) setTaskTags(id, p.tags);
     if (p.status) setStatus(id, p.status);
+    const after = getTask(id)!;
+    recordDiff("task", id, { ...before, tags: before.tags.join(" ") }, { ...after, tags: after.tags.join(" ") }, { title: "Title", project_name: "Project", due: "Due", due_time: "Time", estimate: "Estimate", priority: "Priority", repeat: "Repeat", tags: "Tags" });
+    if (before.notes !== after.notes) record("task", id, "edited", { field: "notes", old: `${before.notes.length} chars`, new: `${after.notes.length} chars` });
   })();
   return true;
 }
@@ -193,7 +212,10 @@ export function presetDate(p: Preset, t = today()): string | null {
 export function reschedule(id: number, to: Preset | string): boolean {
   const due = ["today", "tomorrow", "weekend", "nextweek", "none"].includes(to) ? presetDate(to as Preset) : /^\d{4}-\d{2}-\d{2}$/.test(to) ? to : undefined;
   if (due === undefined) throw new Error(`Invalid date "${to}"`);
-  return db.prepare("UPDATE tasks SET due=? WHERE id=? AND deleted_at IS NULL").run(due, id).changes > 0;
+  const prev = db.prepare("SELECT due FROM tasks WHERE id=?").get(id) as { due: string | null } | undefined;
+  const ok = db.prepare("UPDATE tasks SET due=? WHERE id=? AND deleted_at IS NULL").run(due, id).changes > 0;
+  if (ok && (prev?.due ?? null) !== due) record("task", id, "changed", { field: "Due", old: prev?.due, new: due });
+  return ok;
 }
 
 export function doneToday(): number {
@@ -227,7 +249,7 @@ export function searchTasks(q: string, limit = 50): TaskRow[] {
       if (m[1] === "open" || m[1] === "done" || m[1] === "any") state = m[1];
       else if (m[1] === "recurring") w.push("t.repeat IS NOT NULL");
       else if (m[1] === "overdue") { w.push("t.due < ?"); a.push(t); }
-      else { w.push("t.status=?"); a.push(m[1]); }
+      else { w.push("t.status IN (SELECT key FROM statuses WHERE kind=?)"); a.push(m[1]); }
     }
     else if ((m = low.match(/^due:(.+)$/))) {
       const v = m[1];

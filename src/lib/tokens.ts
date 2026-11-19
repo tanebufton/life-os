@@ -6,7 +6,7 @@ const hash = (s: string) => crypto.createHash("sha256").update(s).digest("hex");
 export const AREAS = ["tasks", "habits", "journal", "money", "subscriptions", "voice"] as const;
 export type Area = (typeof AREAS)[number];
 export type Level = "read" | "write";
-export type TokenInfo = { id: number; level: Level; areas: Area[] | null };
+export type TokenInfo = { name: string; id: number; level: Level; areas: Area[] | null };
 /** `days` = how long it stays valid (omit for never). `areas` limits it to some parts of the API (omit for all). */
 export function createToken(name: string, o: { level?: Level; areas?: string[] | null; days?: number | null } = {}): string {
   const token = "lifeos_" + crypto.randomBytes(24).toString("hex");
@@ -22,11 +22,11 @@ export const revokeToken = (id: number) => db.prepare("DELETE FROM api_tokens WH
 export function verifyToken(header: string | null | undefined): TokenInfo | null {
   const m = header?.match(/^Bearer\s+(\S+)$/i);
   if (!m) return null;
-  const r = db.prepare("SELECT id, level, areas, expires_at FROM api_tokens WHERE hash=?").get(hash(m[1])) as { id: number; level: Level; areas: string | null; expires_at: string | null } | undefined;
+  const r = db.prepare("SELECT id, name, level, areas, expires_at FROM api_tokens WHERE hash=?").get(hash(m[1])) as { name: string; id: number; level: Level; areas: string | null; expires_at: string | null } | undefined;
   if (!r || (r.expires_at && Date.parse(r.expires_at) <= Date.now())) return null;
   db.prepare("UPDATE api_tokens SET last_used_at=datetime('now') WHERE id=?").run(r.id);
   let areas: Area[] | null = null; try { areas = r.areas ? (JSON.parse(r.areas) as Area[]) : null; } catch { areas = []; } // unreadable restriction fails closed
-  return { id: r.id, level: r.level === "read" ? "read" : "write", areas };
+  return { id: r.id, name: r.name, level: r.level === "read" ? "read" : "write", areas };
 }
 export const verifyBearer = (header: string | null | undefined) => !!verifyToken(header);
 /** Long random path secret for the calendar feed (calendar apps can't send headers). */

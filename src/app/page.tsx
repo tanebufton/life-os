@@ -25,7 +25,9 @@ export default function Today() {
   const planned = open.filter((x) => x.due && x.due <= t).reduce((n, x) => n + (x.estimate ?? 0), 0);
   const widgets = resolveWidgets(getSetting("today_widgets"), isOn);
   const emailNew = open.filter((x) => x.source === "email" && !x.due && !x.project_id).length;
-  const groups = bucket(open).filter((g) => g.label !== "Later").map((g) => (g.label === "No date" ? { ...g, label: "Inbox", tasks: g.tasks.slice(0, 6) } : g));
+  // Undated tasks are "To do": the same tasks that sit in the board's To do column. Only tasks with no project AND no date are unsorted "Inbox" items, which have their own page.
+  const unsorted = open.filter((x) => !x.project_id && !x.due).length, undated = open.filter((x) => !x.due && x.status_kind === "todo").length;
+  const groups = bucket(open).filter((g) => g.label !== "Later").map((g) => (g.label === "No date" ? { ...g, label: "To do", tasks: g.tasks.slice(0, 8) } : g));
   const date = new Intl.DateTimeFormat("en-NZ", { timeZone: tz(), weekday: "long", day: "numeric", month: "long" }).format(new Date());
   return (
     <>
@@ -35,7 +37,10 @@ export default function Today() {
         <Link href="/inbox" className="rise mb-5 flex items-center gap-3 rounded-xl border border-accent/30 bg-accent/5 px-4 py-3 text-[14px] hover:bg-accent/10">
           <Icon name="mail" size={18} className="text-accent" /><span><b>{emailNew}</b> new {emailNew === 1 ? "task" : "tasks"} from email waiting in your inbox</span><Icon name="arrow" size={15} className="ml-auto text-accent" /></Link>)}
       <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-x-12 gap-y-6 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <div><TaskGroups groups={groups} empty={<>You&apos;re all caught up. Enjoy the day.</>} /><AddTaskRow /></div>
+        <div><TaskGroups groups={groups} empty={<>You&apos;re all caught up. Enjoy the day.</>} />
+          {undated > 8 && <Link href="/tasks" className="mt-2 inline-block px-2 text-xs text-accent hover:underline">+{undated - 8} more to do in My tasks</Link>}
+          {unsorted > 0 && emailNew === 0 && <Link href="/inbox" className="mt-3 flex items-center gap-2 rounded-lg px-2 py-1.5 text-[13px] text-mute hover:bg-raise/60"><Icon name="inbox" size={15} className="text-accent" /><span><b className="text-fg">{unsorted}</b> unsorted in your Inbox (no project or date)</span><Icon name="arrow" size={13} className="ml-auto" /></Link>}
+          <AddTaskRow /></div>
         <aside className="space-y-4">
           {widgets.map((id, i) => {
             switch (id) {

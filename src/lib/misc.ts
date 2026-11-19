@@ -52,7 +52,7 @@ export function inQuietHours(hm: string, start?: string | null, end?: string | n
 // ---------- do-now ----------
 /** The single most sensible next task: overdue/timed first, then high priority, then in-progress, then soonest. */
 export function nextBest(skip: number[] = [], t = today()): TaskRow | null {
-  const score = (x: TaskRow) => (x.due && x.due < t ? 100 + Math.min(30, diffDays(t, x.due)) : x.due === t ? 80 : x.due ? Math.max(0, 40 - diffDays(x.due, t)) : 10) + x.priority * 25 + (x.status === "doing" ? 30 : 0) + (x.due_time ? 15 : 0) - (x.estimate && x.estimate > 90 ? 10 : 0);
+  const score = (x: TaskRow) => (x.due && x.due < t ? 100 + Math.min(30, diffDays(t, x.due)) : x.due === t ? 80 : x.due ? Math.max(0, 40 - diffDays(x.due, t)) : 10) + x.priority * 25 + (x.status_kind === "doing" ? 30 : 0) + (x.due_time ? 15 : 0) - (x.estimate && x.estimate > 90 ? 10 : 0);
   return queryTasks().filter((x) => !skip.includes(x.id)).sort((a, b) => score(b) - score(a) || a.id - b.id)[0] ?? null;
 }
 // ---------- eisenhower matrix ----------

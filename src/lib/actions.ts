@@ -25,7 +25,7 @@ import { MAX_TABS, NAV, SETTINGS_PAGE } from "./nav";
 import { WIDGETS } from "./widgets";
 
 const refresh = () => revalidatePath("/", "layout");
-const Status = z.enum(["todo", "doing", "done"]);
+const Status = z.string().trim().min(1).max(40);
 const str = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
 
 // ---------- tasks ----------
@@ -49,13 +49,13 @@ export async function toggleTask(id: number): Promise<{ title: string; done: boo
   refresh();
   return out;
 }
-export async function moveTask(id: number, status: Status) { setStatus(id, Status.parse(status)); refresh(); }
+export async function moveTask(id: number, status: string): Promise<{ ok: boolean; error?: string }> { try { setStatus(id, Status.parse(status)); refresh(); return { ok: true }; } catch (e) { return { ok: false, error: (e as Error).message }; } }
 export async function rescheduleAction(id: number, to: string) { reschedule(id, to); refresh(); }
 export async function deleteTaskInline(id: number): Promise<{ id: number; title: string } | null> { const t = getTask(id); if (!t || !softDelete(id)) return null; refresh(); return { id, title: t.title }; }
 export async function restoreTaskAction(id: number) { restoreTask(id); refresh(); }
 export async function deleteTask(id: number) { softDelete(id); refresh(); redirect(`/tasks?deleted=${id}`); }
 export async function duplicateTaskAction(id: number): Promise<number | null> { const n = duplicateTask(id); refresh(); return n; }
-export async function startFocus(id: number) { if (getTask(id)?.status === "todo") setStatus(id, "doing"); refresh(); }
+export async function startFocus(id: number) { if (getTask(id)?.status_kind === "todo") setStatus(id, "doing"); refresh(); }
 export async function addSubtask(parentId: number, title: string) { const t = title.trim(); if (t) createTask({ title: t, parent_id: parentId }); refresh(); }
 
 const Patch = z.object({

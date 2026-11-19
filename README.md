@@ -33,7 +33,8 @@ quick-add syntax (`Pay rent every month #bills @home !high 31 march at 9am ~30m`
 
 **Money:** monthly **budgets** per category (default + per-month overrides), transactions, `$12.50 coffee` quick-add from anywhere, rules that auto-categorise by payee, **bank CSV import** (delimiter/date/debit-credit detection, de-duplicated), month projection and threshold alerts, savings goals. **Subscriptions:** cycle maths, auto-logged renewals, free-trial and renewal reminders, price-rise detection, monthly/yearly totals.
 **Planning & life:** **Planner** (time-blocking timeline, auto-schedule into free slots, synced calendar events), **Notes** (Markdown, `[[links]]`, backlinks), **Goals** with key results, **People** (catch-up cadence, birthdays), **Templates** (one click makes a task with its checklist), **Do this now**, **Priority matrix**, **Trash**, saved filters, bulk select, task comments, link-title enrichment, voice capture (where the browser supports it), quiet hours.
-**Customise:** Settings → Layout picks the (up to 4) tabs in the phone's bottom bar and the order of Today's side panels.
+**Board:** custom columns (add, rename, reorder, remove) with a *kind* (To do / In progress / Done) so counts and reminders keep working, optional **per-project columns**, add cards straight into a column, click a card to open it, and finished cards hide after N days. **Projects** are hubs: tasks, board, notes and goals. **Tags** on tasks, notes, goals and people. **History** on tasks, notes and goals (with restorable note versions) plus an Activity page. Voice is hold-to-talk: let go and it's added as a task.
+**Customise:** Reorder, hide or show sidebar pages from the LifeOS menu → Edit sidebar (desktop). Settings → Layout picks the (up to 4) tabs in the phone's bottom bar and the order of Today's side panels.
 
 ## Integrations
 | What | How |

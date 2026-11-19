@@ -7,6 +7,7 @@ import { ListKeys, ShortcutsHelp } from "@/components/keys";
 import { Palette } from "@/components/palette";
 import { PwaRegister } from "@/components/pwa";
 import { listFilters } from "@/lib/misc";
+import { parsePrefs } from "@/lib/sidebar";
 import { Hotkeys, MobileNav, Sidebar, Topbar, type NavProject } from "@/components/shell";
 import { db } from "@/lib/db";
 import { featureMap } from "@/lib/features";
@@ -26,7 +27,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const projects = db.prepare(`SELECT p.id, p.name, p.color, (SELECT count(*) FROM tasks k WHERE k.project_id=p.id AND k.done_at IS NULL AND k.deleted_at IS NULL AND k.parent_id IS NULL) AS open
     FROM projects p WHERE p.archived=0 ORDER BY p.name`).all() as NavProject[];
   const counts = db.prepare(`SELECT
-    count(CASE WHEN due IS NOT NULL AND due<=? THEN 1 END) AS due, count(*) AS open, count(CASE WHEN status='doing' THEN 1 END) AS doing,
+    count(CASE WHEN due IS NOT NULL AND due<=? THEN 1 END) AS due, count(*) AS open, count(CASE WHEN status IN (SELECT key FROM statuses WHERE kind='doing') THEN 1 END) AS doing,
     count(CASE WHEN project_id IS NULL AND due IS NULL THEN 1 END) AS inbox
     FROM tasks WHERE done_at IS NULL AND deleted_at IS NULL AND parent_id IS NULL`).get(t) as { due: number; open: number; doing: number; inbox: number };
   return (
@@ -35,7 +36,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <SessionProvider>
         <div className="flex h-dvh">
-          <Sidebar counts={counts} projects={projects} features={features} filters={listFilters()} />
+          <Sidebar counts={counts} projects={projects} features={features} filters={listFilters()} prefs={parsePrefs(getSetting("sidebar"))} />
           <div className="flex min-w-0 flex-1 flex-col">
             <main className="min-h-0 flex-1 overflow-y-auto">
               <Topbar today={t} projects={projects} money={money} />

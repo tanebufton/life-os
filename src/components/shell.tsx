@@ -3,6 +3,9 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { addProject } from "@/lib/actions";
+import { resetSidebarAction, saveSidebarAction } from "@/lib/actions5";
+import { arrange, withVisibility, EMPTY_PREFS, type SidebarPrefs } from "@/lib/sidebar";
+import { toast } from "sonner";
 import { NAV, SETTINGS_PAGE, visiblePages, type Features, type NavPage } from "@/lib/nav";
 import { CaptureForm, type MoneyCtx } from "./capture";
 import { Icon } from "./Icon";
@@ -37,9 +40,11 @@ export function Hotkeys({ features }: { features: Features }) {
 }
 
 const row = "flex min-h-[30px] items-center gap-2.5 rounded-md px-2 text-[14px] transition-colors";
-export function Sidebar({ counts, projects, features, filters = [] }: { counts: Counts; projects: NavProject[]; features: Features; filters?: { id: number; name: string; query: string }[] }) {
+export function Sidebar({ counts, projects, features, filters = [], prefs: savedPrefs = EMPTY_PREFS }: { counts: Counts; projects: NavProject[]; features: Features; filters?: { id: number; name: string; query: string }[]; prefs?: SidebarPrefs }) {
   const path = usePathname();
-  const [adding, setAdding] = useState(false);
+  const [adding, setAdding] = useState(false), [editing, setEditing] = useState(false), [prefs, setPrefs] = useState<SidebarPrefs>(savedPrefs), [drag, setDrag] = useState<string | null>(null);
+  useEffect(() => setPrefs(savedPrefs), [savedPrefs]);
+  const persist = (next: SidebarPrefs) => { setPrefs(next); void saveSidebarAction(next).then((r) => { if (!r.ok) toast(r.error); }); };
   const badge: Record<string, number | undefined> = { "/": counts.due, "/inbox": counts.inbox, "/board": counts.doing };
   const pages = visiblePages(features);
   const link = (p: NavPage) => {
@@ -51,21 +56,48 @@ export function Sidebar({ counts, projects, features, filters = [] }: { counts: 
       </Link>
     );
   };
-  const section = (g: NavPage["group"], title?: string) => { const items = pages.filter((p) => p.group === g && !p.hidden); return items.length ? <div className={title ? "mt-4" : ""}>{title && <div className="px-4 pb-1 text-xs font-semibold text-mute">{title}</div>}<div className="space-y-px px-2">{items.map(link)}</div></div> : null; };
+  const arranged = arrange(pages, prefs);
+  const flat = (key: string) => arranged.find((g) => g.key === key)!.items.map((i) => i.page.href);
+  /** Put `href` where `before` is (or at the end of the group). Works on the flat saved order, so other groups keep their place. */
+  const place = (href: string, before: string | null, groupKey: string) => {
+    const g = flat(groupKey).filter((h) => h !== href); const at = before ? g.indexOf(before) : g.length; g.splice(at < 0 ? g.length : at, 0, href);
+    const others = prefs.order.filter((h) => !g.includes(h) && !flat(groupKey).includes(h)); persist({ ...prefs, order: [...others, ...g] });
+  };
+  const bump = (groupKey: string, href: string, dir: -1 | 1) => { const g = flat(groupKey), i = g.indexOf(href), j = i + dir; if (j < 0 || j >= g.length) return; place(href, dir < 0 ? g[j] : g[j + 1] ?? null, groupKey); };
+  const bumpGroup = (key: string, dir: -1 | 1) => { const g = arranged.map((x) => x.key as string), i = g.indexOf(key), j = i + dir; if (j < 0 || j >= g.length) return; [g[i], g[j]] = [g[j], g[i]]; persist({ ...prefs, groups: g }); };
+  const editRow = (p: NavPage, hidden: boolean, gk: string) => (
+    <div key={p.href} draggable onDragStart={() => setDrag(p.href)} onDragEnd={() => setDrag(null)} onDragOver={(e) => { if (drag) e.preventDefault(); }}
+      onDrop={(e) => { e.preventDefault(); if (drag && drag !== p.href && pages.find((x) => x.href === drag)?.group === gk) place(drag, p.href, gk); setDrag(null); }}
+      className={`${row} cursor-grab gap-1.5 ${hidden ? "opacity-50" : ""} ${drag === p.href ? "bg-accent/10" : "hover:bg-raise/70"}`}>
+      <Icon name="grip" size={14} className="text-dim" /><Icon name={p.icon} size={16} className="text-mute" /><span className="flex-1 truncate">{p.label}</span>
+      <button aria-label={`Move ${p.label} up`} onClick={() => bump(gk, p.href, -1)} className="rounded p-0.5 text-dim hover:bg-raise hover:text-fg"><Icon name="chevDown" size={13} className="rotate-180" /></button>
+      <button aria-label={`Move ${p.label} down`} onClick={() => bump(gk, p.href, 1)} className="rounded p-0.5 text-dim hover:bg-raise hover:text-fg"><Icon name="chevDown" size={13} /></button>
+      <button aria-label={hidden ? `Show ${p.label}` : `Hide ${p.label}`} aria-pressed={!hidden} disabled={p.href === "/"} onClick={() => persist(withVisibility(prefs, p, !hidden))} className="rounded p-0.5 text-mute hover:bg-raise hover:text-fg disabled:invisible"><Icon name={hidden ? "eyeoff" : "eye"} size={14} /></button>
+    </div>
+  );
+  const sections = arranged.map((g, gi) => {
+    const visible = g.items.filter((i) => !i.hidden);
+    if (!editing && !visible.length) return null;
+    return (
+      <div key={g.key} className={gi === 0 && !g.title ? "" : "mt-4"}>
+        {(g.title || editing) && <div className="flex items-center px-4 pb-1 text-xs font-semibold text-mute"><span className="flex-1">{g.title || "Top"}</span>
+          {editing && <><button aria-label={`Move ${g.title || "top"} group up`} onClick={() => bumpGroup(g.key, -1)} className="rounded p-0.5 hover:bg-raise"><Icon name="chevDown" size={13} className="rotate-180" /></button><button aria-label={`Move ${g.title || "top"} group down`} onClick={() => bumpGroup(g.key, 1)} className="rounded p-0.5 hover:bg-raise"><Icon name="chevDown" size={13} /></button></>}</div>}
+        <div className="space-y-px px-2">{(editing ? g.items : visible).map((i) => (editing ? editRow(i.page, i.hidden, g.key) : link(i.page)))}</div>
+      </div>
+    );
+  });
   return (
     <aside className="hidden w-[260px] shrink-0 flex-col border-r bg-side md:flex">
       <div className="px-2 pb-1 pt-2.5">
-        <Link href="/" className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-raise">
-          <span className="grid h-[22px] w-[22px] place-items-center rounded-[5px] bg-accent text-[12px] font-bold text-ink">L</span>
-          <span className="text-[14px] font-semibold">LifeOS</span><Icon name="chevDown" size={14} className="text-dim" />
-        </Link>
+        <WorkspaceMenu editing={editing} onEdit={() => setEditing((e) => !e)} onReset={() => void resetSidebarAction().then((r) => toast(r.ok ? (r.message ?? "Done") : r.error))} hiddenPages={arranged.flatMap((g) => g.items).filter((i) => i.hidden).map((i) => i.page)} />
       </div>
       <div className="space-y-px px-2">
         <button onClick={openPalette} className={`${row} w-full text-mute hover:bg-raise`}><Icon name="search" size={16} />Search<span className="ml-auto text-xs text-dim">⌘K</span></button>
         <button onClick={focusCapture} className={`${row} w-full font-medium text-accent hover:bg-accent/10`}><span className="grid h-4 w-4 place-items-center rounded-full bg-accent text-ink"><Icon name="plus" size={12} /></span>New task</button>
       </div>
       <div className="mt-2 min-h-0 flex-1 overflow-y-auto pb-2">
-        {section("main")}{section("life", "Life")}{section("money", "Money")}{section("explore", "Explore")}
+        {sections}
+        {editing && <div className="mx-3 mt-3 rounded-lg border border-dashed p-2.5 text-xs text-mute">Drag pages (or use the arrows) to reorder them. The eye hides a page from this list; it stays reachable from search (⌘K) and the LifeOS menu. <button className="mt-1.5 block font-medium text-accent hover:underline" onClick={() => setEditing(false)}>Done</button></div>}
         {filters.length > 0 && <div className="mt-4"><div className="px-4 pb-1 text-xs font-semibold text-mute">Saved filters</div><div className="space-y-px px-2">{filters.map((f) => <Link key={f.id} href={`/search?q=${encodeURIComponent(f.query)}`} className={`${row} text-fg/80 hover:bg-raise/70`}><Icon name="search" size={16} className="text-mute" /><span className="truncate">{f.name}</span></Link>)}</div></div>}
         <div className="group mt-4 flex items-center justify-between px-4"><span className="text-xs font-semibold text-mute">Projects</span>
           <button onClick={() => setAdding((a) => !a)} aria-label="New project" className="rounded p-0.5 text-mute opacity-0 transition hover:bg-raise hover:text-fg group-hover:opacity-100 focus:opacity-100"><Icon name={adding ? "x" : "plus"} size={14} /></button></div>
@@ -132,5 +164,31 @@ export function MobileNav({ counts, tabs }: { counts: Counts; tabs: NavPage[] })
         );
       })}
     </nav>
+  );
+}
+
+/** The LifeOS header menu: edit the sidebar, reach pages you've hidden, settings, shortcuts. */
+function WorkspaceMenu({ editing, onEdit, onReset, hiddenPages }: { editing: boolean; onEdit: () => void; onReset: () => void; hiddenPages: NavPage[] }) {
+  const [open, setOpen] = useState(false);
+  useEffect(() => { if (!open) return; const k = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false), c = (e: MouseEvent) => { if (!(e.target as HTMLElement).closest("[data-wsmenu]")) setOpen(false); }; window.addEventListener("keydown", k); window.addEventListener("mousedown", c); return () => { window.removeEventListener("keydown", k); window.removeEventListener("mousedown", c); }; }, [open]);
+  const item = "flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[13px] hover:bg-raise";
+  return (
+    <div className="relative" data-wsmenu>
+      <button onClick={() => setOpen((o) => !o)} aria-haspopup="menu" aria-expanded={open} aria-label="LifeOS menu" className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 hover:bg-raise">
+        <span className="grid h-[22px] w-[22px] place-items-center rounded-[5px] bg-accent text-[12px] font-bold text-ink">L</span>
+        <span className="text-[14px] font-semibold">LifeOS</span><Icon name="chevDown" size={14} className={`text-dim transition ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div role="menu" className="absolute left-0 top-full z-50 mt-1 w-60 rounded-xl border bg-panel p-1.5 shadow-[0_8px_30px_rgb(0_0_0/0.15)]">
+          <Link role="menuitem" href="/" onClick={() => setOpen(false)} className={item}><Icon name="today" size={15} className="text-mute" />Home</Link>
+          <button role="menuitem" className={item} onClick={() => { onEdit(); setOpen(false); }}><Icon name="edit" size={15} className="text-mute" />{editing ? "Finish editing sidebar" : "Edit sidebar"}</button>
+          <button role="menuitem" className={item} onClick={() => { onReset(); setOpen(false); }}><Icon name="undo" size={15} className="text-mute" />Reset sidebar order</button>
+          <Link role="menuitem" href="/settings" onClick={() => setOpen(false)} className={item}><Icon name="settings" size={15} className="text-mute" />Settings</Link>
+          <button role="menuitem" className={item} onClick={() => { openHelp(); setOpen(false); }}><Icon name="keyboard" size={15} className="text-mute" />Keyboard shortcuts</button>
+          {hiddenPages.length > 0 && <><div className="mx-2 my-1.5 border-t" /><div className="px-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wide text-dim">More pages</div>
+            {hiddenPages.map((p) => <Link key={p.href} role="menuitem" href={p.href} onClick={() => setOpen(false)} className={item}><Icon name={p.icon} size={15} className="text-mute" />{p.label}</Link>)}</>}
+        </div>
+      )}
+    </div>
   );
 }

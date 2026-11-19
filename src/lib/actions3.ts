@@ -42,7 +42,7 @@ export async function deleteNoteAction(id: number) { deleteNote(id); refresh(); 
 export async function openNoteByTitle(title: string) { const n = noteByTitle(title) ?? getNote(createNote(title, "")); return n!.id; }
 
 // goals
-export async function addGoalAction(fd: FormData) { const t = s(fd, "title"); if (!t) return; createGoal({ title: t, area: s(fd, "area") || "General", target_date: s(fd, "target_date") || null }); refresh(); }
+export async function addGoalAction(fd: FormData) { const t = s(fd, "title"); if (!t) return; createGoal({ title: t, area: s(fd, "area") || "General", target_date: s(fd, "target_date") || null, project_id: Number(s(fd, "project_id")) || null }); refresh(); }
 export async function goalStatusAction(id: number, st: Goal["status"]) { setGoalStatus(id, st); refresh(); }
 export async function deleteGoalAction(id: number) { deleteGoal(id); refresh(); }
 export async function addKrAction(goalId: number, fd: FormData) { try { addKeyResult(goalId, s(fd, "title"), Number(s(fd, "target")), s(fd, "unit")); } catch (e) { console.error(e); } refresh(); }

@@ -44,4 +44,14 @@ assert.equal((await B.list()).length, 2); ok("pruning keeps the newest N (keep=2
 // schedule
 setSetting("backup_enabled", "1"); setSetting("backup_hours", "24"); setSetting("backup_last_try", null as any); assert.equal(B.isDue(Date.now()), false); assert.equal(B.isDue(Date.now() + 25 * 3600_000), true);
 setSetting("backup_enabled", "0"); assert.equal(B.isDue(Date.now() + 99 * 3600_000), false); ok("scheduler: due only when enabled and the interval has passed");
+
+// ---- restoring a backup made by the PREVIOUS release (no board columns, no new tables) must not break the board
+{
+  const Database2 = (await import("better-sqlite3")).default; const legacy = fs.readFileSync("tests/fixtures/legacy-v0.db"); const lt = new Database2("tests/fixtures/legacy-v0.db", { readonly: true }); const legacyTasks = (lt.prepare("SELECT count(*) c FROM tasks").get() as any).c; lt.close();
+  await new (S3Client as any)({ region: "auto", endpoint: "http://127.0.0.1:4600", forcePathStyle: true, credentials: { accessKeyId: "a", secretAccessKey: "b" }, requestChecksumCalculation: "WHEN_REQUIRED" }).send(new PutObjectCommand({ Bucket: "bk", Key: "lifeos/lifeos-99990102T000000Z-legacy00.db.enc", Body: B.seal(legacy, "correct horse") }));
+  const Stat = await import("../src/lib/statuses.ts"); Stat.addColumn(null, "Review", "doing"); // a custom column that the old backup knows nothing about
+  await B.restore("lifeos/lifeos-99990102T000000Z-legacy00.db.enc");
+  assert.equal((db.prepare("SELECT count(*) c FROM tasks").get() as any).c, legacyTasks); assert.deepEqual(Stat.listStatuses(null).map((s: any) => s.key), ["todo", "doing", "done"]);
+  assert.equal((db.prepare("SELECT count(*) c FROM tasks t LEFT JOIN statuses s ON s.key=t.status WHERE s.key IS NULL").get() as any).c, 0); ok("restoring an old-format backup brings back the default columns and every task has a valid column");
+}
 console.log(`\n${n} checks passed`); process.exit(0);

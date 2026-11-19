@@ -94,11 +94,50 @@ function migrate(d: Database.Database) {
     ins.run("https://hnrss.org/frontpage", "Hacker News");
     ins.run("https://feeds.bbci.co.uk/news/world/rss.xml", "BBC World");
   }
+  // Board columns. A status is a column with a "kind" (todo/doing/done) so counts, reminders and Today keep working with custom names.
+  // project_id NULL = the default set; a project can own its own set. Keys are unique across all sets, so a key alone identifies a column.
+  d.exec(`CREATE TABLE IF NOT EXISTS statuses (
+    id INTEGER PRIMARY KEY, project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE, key TEXT NOT NULL UNIQUE, name TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK (kind IN ('todo','doing','done')), position INTEGER NOT NULL DEFAULT 0
+  );`);
+  if (!(d.prepare("SELECT 1 FROM statuses WHERE project_id IS NULL LIMIT 1").get())) {
+    const ins = d.prepare("INSERT INTO statuses (project_id, key, name, kind, position) VALUES (NULL, ?, ?, ?, ?)");
+    ins.run("todo", "To do", "todo", 0); ins.run("doing", "In progress", "doing", 1); ins.run("done", "Done", "done", 2);
+  }
   // API token scopes (added after the table existed in earlier versions)
   const tcols = (d.prepare("PRAGMA table_info(api_tokens)").all() as { name: string }[]).map((c) => c.name);
   if (!tcols.includes("level")) d.exec("ALTER TABLE api_tokens ADD COLUMN level TEXT NOT NULL DEFAULT 'write'"); // existing tokens keep read+write
   if (!tcols.includes("areas")) d.exec("ALTER TABLE api_tokens ADD COLUMN areas TEXT"); // JSON list, null = every area
   if (!tcols.includes("expires_at")) d.exec("ALTER TABLE api_tokens ADD COLUMN expires_at TEXT");
+  // Notes can belong to a project; tags work on any kind of item; every change is recorded in an activity log; notes keep earlier versions.
+  const ncols = (d.prepare("PRAGMA table_info(notes)").all() as { name: string }[]).map((c) => c.name);
+  if (!ncols.includes("project_id")) d.exec("ALTER TABLE notes ADD COLUMN project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL");
+  d.exec(`
+    CREATE TABLE IF NOT EXISTS entity_tags (kind TEXT NOT NULL, entity_id INTEGER NOT NULL, tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE, PRIMARY KEY (kind, entity_id, tag_id));
+    CREATE INDEX IF NOT EXISTS entity_tags_tag ON entity_tags(tag_id);
+    CREATE TABLE IF NOT EXISTS activity (id INTEGER PRIMARY KEY, entity TEXT NOT NULL, entity_id INTEGER NOT NULL, action TEXT NOT NULL, field TEXT, old TEXT, new TEXT, actor TEXT NOT NULL DEFAULT 'you', at TEXT NOT NULL DEFAULT (datetime('now')));
+    CREATE INDEX IF NOT EXISTS activity_entity ON activity(entity, entity_id, id);
+    CREATE TABLE IF NOT EXISTS note_versions (id INTEGER PRIMARY KEY, note_id INTEGER NOT NULL REFERENCES notes(id) ON DELETE CASCADE, title TEXT NOT NULL, body TEXT NOT NULL, at TEXT NOT NULL DEFAULT (datetime('now')));
+    CREATE INDEX IF NOT EXISTS note_versions_note ON note_versions(note_id, id);
+  `);
+}
+
+/** Bump when the schema changes. Existing databases below this get an automatic safety copy before they are migrated. */
+export const SCHEMA_VERSION = 3;
+/**
+ * Before upgrading an existing database to a newer schema, save a complete copy next to it (VACUUM INTO is safe while the app runs).
+ * If this can't be written the upgrade stops rather than risk your data; set LIFEOS_SKIP_UPGRADE_BACKUP=1 to override. Keeps the newest 3.
+ */
+function safetyCopy(d: Database.Database) {
+  const v = Number(d.pragma("user_version", { simple: true })) || 0;
+  if (v >= SCHEMA_VERSION || process.env.LIFEOS_SKIP_UPGRADE_BACKUP === "1") return;
+  if (!d.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='tasks'").get()) return; // brand-new database: nothing to protect
+  const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z"), prefix = `${path.basename(file)}.pre-upgrade-`;
+  try {
+    d.prepare("VACUUM INTO ?").run(path.join(path.dirname(file), `${prefix}v${v}-${stamp}-${process.pid}`));
+    const old = fs.readdirSync(path.dirname(file)).filter((f) => f.startsWith(prefix)).sort().reverse().slice(3);
+    for (const f of old) try { fs.unlinkSync(path.join(path.dirname(file), f)); } catch { /* best effort */ }
+  } catch (e) { throw new Error(`LifeOS could not save a safety copy before upgrading the database (${(e as Error).message}). Free some disk space, or set LIFEOS_SKIP_UPGRADE_BACKUP=1 to upgrade without one.`); }
 }
 
 const g = globalThis as unknown as { __db?: Database.Database };
@@ -109,7 +148,8 @@ export const db = (g.__db ??= (() => {
   d.pragma("foreign_keys = ON");
   // Exclusive lock for the whole migration: when several processes start at once on a new database (e.g. `next build`
   // workers, or web + worker + mcp booting together) the others wait, then see the finished schema instead of racing on ALTER TABLE.
-  d.transaction(() => migrate(d)).immediate();
+  safetyCopy(d);
+  d.transaction(() => { migrate(d); d.pragma(`user_version = ${SCHEMA_VERSION}`); }).immediate();
   return d;
 })());
 

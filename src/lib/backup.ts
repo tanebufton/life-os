@@ -9,6 +9,7 @@ import os from "node:os";
 import path from "node:path";
 import zlib from "node:zlib";
 import { db, dbFile } from "./db";
+import { ensureDefaultStatuses } from "./statuses";
 import { getSetting, setSetting } from "./settings";
 
 export class BackupError extends Error { constructor(public step: string, message: string) { super(message); } }
@@ -155,6 +156,8 @@ function applyFile(file: string) {
         const rc = new Set(cols("r", t)), shared = cols("main", t).filter((c) => rc.has(c)).map((c) => `"${c}"`).join(",");
         if (shared) db.exec(`INSERT INTO main."${t}" (${shared}) SELECT ${shared} FROM r."${t}"`);
       }
+      ensureDefaultStatuses(); // a backup from before board columns existed has no statuses table
+      db.prepare("UPDATE tasks SET status=CASE WHEN done_at IS NOT NULL THEN 'done' ELSE 'todo' END WHERE status NOT IN (SELECT key FROM statuses)").run(); // tasks pointing at a column that no longer exists
       const bad = db.pragma("foreign_key_check") as unknown[]; if (bad.length) throw new BackupError("restore", `Restored data has ${bad.length} broken references; nothing was changed.`);
       const ins = db.prepare("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value");
       for (const k of keep) if (KEEP_SETTINGS.test(k.key)) ins.run(k.key, k.value); // your current backup credentials survive a restore

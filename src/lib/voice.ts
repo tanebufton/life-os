@@ -1,3 +1,4 @@
+import { runAs } from "./activity";
 import { db } from "./db";
 import { createNote } from "./notes";
 import { enrichLinkTask } from "./misc";
@@ -15,7 +16,8 @@ export function saveMemo(text: string, as: MemoAs = "memo", source = "web"): Mem
   if (as !== "memo") convertMemo(id, as);
   return getMemo(id)!;
 }
-export function convertMemo(id: number, as: Exclude<MemoAs, "memo">): Memo | undefined {
+export const convertMemo = (id: number, as: Exclude<MemoAs, "memo">): Memo | undefined => runAs("voice", () => convertMemoInner(id, as));
+function convertMemoInner(id: number, as: Exclude<MemoAs, "memo">): Memo | undefined {
   const m = getMemo(id); if (!m) return undefined;
   if (as === "task") { const tid = createTask({ ...parseQuickAdd(m.text), source: "voice" }); db.prepare("UPDATE voice_memos SET task_id=? WHERE id=?").run(tid, id); void enrichLinkTask(tid); }
   else { const first = m.text.split(/(?<=[.!?])\s/)[0].slice(0, 60); const nid = createNote(`Voice memo: ${first}`.replace(/\s+$/, ""), m.text + "\n"); db.prepare("UPDATE voice_memos SET note_id=? WHERE id=?").run(nid, id); }

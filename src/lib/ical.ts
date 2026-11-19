@@ -26,7 +26,7 @@ export function buildIcs(baseUrl = ""): string {
     if (t.tags.length) L.push(fold(`CATEGORIES:${t.tags.map(esc).join(",")}`));
     if (t.repeat) L.push(`RRULE:${RRULE(t.repeat)}`);
     if (baseUrl) L.push(fold(`URL:${baseUrl}/tasks/${t.id}`));
-    L.push(`STATUS:${t.status === "doing" ? "CONFIRMED" : "TENTATIVE"}`, "TRANSP:TRANSPARENT", "END:VEVENT");
+    L.push(`STATUS:${t.status_kind === "doing" ? "CONFIRMED" : "TENTATIVE"}`, "TRANSP:TRANSPARENT", "END:VEVENT");
   }
   if (isOn("subscriptions")) for (const s of listSubs("active")) {
     const rr = { weekly: "FREQ=WEEKLY", monthly: "FREQ=MONTHLY", quarterly: "FREQ=MONTHLY;INTERVAL=3", yearly: "FREQ=YEARLY" }[s.cycle];

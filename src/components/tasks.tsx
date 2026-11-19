@@ -45,7 +45,7 @@ export function TaskRow({ t }: { t: TaskRow }) {
           {t.estimate ? <span className="inline-flex items-center gap-1 text-mute" title="Estimate"><Icon name="clock" size={12} />{fmtMinutes(t.estimate)}</span> : null}
           {t.repeat && <span className="inline-flex items-center gap-1 text-mute" title="Repeats"><Icon name="repeat" size={12} />{describeRepeat(t.repeat)}</span>}
           {t.sub_total > 0 && <span className="inline-flex items-center gap-1 text-mute" title="Subtasks"><Icon name="list" size={12} />{t.sub_done}/{t.sub_total}</span>}
-          {t.status === "doing" && !done && <span className="lozenge bg-accent/15 text-accent">In progress</span>}
+          {t.status_kind === "doing" && !done && <span className="lozenge bg-accent/15 text-accent">{t.status_name}</span>}
           {from !== null && from !== undefined && <span className="inline-flex items-center gap-1 text-mute" title="Imported from email"><Icon name="mail" size={12} />{from || "Email"}</span>}
           {t.source === "share" && <span className="inline-flex items-center gap-1 text-mute"><Icon name="share" size={12} />Shared</span>}
           {url && <a href={url} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-1 text-accent hover:underline" title={url}><Icon name="link" size={12} />{hostOf(url)}</a>}
@@ -85,7 +85,7 @@ export function bucket(tasks: TaskRow[]): Group[] {
   return [
     { label: "Overdue", tone: "danger", tasks: take((x) => !!x.due && x.due < t) },
     { label: "Today", tone: "ok", tasks: take((x) => x.due === t) },
-    { label: "In progress", tone: "accent", tasks: take((x) => x.status === "doing") },
+    { label: "In progress", tone: "accent", tasks: take((x) => x.status_kind === "doing") },
     { label: "Next 7 days", tasks: take((x) => !!x.due && diffDays(x.due, t) <= 7) },
     { label: "Later", tasks: take((x) => !!x.due) },
     { label: "No date", tasks: take(() => true) },

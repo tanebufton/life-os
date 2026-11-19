@@ -9,15 +9,15 @@ import { MarkdownField } from "./mdfield";
 import { ago, clearDraft, peekDraft } from "@/lib/drafts";
 import { RestoreBanner, useSession } from "./session";
 
-export type EditorTask = { id: number; title: string; notes: string; status: "todo" | "doing" | "done"; priority: number; project_id: number | null; due: string | null; due_time: string | null; estimate: number | null; repeat: string; tags: string };
+export type EditorTask = { id: number; title: string; notes: string; status: string; priority: number; project_id: number | null; due: string | null; due_time: string | null; estimate: number | null; repeat: string; tags: string };
 const parseEst = (s: string): number | null | undefined => { const m = s.trim().toLowerCase().match(/^(\d+(?:\.\d+)?)\s*(h|hr|hrs|m|min|mins)?$/); if (!s.trim()) return null; if (!m) return undefined; const n = parseFloat(m[1]); return Math.max(1, Math.round(m[2]?.startsWith("h") ? n * 60 : n)); };
 const Prop = ({ icon, label, children }: { icon: string; label: string; children: React.ReactNode }) => (
-  <div className="grid grid-cols-[92px_minmax(0,1fr)] items-center gap-2 py-0.5 sm:grid-cols-[150px_minmax(0,1fr)]">
+  <div className="grid grid-cols-[88px_minmax(0,1fr)] items-center gap-2 py-0.5">
     <span className="flex items-center gap-2 px-1 text-[13px] text-mute"><Icon name={icon} size={15} />{label}</span>{children}</div>
 );
 
 /** Notion-style editor: every change saves itself, no Save button. */
-export function TaskEditor({ task, projects, focus, children }: { task: EditorTask; projects: { id: number; name: string }[]; focus: boolean; children?: React.ReactNode }) {
+export function TaskEditor({ task, projects, focus, columns, head, children }: { task: EditorTask; projects: { id: number; name: string }[]; focus: boolean; columns?: Record<string, { key: string; name: string; kind: string }[]>; head?: React.ReactNode; children?: React.ReactNode }) {
   const router = useRouter();
   const [v, setV] = useState(task), [est, setEst] = useState(task.estimate ? `${task.estimate}m` : ""), [state, setState] = useState<"idle" | "saving" | "saved" | string>("idle");
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined), pending = useRef<Record<string, unknown>>({}), unsaved = useRef<Record<string, unknown>>({});
@@ -36,30 +36,43 @@ export function TaskEditor({ task, projects, focus, children }: { task: EditorTa
   const set = <K extends keyof EditorTask>(k: K, val: EditorTask[K]) => setV((s) => ({ ...s, [k]: val }));
   const err = state !== "idle" && state !== "saving" && state !== "saved";
   const restore = () => { if (!found) return; const p = found.value; setV((s) => ({ ...s, ...(p as Partial<EditorTask>), repeat: p.repeat === undefined ? s.repeat : String(p.repeat ?? ""), tags: p.tags === undefined ? s.tags : String(p.tags ?? "") })); if (typeof p.estimate === "number") setEst(`${p.estimate}m`); save(p); setFound(null); };
+  const cols = columns?.[String(v.project_id ?? 0)] ?? [];
+  const changeProject = (n: number | null) => { // a task moved to another project lands in the matching column there
+    const oldKind = (columns?.[String(v.project_id ?? 0)] ?? []).find((c) => c.key === v.status)?.kind ?? "todo", next = columns?.[String(n ?? 0)] ?? [];
+    const st = next.find((c) => c.key === v.status)?.key ?? next.find((c) => c.kind === oldKind)?.key ?? next[0]?.key ?? v.status;
+    set("project_id", n); set("status", st); save({ project_id: n });
+  };
   return (
-    <>
-      {found && <RestoreBanner at={ago(found.at)} what="edits to this task" onRestore={restore} onDiscard={() => { clearDraft(dkey); setFound(null); }} />}
-      <div className="mb-1 flex h-5 items-center justify-end text-xs text-dim" aria-live="polite">{state === "saving" ? "Saving…" : state === "saved" ? <span className="inline-flex items-center gap-1 text-ok"><Icon name="check" size={12} />Saved</span> : err ? <span className="text-danger">{state}</span> : ""}</div>
-      <input value={v.title} onChange={(e) => { set("title", e.target.value); if (e.target.value.trim()) save({ title: e.target.value }, 700); }} onBlur={() => void flush()} aria-label="Title"
-        className="mb-5 w-full rounded-md bg-transparent px-1 py-1 text-[30px] font-bold leading-tight tracking-tight outline-none hover:bg-raise/60 focus:bg-raise/60" />
-      <div className="space-y-0.5 border-y py-3">
-        <Prop icon="circleCheck" label="Status"><select value={v.status} onChange={(e) => { set("status", e.target.value as EditorTask["status"]); save({ status: e.target.value }); }} className="ghost max-w-[15rem]"><option value="todo">To do</option><option value="doing">In progress</option><option value="done">Done</option></select></Prop>
-        <Prop icon="chevUp2" label="Priority"><select value={v.priority} onChange={(e) => { set("priority", Number(e.target.value)); save({ priority: Number(e.target.value) }); }} className="ghost max-w-[15rem]"><option value={1}>High</option><option value={0}>Normal</option><option value={-1}>Low</option></select></Prop>
-        <Prop icon="list" label="Project"><select value={v.project_id ?? ""} onChange={(e) => { const n = e.target.value ? Number(e.target.value) : null; set("project_id", n); save({ project_id: n }); }} className="ghost max-w-[15rem]"><option value="">None</option>{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Prop>
-        <Prop icon="calendar" label="Due date"><div className="flex min-w-0 flex-wrap gap-1.5"><input type="date" value={v.due ?? ""} onChange={(e) => { set("due", e.target.value || null); save(e.target.value ? { due: e.target.value } : { due: null, due_time: null }); if (!e.target.value) set("due_time", null); }} className="ghost !w-[9.5rem] shrink-0" />
-          <input type="time" value={v.due_time ?? ""} disabled={!v.due} onChange={(e) => { set("due_time", e.target.value || null); save({ due_time: e.target.value || null }); }} className="ghost !w-[8.5rem] shrink-0 disabled:opacity-40" aria-label="Time" /></div></Prop>
-        <Prop icon="clock" label="Estimate"><input value={est} onChange={(e) => setEst(e.target.value)} onBlur={() => { const n = parseEst(est); if (n === undefined) setState("Try 30m, 1h or 90"); else { set("estimate", n); save({ estimate: n }); void flush(); } }} placeholder="e.g. 30m, 1.5h" className="ghost max-w-[15rem]" /></Prop>
-        <Prop icon="repeat" label="Repeat"><input value={v.repeat} onChange={(e) => set("repeat", e.target.value)} onBlur={() => { save({ repeat: v.repeat.trim() || null }); void flush(); }} placeholder="Doesn't repeat (try: weekly, every 2 weeks)" className="ghost max-w-md" /></Prop>
-        <Prop icon="inbox" label="Tags"><input value={v.tags} onChange={(e) => set("tags", e.target.value)} onBlur={() => { save({ tags: v.tags }); void flush(); }} placeholder="Add tags, separated by spaces" className="ghost max-w-md" /></Prop>
+    <div className="grid items-start gap-x-10 gap-y-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="min-w-0 lg:col-start-1 lg:row-start-1">
+        {found && <RestoreBanner at={ago(found.at)} what="edits to this task" onRestore={restore} onDiscard={() => { clearDraft(dkey); setFound(null); }} />}
+        {head}
+        <input value={v.title} onChange={(e) => { set("title", e.target.value); if (e.target.value.trim()) save({ title: e.target.value }, 700); }} onBlur={() => void flush()} aria-label="Title"
+          className="w-full rounded-md bg-transparent px-1 py-1 text-[28px] font-bold leading-tight tracking-tight outline-none hover:bg-raise/60 focus:bg-raise/60 md:text-[30px]" />
       </div>
-      <MarkdownField className="mt-4" value={v.notes} onChange={(x) => { set("notes", x); save({ notes: x }, 800); }} onBlur={() => void flush()} rows={8} label="Notes" placeholder="Add notes. Markdown works: **bold**, lists, checklists. Links are picked up automatically." defaultMode={v.notes ? "view" : "edit"} />
-      {children}
-      <div className="mt-6 flex flex-wrap items-center gap-2 border-t pt-4">
-        {focus && <button className="btn" onClick={async () => { await startFocus(task.id); router.push(`/focus?task=${task.id}`); }}><Icon name="focus" size={15} className="text-accent" />Start focus</button>}
-        <button className="btn" onClick={async () => { const n = await duplicateTaskAction(task.id); if (n) { toast("Task duplicated"); router.push(`/tasks/${n}`); } }}><Icon name="copy" size={15} />Duplicate</button>
-        <button className="btn ml-auto text-danger" onClick={async () => { const r = await deleteTaskInline(task.id); if (r) { router.push("/tasks"); toast(`Deleted “${r.title}”`, { action: { label: "Undo", onClick: () => void restoreTaskAction(task.id).then(() => router.push(`/tasks/${task.id}`)) } }); } }}><Icon name="trash" size={15} />Delete</button>
+      <aside className="rounded-xl border bg-panel p-3 lg:col-start-2 lg:row-span-3 lg:row-start-1" aria-label="Properties">
+        <div className="mb-1 flex h-5 items-center justify-between px-1 text-xs text-dim" aria-live="polite"><span className="font-semibold text-mute">Properties</span><span>{state === "saving" ? "Saving…" : state === "saved" ? <span className="inline-flex items-center gap-1 text-ok"><Icon name="check" size={12} />Saved</span> : err ? <span className="text-danger">{state}</span> : ""}</span></div>
+        <div className="space-y-0.5">
+          <Prop icon="circleCheck" label="Status"><select value={v.status} onChange={(e) => { set("status", e.target.value); save({ status: e.target.value }); }} className="ghost max-w-full">{cols.length ? cols.map((c) => <option key={c.key} value={c.key}>{c.name}</option>) : <><option value="todo">To do</option><option value="doing">In progress</option><option value="done">Done</option></>}</select></Prop>
+          <Prop icon="chevUp2" label="Priority"><select value={v.priority} onChange={(e) => { set("priority", Number(e.target.value)); save({ priority: Number(e.target.value) }); }} className="ghost max-w-full"><option value={1}>High</option><option value={0}>Normal</option><option value={-1}>Low</option></select></Prop>
+          <Prop icon="list" label="Project"><select value={v.project_id ?? ""} onChange={(e) => changeProject(e.target.value ? Number(e.target.value) : null)} className="ghost max-w-full"><option value="">None</option>{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Prop>
+          <Prop icon="calendar" label="Due date"><div className="flex min-w-0 flex-wrap gap-1.5"><input type="date" value={v.due ?? ""} onChange={(e) => { set("due", e.target.value || null); save(e.target.value ? { due: e.target.value } : { due: null, due_time: null }); if (!e.target.value) set("due_time", null); }} className="ghost !w-[9.5rem] shrink-0" />
+            <input type="time" value={v.due_time ?? ""} disabled={!v.due} onChange={(e) => { set("due_time", e.target.value || null); save({ due_time: e.target.value || null }); }} className="ghost !w-[8.5rem] shrink-0 disabled:opacity-40" aria-label="Time" /></div></Prop>
+          <Prop icon="clock" label="Estimate"><input value={est} onChange={(e) => setEst(e.target.value)} onBlur={() => { const n = parseEst(est); if (n === undefined) setState("Try 30m, 1h or 90"); else { set("estimate", n); save({ estimate: n }); void flush(); } }} placeholder="e.g. 30m, 1.5h" className="ghost max-w-full" /></Prop>
+          <Prop icon="repeat" label="Repeat"><input value={v.repeat} onChange={(e) => set("repeat", e.target.value)} onBlur={() => { save({ repeat: v.repeat.trim() || null }); void flush(); }} placeholder="Doesn't repeat" title="Try: weekly, every 2 weeks, 15th of the month" className="ghost max-w-full" /></Prop>
+          <Prop icon="inbox" label="Tags"><input value={v.tags} onChange={(e) => set("tags", e.target.value)} onBlur={() => { save({ tags: v.tags }); void flush(); }} placeholder="Add tags" title="Separate tags with spaces" className="ghost max-w-full" /></Prop>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2 border-t pt-3">
+          {focus && <button className="btn !h-8" onClick={async () => { await startFocus(task.id); router.push(`/focus?task=${task.id}`); }}><Icon name="focus" size={15} className="text-accent" />Focus</button>}
+          <button className="btn !h-8" onClick={async () => { const n = await duplicateTaskAction(task.id); if (n) { toast("Task duplicated"); router.push(`/tasks/${n}`); } }}><Icon name="copy" size={15} />Duplicate</button>
+          <button className="btn !h-8 ml-auto text-danger" onClick={async () => { const r = await deleteTaskInline(task.id); if (r) { router.push("/tasks"); toast(`Deleted “${r.title}”`, { action: { label: "Undo", onClick: () => void restoreTaskAction(task.id).then(() => router.push(`/tasks/${task.id}`)) } }); } }}><Icon name="trash" size={15} />Delete</button>
+        </div>
+      </aside>
+      <div className="min-w-0 lg:col-start-1 lg:row-start-2">
+        <MarkdownField value={v.notes} onChange={(x) => { set("notes", x); save({ notes: x }, 800); }} onBlur={() => void flush()} rows={10} label="Notes" placeholder="Add notes. Markdown works: **bold**, lists, checklists. Links are picked up automatically." defaultMode={v.notes ? "view" : "edit"} />
+        {children}
       </div>
-    </>
+    </div>
   );
 }
 

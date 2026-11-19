@@ -7,7 +7,7 @@ import { doneToday, queryTasks, type TaskRow } from "./tasks";
 import { today } from "./time";
 import { getWeather } from "./weather";
 
-export const briefTask = (t: TaskRow) => ({ id: t.id, title: t.title, status: t.status, project: t.project_name, due: t.due, time: t.due_time, estimate: t.estimate, priority: t.priority, tags: t.tags, subtasks: t.sub_total ? `${t.sub_done}/${t.sub_total}` : undefined });
+export const briefTask = (t: TaskRow) => ({ id: t.id, title: t.title, status: t.status_name, project: t.project_name, due: t.due, time: t.due_time, estimate: t.estimate, priority: t.priority, tags: t.tags, subtasks: t.sub_total ? `${t.sub_done}/${t.sub_total}` : undefined });
 
 export async function dailyBrief(o: { network?: boolean } = {}) {
   const t = today(), net = o.network !== false;
@@ -18,7 +18,7 @@ export async function dailyBrief(o: { network?: boolean } = {}) {
     today: t,
     overdue: open.filter((x) => x.due && x.due < t).map(briefTask),
     due_today: open.filter((x) => x.due === t).map(briefTask),
-    in_progress: open.filter((x) => x.status === "doing").map(briefTask),
+    in_progress: open.filter((x) => x.status_kind === "doing").map(briefTask),
     upcoming: open.filter((x) => x.due && x.due > t && x.due <= addDays(t, 3)).map(briefTask),
     inbox_count: queryTasks({ inbox: true }).length,
     planned_minutes: planned, done_today: doneToday(), focus_today: isOn("focus") ? focusToday() : undefined,

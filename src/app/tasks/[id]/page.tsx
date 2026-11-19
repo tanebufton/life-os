@@ -10,6 +10,8 @@ import { issueKey } from "@/lib/ui";
 import { addCommentAction, deleteCommentAction, saveTemplateFromTask } from "@/lib/actions3";
 import { listComments } from "@/lib/misc";
 import { nice } from "@/lib/dates";
+import { listStatuses } from "@/lib/statuses";
+import { History } from "@/components/history";
 
 export const dynamic = "force-dynamic";
 export default async function TaskPage({ params }: { params: Promise<{ id: string }> }) {
@@ -20,25 +22,28 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
   const parent = t.parent_id ? getTask(t.parent_id) : null;
   const meta = t.meta ? (JSON.parse(t.meta) as { from?: string; subject?: string }) : null;
   const comments = listComments(t.id);
+  const columns = Object.fromEntries([["0", listStatuses(null)], ...projects.map((p) => [String(p.id), listStatuses(p.id)])].map(([k, v]) => [k, (v as ReturnType<typeof listStatuses>).map((c) => ({ key: c.key, name: c.name, kind: c.kind }))]));
   return (
-    <div className="max-w-3xl">
-      <Link href={parent ? `/tasks/${parent.id}` : "/tasks"} className="mb-5 inline-flex items-center gap-1 text-[13px] text-mute hover:text-fg"><Icon name="chevRight" size={14} className="rotate-180" />{parent ? parent.title : "My tasks"}</Link>
+    <div className="max-w-[1100px]">
       <div className="rise">
+        <TaskEditor focus={isOn("focus")} projects={projects} columns={columns} head={<>
         <div className="mb-1 flex items-center gap-2 text-xs text-mute">
-          <StatusIcon status={t.status} size={15} /><span className="font-medium">{issueKey(t.project_name, t.id)}</span>
-          {t.done_at && <span className="lozenge bg-ok/15 text-ok">Done</span>}
+          {parent && <><Link href={`/tasks/${parent.id}`} className="inline-flex max-w-[16rem] items-center gap-1 truncate hover:text-fg"><Icon name="chevRight" size={12} className="rotate-180" />{parent.title}</Link><span aria-hidden>/</span></>}
+          <StatusIcon status={t.status_kind} size={15} /><span className="font-medium">{issueKey(t.project_name, t.id)}</span>
+          <span>{t.status_name}</span>{t.done_at && <span className="lozenge bg-ok/15 text-ok">Done</span>}
           {t.source === "email" && <span className="inline-flex items-center gap-1"><Icon name="mail" size={12} />Imported from email</span>}
           {t.source === "share" && <span className="inline-flex items-center gap-1"><Icon name="share" size={12} />Shared to LifeOS</span>}
         </div>
         {meta?.from && <p className="mb-2 text-xs text-mute">From {meta.from}{meta.subject ? <> · “{meta.subject}”</> : null}</p>}
-        <TaskEditor focus={isOn("focus")} projects={projects} task={{ id: t.id, title: t.title, notes: t.notes, status: t.status, priority: t.priority, project_id: t.project_id, due: t.due, due_time: t.due_time, estimate: t.estimate, repeat: t.repeat ? describeRepeat(t.repeat) : "", tags: t.tags.join(" ") }}>
+        </>} task={{ id: t.id, title: t.title, notes: t.notes, status: t.status, priority: t.priority, project_id: t.project_id, due: t.due, due_time: t.due_time, estimate: t.estimate, repeat: t.repeat ? describeRepeat(t.repeat) : "", tags: t.tags.join(" ") }}>
           {!t.parent_id && <SubtaskList parentId={t.id} items={kids} />}
         </TaskEditor>
       </div>
-      <section className="rise mt-8" style={{ ["--i" as string]: 2 }}>
+      <section className="rise mt-8 max-w-3xl" style={{ ["--i" as string]: 2 }}>
         <h2 className="mb-2 text-[13px] font-semibold">Activity <span className="font-normal text-dim">{comments.length || ""}</span></h2>
         <ul className="space-y-2">{comments.map((c) => <li key={c.id} className="group rounded-lg border bg-panel px-3 py-2 text-[14px]"><p className="whitespace-pre-wrap">{c.body}</p><div className="mt-1 flex items-center justify-between text-xs text-dim"><span>{nice(c.created_at.slice(0, 10))} {c.created_at.slice(11, 16)}</span><form action={deleteCommentAction.bind(null, t.id, c.id)}><button className="opacity-0 hover:text-danger focus:opacity-100 group-hover:opacity-100">Delete</button></form></div></li>)}</ul>
         <form action={addCommentAction.bind(null, t.id)} className="mt-2 flex gap-2"><input name="body" required placeholder="Add a comment or progress note…" aria-label="Comment" className="field" /><button className="btn">Post</button></form>
+        <History entity="task" id={t.id} />
         {isOn("templates") && !t.parent_id && <form action={saveTemplateFromTask.bind(null, t.id)} className="mt-4"><button className="text-xs text-mute hover:text-fg">Save as template</button></form>}
       </section>
     </div>

@@ -89,6 +89,8 @@ claude mcp add --transport http lifeos https://<machine>.<tailnet>.ts.net:8443/m
 ```
 
 ## Updating
+Before LifeOS changes your database's structure for a new version it **saves a complete copy next to it** (`lifeos.db.pre-upgrade-v<old>-<time>`, the newest three are kept), then upgrades in place. If an upgrade ever misbehaves, stop the app and copy that file over `lifeos.db`. Your R2 backup is the second safety net. New versions only add to the database; they never delete or rewrite your existing tasks, notes or settings. The tests include upgrading a real database from the previous release and checking every row survives.
+
 ```bash
 git pull && docker compose up -d --build     # or: docker compose pull && docker compose up -d
 ```

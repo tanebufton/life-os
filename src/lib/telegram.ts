@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { runAs } from "./activity";
 import { dailyBrief, briefText } from "./brief";
 import { isOn } from "./features";
 import { habitsToday, listHabits, toggleHabit } from "./habits";
@@ -48,7 +49,8 @@ export type Update = { message?: { chat: { id: number }; text?: string } };
 const list = (ts: { id: number; title: string; due?: string | null }[], empty: string) => (ts.length ? ts.map((x) => `#${x.id} ${x.title}`).join("\n") : empty);
 const HELP = `LifeOS bot\n\nJust type a task: "Call mum tomorrow at 5pm #family"\n/today · what's due\n/inbox · unsorted tasks\n/done 12 · complete task 12\n/search words · find tasks\n/brief · your morning brief\n/habits · today's habits (and /habit name to tick one)\n/spent 12.50 coffee · log spending\n/subs · renewals\n/help`;
 /** Handles one Telegram update and returns the reply text (also sent when `send` is provided). Pure apart from the DB and `send`. */
-export async function handleUpdate(u: Update, send: (chat: number, text: string) => Promise<void> = tgSend): Promise<string | null> {
+export async function handleUpdate(u: Update, send: (chat: number, text: string) => Promise<void> = tgSend): Promise<string | null> { return runAs("telegram", () => handleUpdateInner(u, send)); }
+async function handleUpdateInner(u: Update, send: (chat: number, text: string) => Promise<void>): Promise<string | null> {
   const m = u.message; if (!m?.text) return null;
   const chat = m.chat.id, text = m.text.trim(), reply = async (t: string) => { await send(chat, t); return t; };
   const linked = tgChat();

@@ -33,7 +33,9 @@ import { createPerson, listPeople, logContact, catchUpIn, upcomingBirthdays } fr
 import { listTemplates, useTemplate } from "../src/lib/templates";
 import { listMemos, saveMemo } from "../src/lib/voice";
 import { nextBest } from "../src/lib/misc";
+import { setProcessActor } from "../src/lib/activity";
 import { authBlocked, authFailed } from "../src/lib/ratelimit";
+import { hasCustomColumns, listStatuses } from "../src/lib/statuses";
 import { today } from "../src/lib/time";
 import { getWeather } from "../src/lib/weather";
 
@@ -42,7 +44,8 @@ const fail = (e: unknown) => ({ isError: true, content: [{ type: "text" as const
 const safe = <A,>(fn: (a: A) => unknown | Promise<unknown>) => async (a: A) => { try { return json(await fn(a)); } catch (e) { return fail(e); } };
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "YYYY-MM-DD");
 const hm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "HH:MM (24h)");
-const status = z.enum(["todo", "doing", "done"]);
+const projectByNameLoose = (n: string): number | null => (db.prepare("SELECT id FROM projects WHERE lower(name)=lower(?) AND archived=0").get(n) as { id: number } | undefined)?.id ?? null;
+const status = z.string().min(1).max(40).describe("todo, doing or done, or the name of one of the board's columns");
 
 function buildServer() {
   const s = new McpServer({ name: "lifeos", version: "0.3.0" });
@@ -58,7 +61,7 @@ function buildServer() {
     repeat: z.string().optional(), status: status.optional(), parent_id: z.number().int().optional() } },
     safe(({ time, estimate_minutes, ...a }: any) => ({ id: createTask({ ...a, due_time: time, estimate: estimate_minutes, source: "mcp" }), title: a.title })));
   tool("list_tasks", { description: "List tasks (top-level). Defaults to open tasks (todo + doing).", inputSchema: {
-    project: z.string().optional(), tag: z.string().optional(), column: z.enum(["todo", "doing"]).optional(), state: z.enum(["open", "done", "all"]).optional(),
+    project: z.string().optional(), tag: z.string().optional(), column: z.string().optional().describe("todo or doing (any column of that kind), or a column name"), state: z.enum(["open", "done", "all"]).optional(),
     due_by: date.optional().describe("only tasks due on/before this date (includes overdue)"), parent_id: z.number().int().optional().describe("list the subtasks of this task"), limit: z.number().int().min(1).max(200).optional() } },
     safe((a: any) => {
       const proj = a.project ? (db.prepare("SELECT id FROM projects WHERE lower(name)=lower(?)").get(a.project) as { id: number } | undefined) : undefined;
@@ -73,6 +76,8 @@ function buildServer() {
     safe(({ id, time, estimate_minutes, ...patch }: any) => (updateTask(id, { ...patch, ...(time !== undefined ? { due_time: time } : {}), ...(estimate_minutes !== undefined ? { estimate: estimate_minutes } : {}) }) ? "updated" : "no such task")));
   tool("reschedule_task", { description: "Move a task's due date. `to` is today, tomorrow, weekend (next Saturday), nextweek (next Monday), none, or YYYY-MM-DD.", inputSchema: { id: z.number().int(), to: z.string() } },
     safe(({ id, to }: any) => (reschedule(id, to) ? "rescheduled" : "no such task")));
+  if (isOn("board")) tool("board_columns", { description: "The kanban columns (name, key and kind todo/doing/done) for the default board or a project's own board.", inputSchema: { project: z.string().optional() } },
+    safe(({ project }: any) => { const pr = project ? projectByNameLoose(project) : null; return { custom: pr ? hasCustomColumns(pr) : false, columns: listStatuses(pr).map((s) => ({ key: s.key, name: s.name, kind: s.kind })) }; }));
   if (isOn("board")) tool("move_task", { description: "Move a task on the kanban board. Moving to done completes it (repeating tasks roll to their next date).", inputSchema: { id: z.number().int(), column: status } }, safe(({ id, column }: any) => setStatus(id, column) ?? "no such task"));
   tool("complete_task", { description: "Mark a task done. Completes its subtasks too. Repeating tasks roll forward to the next occurrence and the response includes next_due.", inputSchema: { id: z.number().int() } }, safe(({ id }: any) => completeTask(id) ?? "no such task"));
   tool("delete_task", { description: "Delete a task (and its subtasks). Recoverable for 30 days with restore_task.", inputSchema: { id: z.number().int() } }, safe(({ id }: any) => (deleteTask(id) ? "deleted (restorable for 30 days)" : "no such task")));
@@ -170,6 +175,7 @@ const token = process.env.LIFEOS_MCP_TOKEN;
 const eq = (a: string, b: string) => { const A = Buffer.from(a), B = Buffer.from(b); return A.length === B.length && crypto.timingSafeEqual(A, B); };
 const host = process.env.LIFEOS_MCP_HOST ?? "127.0.0.1", port = Number(process.env.LIFEOS_MCP_PORT ?? 3737);
 
+setProcessActor("mcp");
 const loopback = ["127.0.0.1", "::1", "localhost"].includes(host);
 // Fail closed: without a token the MCP server (which can read and change everything) may only listen on loopback.
 if (!token && !loopback) { console.error(`Refusing to start: LIFEOS_MCP_HOST=${host} is not loopback and LIFEOS_MCP_TOKEN is not set. Set a token (openssl rand -hex 24).`); process.exit(1); }

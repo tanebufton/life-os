@@ -18,6 +18,8 @@ import { getSetting } from "@/lib/settings";
 import { redirectUri, spotifyConfigured, spotifyConnected } from "@/lib/spotify";
 import { tz } from "@/lib/time";
 import { TelegramButtons } from "@/components/settingsui";
+import { db } from "@/lib/db";
+import { unarchiveProjectAction } from "@/lib/actions5";
 import { BackupPanel } from "@/components/backupui";
 import * as Backup from "@/lib/backup";
 import { addCalFeedAction, removeCalFeedAction, saveQuietHours, saveTelegramToken, saveWorkHours, syncCalendarsAction, telegramRegen, telegramUnlink } from "@/lib/actions3";
@@ -175,6 +177,11 @@ export default async function Settings({ searchParams }: { searchParams: Promise
         {(() => { const c = Backup.config(), st = Backup.status(); return (
           <Panel><BackupPanel init={{ account: (getSetting("backup_endpoint") ?? ""), bucket: c.bucket, keyId: c.keyId, prefix: c.prefix, keep: c.keep, hours: c.hours, hasSecret: !!c.secret, hasPass: !!c.passphrase, configured: Backup.configured(c), enabled: c.enabled, lastOk: st.lastOk, lastError: st.lastError, fromEnv: !!process.env.LIFEOS_BACKUP_ENDPOINT }} /></Panel>); })()}
       </Section>
+
+      {(() => { const arch = db.prepare("SELECT id, name FROM projects WHERE archived=1 ORDER BY name").all() as { id: number; name: string }[]; return arch.length ? (
+        <Section id="archived" i={8} title="Archived projects" desc="Archived projects are hidden from the sidebar. Their tasks are kept.">
+          <Panel><ul>{arch.map((a) => <li key={a.id} className="flex items-center justify-between gap-3 border-b px-4 py-2.5 text-sm last:border-b-0"><span className="truncate">{a.name}</span><form action={async () => { "use server"; await unarchiveProjectAction(a.id); }}><button className="btn !h-7 text-xs">Restore</button></form></li>)}</ul></Panel>
+        </Section>) : null; })()}
 
       <Section id="data" i={8} title="Your data" desc="It's yours. Take a copy any time. Deleted tasks stay recoverable for 30 days.">
         <Panel bodyClass="divide-y">
