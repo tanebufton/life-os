@@ -53,15 +53,7 @@ Each project is its own workspace with tabs: Overview, List, Board, Table, Notes
 
 ## Upgrading
 
-Fastest: use the image CI already built, instead of building on your machine (about 30 seconds instead of minutes). Set `LIFEOS_IMAGE=ghcr.io/tanebufton/life-os:latest` in `.env`, `docker login ghcr.io` once (a token with `read:packages`), then:
-
-```
-docker compose --profile mcp pull web && docker compose --profile mcp up -d --no-build --force-recreate
-```
-
-Or build locally:
-
-`git pull` then `docker compose up -d --build web worker`. Database changes are additive, and a copy of your database is saved next to it before any schema upgrade (currently schema v4).
+`git pull` then `docker compose --profile mcp up -d --build`. Run `npm test` first if you want to check a change before deploying. Database changes are additive, and a copy of your database is saved next to it before any schema upgrade (currently schema v5).
 
 ## Integrations
 | What | How |

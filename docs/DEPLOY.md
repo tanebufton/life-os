@@ -4,7 +4,7 @@ Docker Compose on any always-on machine, a Cloudflare Tunnel in front (no open p
 
 ## What you need
 
-Measured on the production build. "Idle" is a freshly started container in CI; "after use" is after browsing every page on a dev machine:
+Measured on the production build. "Idle" is a freshly started container; "after use" is after browsing every page on a dev machine:
 
 | Piece | Memory idle | Memory after use | Notes |
 |---|---|---|---|
@@ -15,7 +15,7 @@ Measured on the production build. "Idle" is a freshly started container in CI; "
 
 - **Runtime:** about **400 MB** for web + worker, about **550 MB** with MCP. A **1 GB** machine is fine, **2 GB** is comfortable.
 - **Building the image on the server** peaked at **~800 MB**, so on a 1 GB machine pull the prebuilt image (below) instead of building.
-- **CPU:** any modern single core is enough. One user, mostly idle. ARM works (Raspberry Pi 4/5, 64-bit OS): CI publishes `linux/arm64`.
+- **CPU:** any modern single core is enough. One user, mostly idle. ARM works (Raspberry Pi 4/5, 64-bit OS): the image builds on `linux/arm64` too.
 - **Disk:** the image is **1.55 GB unpacked (302 MB to download)**, so allow **4 GB** for Docker plus the volume. The database itself is small (the seeded demo is ~240 KB; a few years of heavy use is tens of MB). SQLite needs a real disk (not a network share).
 - **Network:** outbound only. No inbound ports, no public IP, no TLS to manage.
 - **Cost:** a Raspberry Pi or old laptop you own is $0; a small VPS (1–2 GB) is roughly $4–6 a month. Cloudflare Tunnel and Access (free plan, up to 50 users) cost nothing. R2 backups are effectively free at this size.
@@ -27,14 +27,6 @@ Measured on the production build. "Idle" is a freshly started container in CI; "
 # Docker + Compose installed. Then:
 git clone https://github.com/<you>/life-os.git && cd life-os
 cp .env.example .env        # fill in the values as you go below
-```
-
-### Pull the prebuilt image instead of building (small servers)
-CI publishes `ghcr.io/<you>/life-os:latest` on every push to `main`. For a private repo the package is private too, so log in once with a GitHub token that has `read:packages`:
-```bash
-echo <token> | docker login ghcr.io -u <you> --password-stdin
-echo 'LIFEOS_IMAGE=ghcr.io/<you>/life-os:latest' >> .env
-docker compose pull
 ```
 
 ## 2. Cloudflare Tunnel
