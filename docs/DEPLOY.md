@@ -9,7 +9,7 @@ Measured on the production build. "Idle" is a freshly started container; "after 
 | Piece | Memory idle | Memory after use | Notes |
 |---|---|---|---|
 | `web` | ~110 MB | ~240 MB | Next.js server |
-| `worker` | ~70 MB | ~140 MB | reminders, scheduled backups, calendar sync, subscription auto-logging, email polling |
+| `worker` | ~70 MB | ~140 MB | reminders, scheduled backups, calendar sync, email polling |
 | `mcp` (optional) | ~90 MB | ~150 MB | only if you connect Claude / MCP clients |
 | `cloudflared` | small | not measured |
 
