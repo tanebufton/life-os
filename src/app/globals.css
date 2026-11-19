@@ -76,3 +76,8 @@ html[data-sidebar="collapsed"] .ptabs { display: flex !important; }
 /* Reading-width pages sit in the middle of the space instead of hugging the left edge */
 .page > .max-w-4xl, .page > .max-w-3xl, .page > .max-w-2xl { margin-left: auto; margin-right: auto; }
 .page > .proj .max-w-4xl, .page > .proj .max-w-2xl { margin-left: 0; margin-right: 0; }
+
+/* Save indicator: a quick, small pop when it appears */
+@keyframes save-pop { from { opacity: 0; transform: translateY(2px) scale(.94); } to { opacity: 1; transform: none; } }
+.save-pop { animation: save-pop .16s ease-out; }
+@media (prefers-reduced-motion: reduce) { .save-pop { animation: none; } }

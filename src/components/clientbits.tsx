@@ -1,4 +1,5 @@
 "use client";
+import { SaveStatus } from "./savestatus";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -56,7 +57,7 @@ export function NoteEditor({ id, title, body, rev, links, lead, meta }: { id: nu
         </div>)}
       {found && <RestoreBanner at={ago(found.at)} what="edits to this note" onRestore={() => { setT(found.value.title); setB(found.value.body); setFound(null); }} onDiscard={() => { clearDraft(key); setFound(null); }} />}
       <div className="flex items-center gap-2">{lead}<input value={t} onChange={(e) => setT(e.target.value)} placeholder="Untitled" aria-label="Title" className="min-w-0 flex-1 bg-transparent text-[22px] font-bold tracking-tight outline-none placeholder:text-dim md:text-[32px]" /></div>
-      <div className="mb-3 mt-1 h-4 text-xs text-mute" aria-live="polite">{saved === "saving" ? "Saving…" : saved === "kept" ? <span className="text-warn">Not saved yet. Kept safely in this browser</span> : saved === "err" ? <span className="text-danger">{err || "Couldn't save"}</span> : "Saved"}</div>
+      <SaveStatus className="mb-3 mt-1.5" state={saved === "err" ? "error" : saved} error={err} />
       {meta}
       <MarkdownField value={b} onChange={setB} links={links} label="Note body" rows={18} defaultMode={body ? "view" : "edit"} placeholder="Write in Markdown. Link notes with [[Note title]]." />
     </div>

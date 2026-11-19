@@ -1,4 +1,5 @@
 "use client";
+import { SaveStatus } from "./savestatus";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { saveJournal } from "@/lib/actions";
 import { Icon } from "./Icon";
@@ -34,7 +35,7 @@ export function JournalEditor({ date, initial }: { date: string; initial: string
     <div>
       {found && <RestoreBanner at={ago(found.at)} what="journal text" onRestore={() => { setV(found.value.body); void flush(found.value.body); setFound(null); }} onDiscard={() => { clearDraft(dkey); setFound(null); }} />}
       <MarkdownField value={v} onChange={(x) => { setV(x); setState("idle"); clearTimeout(t.current); t.current = setTimeout(() => void flush(x), 800); }} onBlur={() => { clearTimeout(t.current); void flush(v); }} rows={12} label="Journal entry" placeholder="What's on your mind? What went well today? What would you do differently?" />
-      <div className="mt-1.5 h-4 text-xs text-dim">{state === "saving" ? "Saving…" : state === "saved" ? "Saved" : state === "kept" ? <span className="text-warn">Not saved yet. Kept safely in this browser</span> : v.length ? `${v.trim().split(/\s+/).filter(Boolean).length} words` : ""}</div>
+      <div className="mt-1.5 flex min-h-6 items-center gap-3 text-xs text-dim">{state === "saving" || state === "saved" || state === "kept" ? <SaveStatus state={state === "kept" ? "kept" : state} /> : v.length ? `${v.trim().split(/\s+/).filter(Boolean).length} words` : ""}</div>
     </div>
   );
 }

@@ -1,4 +1,5 @@
 "use client";
+import { SaveStatus } from "./savestatus";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
@@ -51,7 +52,7 @@ export function TaskEditor({ task, projects, focus, columns, head, children }: {
           className="w-full rounded-md bg-transparent px-1 py-1 text-[28px] font-bold leading-tight tracking-tight outline-none hover:bg-raise/60 focus:bg-raise/60 md:text-[30px]" />
       </div>
       <aside className="rounded-xl border bg-panel p-3 lg:col-start-2 lg:row-span-3 lg:row-start-1" aria-label="Properties">
-        <div className="mb-1 flex h-5 items-center justify-between px-1 text-xs text-dim" aria-live="polite"><span className="font-semibold text-mute">Properties</span><span>{state === "saving" ? "Saving…" : state === "saved" ? <span className="inline-flex items-center gap-1 text-ok"><Icon name="check" size={12} />Saved</span> : err ? <span className="text-danger">{state}</span> : ""}</span></div>
+        <div className="mb-1 flex min-h-6 items-center justify-between px-1 text-xs text-dim"><span className="font-semibold text-mute">Properties</span><SaveStatus state={state === "idle" ? "idle" : state === "saving" ? "saving" : state === "saved" ? "saved" : "error"} error={err ? state : undefined} /></div>
         <div className="space-y-0.5">
           <Prop icon="circleCheck" label="Status"><select value={v.status} onChange={(e) => { set("status", e.target.value); save({ status: e.target.value }); }} className="ghost max-w-full">{cols.length ? cols.map((c) => <option key={c.key} value={c.key}>{c.name}</option>) : <><option value="todo">To do</option><option value="doing">In progress</option><option value="done">Done</option></>}</select></Prop>
           <Prop icon="chevUp2" label="Priority"><select value={v.priority} onChange={(e) => { set("priority", Number(e.target.value)); save({ priority: Number(e.target.value) }); }} className="ghost max-w-full"><option value={1}>High</option><option value={0}>Normal</option><option value={-1}>Low</option></select></Prop>
