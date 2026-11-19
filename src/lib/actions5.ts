@@ -1,12 +1,15 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { db } from "./db";
-import { setEntityTags, parseTags, type TagKind } from "./entitytags";
+import { parseImport, runImport, type ImportFile, type ImportResult } from "./importer";
+import { deleteTag, pruneUnusedTags, renameTag, setTagColor } from "./tags";
+import { addLink, removeLink, type LinkKind } from "./links";
+import { setEntityTags, type TagKind } from "./entitytags";
 import { createNote, restoreNoteVersion, updateNote } from "./notes";
 import { redirect } from "next/navigation";
 import { setSetting } from "./settings";
 import { parsePrefs } from "./sidebar";
-import { createTask, parseQuickAdd, setStatus } from "./tasks";
+import { createTask, deleteTask, getTask, moveCard, parseQuickAdd, parseTags, setStatus, setTaskOrder, updateTask } from "./tasks";
 import { listStatuses } from "./statuses";
 import { addColumn, customizeProject, deleteColumn, moveColumn, renameColumn, resetProject, setColumnKind, type Kind } from "./statuses";
 
@@ -46,3 +49,44 @@ export async function renameProjectAction(id: number, name: string, color: strin
 export async function unarchiveProjectAction(id: number): Promise<R> { return run(() => { db.prepare("UPDATE projects SET archived=0 WHERE id=?").run(id); return "Project restored"; }); }
 
 export async function newNoteInProjectAction(projectId: number) { const id = createNote("", "", projectId); revalidatePath("/", "layout"); redirect(`/notes/${id}`); }
+
+/** Persist a drag-to-reorder of tasks within one list. */
+export async function setOrderAction(ids: number[]): Promise<R> { return run(() => { if (!Array.isArray(ids) || ids.length > 1000) throw new Error("Bad order"); setTaskOrder(ids.map(Number)); }); }
+/** Persist dropping a card into a column at a position. */
+export async function moveCardAction(id: number, columnKey: string, ordered: number[]): Promise<R> { return run(() => { if (!Array.isArray(ordered) || ordered.length > 1000) throw new Error("Bad order"); moveCard(Number(id), String(columnKey), ordered.map(Number)); }); }
+
+export async function addLinkAction(ak: LinkKind, ai: number, bk: LinkKind, bi: number): Promise<R> { return run(() => { addLink(ak, Number(ai), bk, Number(bi)); }); }
+export async function removeLinkAction(ak: LinkKind, ai: number, bk: LinkKind, bi: number): Promise<R> { return run(() => { removeLink(ak, Number(ai), bk, Number(bi)); }); }
+
+export async function renameTagAction(from: string, to: string): Promise<R> { return run(() => { const r = renameTag(from, to); return r.merged ? `Merged into #${to.replace(/^#/, "")}` : "Renamed"; }); }
+export async function deleteTagAction(name: string): Promise<R> { return run(() => { const n = deleteTag(name); return n ? `Removed from ${n} item${n === 1 ? "" : "s"}` : "Deleted"; }); }
+export async function setTagColorAction(name: string, color: string | null): Promise<R> { return run(() => { setTagColor(name, color); }); }
+export async function pruneTagsAction(): Promise<R> { return run(() => { const n = pruneUnusedTags(); return n ? `Removed ${n} unused tag${n === 1 ? "" : "s"}` : "No unused tags"; }); }
+
+export type ImportSummary = { formats: string[]; tasks: number; subtasks: number; notes: number; done: number; sample: { title: string; project: string | null; due: string | null }[]; noteTitles: string[]; warnings: string[] };
+const clean = (files: unknown): ImportFile[] => (Array.isArray(files) ? files : []).slice(0, 300).map((f) => ({ name: String((f as ImportFile).name ?? "file").slice(0, 200), text: String((f as ImportFile).text ?? "").slice(0, 5_000_000) }));
+/** Read the files and say what would be imported, without changing anything. */
+export async function previewImportAction(files: ImportFile[], project: string): Promise<{ ok: true; summary: ImportSummary } | { ok: false; error: string }> {
+  try { const p = parseImport(clean(files), { project }); return { ok: true, summary: { formats: p.formats, tasks: p.tasks.filter((t) => t.parent === null).length, subtasks: p.tasks.filter((t) => t.parent !== null).length, notes: p.notes.length, done: p.tasks.filter((t) => t.done).length, sample: p.tasks.slice(0, 6).map((t) => ({ title: t.title, project: t.project, due: t.due })), noteTitles: p.notes.slice(0, 6).map((n) => n.title), warnings: p.warnings } }; }
+  catch (e) { return { ok: false, error: (e as Error).message }; }
+}
+export async function runImportAction(files: ImportFile[], project: string): Promise<{ ok: true; result: ImportResult } | { ok: false; error: string }> {
+  try { const r = runImport(parseImport(clean(files), { project })); revalidatePath("/", "layout"); return { ok: true, result: r }; } catch (e) { return { ok: false, error: (e as Error).message }; }
+}
+
+export type BulkOp = { op: "move"; column: string } | { op: "priority"; value: -1 | 0 | 1 } | { op: "tag"; tag: string } | { op: "delete" };
+/** Change several cards at once. Each is applied on its own, so one failure doesn't stop the rest. */
+export async function bulkBoardAction(ids: number[], o: BulkOp): Promise<R> {
+  return run(() => {
+    const list = [...new Set((Array.isArray(ids) ? ids : []).map(Number).filter((n) => Number.isInteger(n) && n > 0))].slice(0, 200); if (!list.length) throw new Error("Select some cards first");
+    let n = 0, bad = 0;
+    for (const id of list) {
+      try {
+        if (o.op === "move") setStatus(id, o.column); else if (o.op === "priority") updateTask(id, { priority: o.value }); else if (o.op === "delete") deleteTask(id);
+        else if (o.op === "tag") { const t = getTask(id); if (t) updateTask(id, { tags: [...new Set([...t.tags, ...parseTags(o.tag)])] }); }
+        n++;
+      } catch { bad++; }
+    }
+    return `${n} card${n === 1 ? "" : "s"} updated${bad ? `, ${bad} couldn't be changed` : ""}`;
+  });
+}

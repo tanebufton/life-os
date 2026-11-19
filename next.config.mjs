@@ -12,5 +12,5 @@ const securityHeaders = [
 export default {
   async headers() { return [{ source: "/:path*", headers: securityHeaders }]; },
   serverExternalPackages: ["better-sqlite3", "node-ical", "imapflow", "mailparser"],
-  ...(allowed.length ? { experimental: { serverActions: { allowedOrigins: allowed } } } : {}),
+  experimental: { serverActions: { bodySizeLimit: "8mb", ...(allowed.length ? { allowedOrigins: allowed } : {}) } }, // imports upload files through server actions
 };

@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useOptimistic, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { moveTask } from "@/lib/actions";
-import { addCardAction } from "@/lib/actions5";
+import { addCardAction, bulkBoardAction, moveCardAction, type BulkOp } from "@/lib/actions5";
 import { nice } from "@/lib/dates";
 import { issueKey } from "@/lib/ui";
 import { StatusIcon } from "./StatusIcon";
@@ -13,41 +13,57 @@ import { Pill } from "./Pill";
 
 type Kind = "todo" | "doing" | "done";
 export type Column = { id: number; key: string; name: string; kind: Kind };
-export type Card = { id: number; title: string; status: string; priority: number; due: string | null; project_name: string | null; project_color: string | null; tags: string[]; repeat: string | null };
+export type Card = { id: number; title: string; status: string; priority: number; due: string | null; project_name: string | null; project_color: string | null; tags: string[]; repeat: string | null; sub_total?: number; sub_done?: number };
 const lift = "shadow-[0_1px_1px_rgb(9_30_66/0.25),0_0_1px_rgb(9_30_66/0.31)] dark:shadow-none dark:border";
 
 export function Board({ columns, cards, today, projectId = null, hiddenNote }: { columns: Column[]; cards: Card[]; today: string; projectId?: number | null; hiddenNote?: React.ReactNode }) {
   const router = useRouter();
-  const [items, setItems] = useOptimistic(cards, (s, a: { id: number; status: string }) => s.map((c) => (c.id === a.id ? { ...c, status: a.status } : c)));
+  const [items, setItems] = useOptimistic(cards, (s, a: { id: number; status: string; before?: number | null }) => { const c = s.find((x) => x.id === a.id); if (!c) return s; const rest = s.filter((x) => x.id !== a.id), at = a.before ? rest.findIndex((x) => x.id === a.before) : -1; const moved = { ...c, status: a.status }; return at < 0 ? [...rest, moved] : [...rest.slice(0, at), moved, ...rest.slice(at)]; });
   const [, start] = useTransition();
-  const [over, setOver] = useState<string | null>(null);
+  const [over, setOver] = useState<string | null>(null), [selecting, setSelecting] = useState(false), [sel, setSel] = useState<Set<number>>(new Set()), [mobileCol, setMobileCol] = useState(columns[0]?.key ?? "");
+  const toggle = (id: number) => setSel((s) => { const n = new Set(s); if (!n.delete(id)) n.add(id); return n; });
+  const bulk = (o: BulkOp) => start(async () => { const r = await bulkBoardAction([...sel], o); toast(r.ok ? (r.message ?? "Done") : r.error); if (r.ok && o.op === "delete") { setSel(new Set()); setSelecting(false); } }); // other changes keep the selection, so you can apply several in a row
   const kindOf = (key: string): Kind => columns.find((c) => c.key === key)?.kind ?? "todo";
   const move = (id: number, status: string) => start(async () => { setItems({ id, status }); const r = await moveTask(id, status); if (!r.ok) toast(r.error ?? "Couldn't move that card"); });
+  /** Drop `id` into `status`, just before card `before` (or at the end), keeping the column's manual order. */
+  const place = (id: number, status: string, before: number | null) => start(async () => {
+    setItems({ id, status, before });
+    const col = items.filter((c) => c.status === status && c.id !== id).map((c) => c.id), at = before ? col.indexOf(before) : -1; col.splice(at < 0 ? col.length : at, 0, id);
+    const r = await moveCardAction(id, status, col); if (!r.ok) toast(r.error);
+  });
   // The whole card opens the task (not just the title). Buttons and links inside keep their own behaviour; a drag never counts as a click.
-  const open = (e: React.MouseEvent | React.KeyboardEvent, id: number) => { if ((e.target as HTMLElement).closest("button, a")) return; router.push(`/tasks/${id}`); };
+  const open = (e: React.MouseEvent | React.KeyboardEvent, id: number) => { if ((e.target as HTMLElement).closest("button, a, input")) return; if (selecting) { toggle(id); return; } router.push(`/tasks/${id}`); };
 
   return (
+    <>
+    <div className="mb-3 flex flex-wrap items-center gap-2">
+      <button className={selecting ? "btn-primary !h-8 text-xs" : "btn !h-8 text-xs"} onClick={() => { setSelecting((v) => !v); setSel(new Set()); }}>{selecting ? "Done selecting" : "Select cards"}</button>
+      {selecting && <span className="text-xs text-mute">{sel.size} selected. Click cards to pick them.</span>}
+    </div>
+    <div role="tablist" aria-label="Columns" className="-mx-4 mb-3 flex gap-1.5 overflow-x-auto px-4 md:hidden">{columns.map((c) => <button key={c.key} role="tab" aria-selected={mobileCol === c.key} onClick={() => setMobileCol(c.key)} className={`shrink-0 rounded-full border px-3 py-1.5 text-[13px] ${mobileCol === c.key ? "border-accent/50 bg-accent/10 font-medium text-accent" : "text-mute"}`}>{c.name} <span className="text-dim">{items.filter((x) => x.status === c.key).length}</span></button>)}</div>
     <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-3 md:-mx-10 md:grid md:snap-none md:px-10 md:[grid-template-columns:repeat(var(--cols),minmax(220px,1fr))]" style={{ ["--cols" as string]: columns.length }}>
       {columns.map((col, ci) => {
         const list = items.filter((c) => c.status === col.key);
         return (
           <section key={col.key} onDragOver={(e) => { e.preventDefault(); setOver(col.key); }} onDragLeave={() => setOver(null)}
-            onDrop={(e) => { e.preventDefault(); setOver(null); const id = Number(e.dataTransfer.getData("text/plain")); if (id) move(id, col.key); }}
-            className={`rise min-h-[60vh] w-[84%] shrink-0 snap-center rounded-xl bg-raise/70 p-2 transition md:w-auto ${over === col.key ? "ring-2 ring-accent/50" : ""}`} style={{ ["--i" as string]: ci }}>
+            onDrop={(e) => { e.preventDefault(); setOver(null); const id = Number(e.dataTransfer.getData("text/plain")); if (id) place(id, col.key, null); }}
+            className={`rise min-h-[60vh] w-full shrink-0 rounded-xl bg-raise/70 p-2 transition md:block md:w-auto ${mobileCol === col.key ? "" : "hidden"} ${over === col.key ? "ring-2 ring-accent/50" : ""}`} style={{ ["--i" as string]: ci }}>
             <h2 className="flex items-center gap-2 px-2 pb-2.5 pt-1.5 text-xs font-semibold uppercase tracking-wide text-mute"><StatusIcon status={col.kind} size={13} /><span className="truncate">{col.name}</span><span className="font-medium text-dim">{list.length}</span></h2>
             <ul className="space-y-2">
               {list.map((c) => {
                 const done = col.kind === "done";
                 const d = c.due && !done ? (c.due < today ? "text-danger" : c.due === today ? "text-ok" : "text-mute") : "text-mute";
                 return (
-                  <li key={c.id} draggable onDragStart={(e) => e.dataTransfer.setData("text/plain", String(c.id))} onClick={(e) => open(e, c.id)} onKeyDown={(e) => { if (e.key === "Enter") open(e, c.id); }} tabIndex={0} role="link" aria-label={`Open ${c.title}`}
+                  <li key={c.id} draggable onDragStart={(e) => e.dataTransfer.setData("text/plain", String(c.id))} onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); e.stopPropagation(); setOver(null); const id = Number(e.dataTransfer.getData("text/plain")); if (!id || id === c.id) return; const r = e.currentTarget.getBoundingClientRect(), after = e.clientY > r.top + r.height / 2, i = list.findIndex((x) => x.id === c.id), next = after ? list[i + 1]?.id ?? null : c.id; place(id, col.key, next); }} onClick={(e) => open(e, c.id)} onKeyDown={(e) => { if (e.key === "Enter") open(e, c.id); }} tabIndex={0} role="link" aria-label={`Open ${c.title}`}
                     className={`group relative cursor-pointer rounded-lg bg-panel p-3 outline-none transition hover:bg-raise/40 focus-visible:ring-2 focus-visible:ring-accent/50 active:cursor-grabbing ${lift}`}>
-                    <Link href={`/tasks/${c.id}`} draggable={false} className={`block pr-12 text-[14px] leading-snug ${done ? "text-dim line-through" : ""}`}>{c.title}</Link>
+                    {selecting && <input type="checkbox" checked={sel.has(c.id)} onChange={() => toggle(c.id)} aria-label={`Select ${c.title}`} className="absolute left-2.5 top-3.5 h-4 w-4" />}
+                    <Link href={`/tasks/${c.id}`} draggable={false} className={`block ${selecting ? "pl-6" : ""} pr-12 text-[14px] leading-snug ${done ? "text-dim line-through" : ""}`}>{c.title}</Link>
                     {c.tags.length > 0 && <div className="mt-2 flex flex-wrap gap-1">{c.tags.map((g) => <Pill key={g} name={g} />)}</div>}
                     <div className="mt-3 flex items-center gap-2 text-xs text-mute">
                       <StatusIcon status={kindOf(c.status)} size={15} />
                       <span className={`font-medium ${done ? "line-through" : ""}`}>{issueKey(c.project_name, c.id)}</span>
                       <span className="ml-auto flex items-center gap-2">
+                        {!!c.sub_total && <span className="inline-flex items-center gap-1" title={`${c.sub_done ?? 0} of ${c.sub_total} subtasks done`}><span className="h-1 w-8 overflow-hidden rounded-full bg-fg/10"><span className="block h-full bg-ok" style={{ width: `${((c.sub_done ?? 0) / c.sub_total) * 100}%` }} /></span>{c.sub_done ?? 0}/{c.sub_total}</span>}
                         {c.repeat && <Icon name="repeat" size={13} />}
                         {c.due && <span className={`inline-flex items-center gap-1 ${d}`}><Icon name="calendar" size={12} />{c.due === today ? "Today" : nice(c.due).split(", ")[1]}</span>}
                         {c.priority > 0 && <Icon name="chevUp2" size={15} className="text-danger" />}{c.priority < 0 && <Icon name="chevDown1" size={15} className="text-accent" />}
@@ -68,6 +84,16 @@ export function Board({ columns, cards, today, projectId = null, hiddenNote }: {
         );
       })}
     </div>
+    {selecting && sel.size > 0 && (
+      <div className="sticky bottom-20 z-20 mt-4 flex flex-wrap items-center gap-2 rounded-xl border bg-panel p-2 shadow-[0_8px_30px_rgb(0_0_0/0.15)] md:bottom-4">
+        <span className="px-1 text-xs font-medium">{sel.size} selected</span>
+        <select aria-label="Move selected to" defaultValue="" onChange={(e) => { if (e.target.value) { bulk({ op: "move", column: e.target.value }); e.target.value = ""; } }} className="field !w-auto !py-1 text-[13px]"><option value="">Move to…</option>{columns.map((c) => <option key={c.key} value={c.key}>{c.name}</option>)}</select>
+        <select aria-label="Set priority of selected" defaultValue="" onChange={(e) => { if (e.target.value !== "") { bulk({ op: "priority", value: Number(e.target.value) as -1 | 0 | 1 }); e.target.value = ""; } }} className="field !w-auto !py-1 text-[13px]"><option value="">Priority…</option><option value="1">High</option><option value="0">Normal</option><option value="-1">Low</option></select>
+        <form className="flex gap-1" onSubmit={(e) => { e.preventDefault(); const f = e.currentTarget, v = (f.elements.namedItem("tag") as HTMLInputElement).value.trim(); if (v) { bulk({ op: "tag", tag: v }); f.reset(); } }}><input name="tag" placeholder="Add tag" aria-label="Add tag to selected" className="field !w-28 !py-1 text-[13px]" /><button className="btn !h-8 text-xs">Add</button></form>
+        <button className="btn !h-8 text-xs text-danger" onClick={() => { if (confirm(`Delete ${sel.size} card${sel.size === 1 ? "" : "s"}? You can restore them from Trash.`)) bulk({ op: "delete" }); }}>Delete</button>
+        <button className="text-xs text-mute hover:text-fg" onClick={() => setSel(new Set())}>Clear</button>
+      </div>)}
+    </>
   );
 }
 

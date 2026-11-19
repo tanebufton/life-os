@@ -5,18 +5,36 @@ import { Panel } from "@/components/Panel";
 import { PageHead, TaskRow } from "@/components/tasks";
 import { addDays, fmtMinutes, monthStart, nice, weekday } from "@/lib/dates";
 import { queryTasks } from "@/lib/tasks";
+import { WeekGrid } from "@/components/weekgrid";
+import { eventsBetween } from "@/lib/calendar";
+import { isOn } from "@/lib/features";
 import { today } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
 const dayLabel = (d: string, t: string) => (d === t ? "Today" : d === addDays(t, 1) ? "Tomorrow" : nice(d).replace(",", ""));
 
-export default async function Upcoming({ searchParams }: { searchParams: Promise<{ view?: string; m?: string }> }) {
-  const { view, m } = await searchParams;
-  const t = today(), month = view === "month";
+export default async function Upcoming({ searchParams }: { searchParams: Promise<{ view?: string; m?: string; d?: string }> }) {
+  const { view, m, d: wd } = await searchParams;
+  const t = today(), month = view === "month", week = view === "week";
   const all = queryTasks({ dueBy: addDays(t, 400) });
   const tab = (on: boolean) => `rounded-md px-3 py-1 text-[13px] font-medium ${on ? "bg-panel shadow-sm" : "text-mute hover:text-fg"}`;
-  const head = <PageHead title="Upcoming" sub={month ? "Month at a glance" : "The next two weeks, day by day"} right={<div className="inline-flex rounded-lg bg-raise p-0.5"><Link href="/upcoming" className={tab(!month)}>Agenda</Link><Link href="/upcoming?view=month" className={tab(month)}>Month</Link></div>} />;
+  const head = <PageHead title="Upcoming" sub={month ? "Month at a glance" : week ? "The week, with drag-to-reschedule" : "The next two weeks, day by day"} right={<div className="inline-flex rounded-lg bg-raise p-0.5"><Link href="/upcoming" className={tab(!month && !week)}>Agenda</Link><Link href="/upcoming?view=week" className={tab(week)}>Week</Link><Link href="/upcoming?view=month" className={tab(month)}>Month</Link></div>} />;
 
+  if (week) {
+    const anchor = wd && /^\d{4}-\d{2}-\d{2}$/.test(wd) ? wd : t, start = addDays(anchor, -((weekday(anchor) + 6) % 7)), dates = Array.from({ length: 7 }, (_, i) => addDays(start, i));
+    const tasks = queryTasks({ dueBy: dates[6] }).filter((x) => x.due! >= dates[0]), overdue = queryTasks({ dueBy: addDays(dates[0], -1) }).filter((x) => x.due! < dates[0] && x.due! < t);
+    const evs = isOn("calendar") ? eventsBetween(dates[0], dates[6]) : [];
+    const days = dates.map((d) => ({ date: d, label: new Intl.DateTimeFormat("en-NZ", { timeZone: "UTC", weekday: "short" }).format(new Date(d + "T00:00:00Z")), num: Number(d.slice(8)), isToday: d === t,
+      tasks: tasks.filter((x) => x.due === d).sort((a, b) => (a.due_time ?? "99").localeCompare(b.due_time ?? "99")).map((x) => ({ id: x.id, title: x.title, time: x.due_time, priority: x.priority, minutes: x.estimate })),
+      events: evs.filter((e) => e.date === d).map((e) => ({ title: e.title, time: e.all_day ? null : e.start_time, color: (e as { color?: string }).color ?? "#8b5cf6" })) }));
+    return (
+      <FeatureGate feature="upcoming"><div>{head}
+        <div className="mb-3 flex items-center gap-2"><Link href={`/upcoming?view=week&d=${addDays(start, -7)}`} className="btn" aria-label="Previous week">‹</Link><Link href="/upcoming?view=week" className="btn">This week</Link><Link href={`/upcoming?view=week&d=${addDays(start, 7)}`} className="btn" aria-label="Next week">›</Link><span className="ml-2 text-sm font-medium">{nice(dates[0]).replace(/^\w+, /, "")} – {nice(dates[6]).replace(/^\w+, /, "")}</span></div>
+        {overdue.length > 0 && start <= t && <p className="mb-3 text-xs text-danger">{overdue.length} overdue task{overdue.length === 1 ? "" : "s"} not shown here. <Link href="/upcoming" className="underline">See them in the agenda</Link>.</p>}
+        <WeekGrid days={days} />
+      </div></FeatureGate>
+    );
+  }
   if (!month) {
     const days = Array.from({ length: 14 }, (_, i) => addDays(t, i));
     const overdue = all.filter((x) => x.due! < t), by = (d: string) => all.filter((x) => x.due === d);

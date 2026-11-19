@@ -12,7 +12,7 @@ export type TaskRow = {
   id: number; title: string; notes: string; project_id: number | null; priority: number;
   due: string | null; due_time: string | null; estimate: number | null; done_at: string | null; status: Status; repeat: string | null;
   parent_id: number | null; source: string; meta: string | null; deleted_at: string | null;
-  status_kind: Kind; status_name: string; project_name: string | null; project_color: string | null; tags: string[]; sub_total: number; sub_done: number;
+  status_kind: Kind; status_name: string; position: number | null; project_name: string | null; project_color: string | null; tags: string[]; sub_total: number; sub_done: number;
 };
 export type NewTask = {
   title: string; notes?: string; project_id?: number | null; project?: string; due?: string | null; due_time?: string | null; estimate?: number | null;
@@ -97,6 +97,19 @@ export function nextDue(due: string | null, r: string): string {
   return d;
 }
 
+/** Manual order: tasks that have been dragged come first, in the order set; the rest follow in their usual order. */
+export const byPosition = <T extends { position: number | null }>(list: T[]): T[] => [...list].sort((a, b) => (a.position === null ? 1 : 0) - (b.position === null ? 1 : 0) || (a.position ?? 0) - (b.position ?? 0));
+/** Save a manual order for these tasks (first in the list = first on screen). */
+export function setTaskOrder(ids: number[]) {
+  const clean = [...new Set(ids.filter((n) => Number.isInteger(n) && n > 0))].slice(0, 1000), up = db.prepare("UPDATE tasks SET position=? WHERE id=? AND deleted_at IS NULL");
+  db.transaction(() => clean.forEach((id, i) => up.run((i + 1) * 1024, id)))();
+}
+/** Move a card into a column and place it in the given order. Moving to a different column also changes its status (and may complete it). */
+export function moveCard(id: number, columnKey: string, ordered: number[]) {
+  const t = getTask(id); if (!t) return;
+  if (t.status !== columnKey) setStatus(id, columnKey);
+  setTaskOrder(ordered.includes(id) ? ordered : [...ordered, id]);
+}
 // ---------- mutations ----------
 export function createTask(n: NewTask): number {
   const rep = normalizeRepeat(n.repeat);

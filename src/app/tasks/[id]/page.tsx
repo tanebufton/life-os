@@ -12,6 +12,8 @@ import { listComments } from "@/lib/misc";
 import { nice } from "@/lib/dates";
 import { listStatuses } from "@/lib/statuses";
 import { History } from "@/components/history";
+import { LinksPanel } from "@/components/links";
+import { listLinks } from "@/lib/links";
 
 export const dynamic = "force-dynamic";
 export default async function TaskPage({ params }: { params: Promise<{ id: string }> }) {
@@ -37,6 +39,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
         {meta?.from && <p className="mb-2 text-xs text-mute">From {meta.from}{meta.subject ? <> · “{meta.subject}”</> : null}</p>}
         </>} task={{ id: t.id, title: t.title, notes: t.notes, status: t.status, priority: t.priority, project_id: t.project_id, due: t.due, due_time: t.due_time, estimate: t.estimate, repeat: t.repeat ? describeRepeat(t.repeat) : "", tags: t.tags.join(" ") }}>
           {!t.parent_id && <SubtaskList parentId={t.id} items={kids} />}
+          <LinksPanel kind="task" id={t.id} links={listLinks("task", t.id)} />
         </TaskEditor>
       </div>
       <section className="rise mt-8 max-w-3xl" style={{ ["--i" as string]: 2 }}>

@@ -8,13 +8,15 @@ import { focusCapture, type NavProject } from "./shell";
 
 type Item = { label: string; group: string; hint?: string; icon?: string; project?: NavProject; run: () => void };
 
-type TaskHit = { id: number; title: string; due: string | null; project: string | null };
+type FoundHit = { kind: string; id: number; title: string; href: string; meta?: string; snippet?: string };
+type FoundGroup = { kind: string; label: string; items: FoundHit[] };
+const KIND_ICON: Record<string, string> = { task: "circleCheck", note: "notes", goal: "goals", person: "people", memo: "mic", project: "list" };
 export function Palette({ projects, features }: { projects: NavProject[]; features: Features }) {
   const router = useRouter();
   const [open, setOpen] = useState(false), [q, setQ] = useState(""), [sel, setSel] = useState(0);
   const ref = useRef<HTMLInputElement>(null);
-  const [hits, setHits] = useState<TaskHit[]>([]);
-  useEffect(() => { if (!open || q.trim().length < 2) { setHits([]); return; } const c = new AbortController(); const t = setTimeout(() => fetch(`/api/search?q=${encodeURIComponent(q)}`, { signal: c.signal }).then((r) => r.json()).then((j) => setHits(j.tasks ?? [])).catch(() => {}), 150); return () => { clearTimeout(t); c.abort(); }; }, [q, open]);
+  const [found, setFound] = useState<FoundGroup[]>([]);
+  useEffect(() => { if (!open || q.trim().length < 2) { setFound([]); return; } const c = new AbortController(); const t = setTimeout(() => fetch(`/api/search?q=${encodeURIComponent(q)}`, { signal: c.signal }).then((r) => r.json()).then((j) => setFound(j.groups ?? [])).catch(() => {}), 150); return () => { clearTimeout(t); c.abort(); }; }, [q, open]);
 
   useEffect(() => {
     const toggle = () => { setOpen((o) => !o); setQ(""); setSel(0); };
@@ -34,8 +36,8 @@ export function Palette({ projects, features }: { projects: NavProject[]; featur
     ]),
   // eslint-disable-next-line react-hooks/exhaustive-deps
   ], [projects, features]);
-  const taskItems: Item[] = hits.map((h) => ({ label: h.title, group: "Tasks", icon: "circleCheck", hint: h.project ?? h.due ?? undefined, run: go(`/tasks/${h.id}`) }));
-  const shown = [...taskItems, ...items.filter((i) => i.label.toLowerCase().includes(q.toLowerCase()))].concat(q.trim().length >= 2 ? [{ label: `Search all tasks for “${q.trim()}”`, group: "Search", icon: "search", run: go(`/search?q=${encodeURIComponent(q.trim())}`) }] : []);
+  const taskItems: Item[] = found.flatMap((g) => g.items.map((h) => ({ label: h.title, group: g.label, icon: KIND_ICON[h.kind] ?? "search", hint: h.meta ?? undefined, run: go(h.href) })));
+  const shown = [...taskItems, ...items.filter((i) => i.label.toLowerCase().includes(q.toLowerCase()))].concat(q.trim().length >= 2 ? [{ label: `Search everything for “${q.trim()}”`, group: "Search", icon: "search", run: go(`/search?q=${encodeURIComponent(q.trim())}`) }] : []);
 
   if (!open) return null;
   return (

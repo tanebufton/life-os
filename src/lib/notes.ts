@@ -1,7 +1,7 @@
 import { db } from "./db";
 
 import { record } from "./activity";
-export type Note = { project_id: number | null; id: number; title: string; body: string; pinned: number; created_at: string; updated_at: string };
+export type Note = { rev: number; project_id: number | null; id: number; title: string; body: string; pinned: number; created_at: string; updated_at: string };
 export const getNote = (id: number) => db.prepare("SELECT * FROM notes WHERE id=? AND deleted_at IS NULL").get(id) as Note | undefined;
 export const noteByTitle = (title: string) => db.prepare("SELECT * FROM notes WHERE lower(title)=lower(?) AND deleted_at IS NULL").get(title.trim()) as Note | undefined;
 export function listNotes(o: { q?: string; limit?: number; project?: number; ids?: number[] } = {}): Note[] {
@@ -15,7 +15,7 @@ export function createNote(title = "", body = "", projectId: number | null = nul
 const VERSION_EVERY_MIN = 10, KEEP_VERSIONS = 30;
 export function updateNote(id: number, p: { title?: string; body?: string; pinned?: boolean; project_id?: number | null }): boolean {
   const before = db.prepare("SELECT * FROM notes WHERE id=? AND deleted_at IS NULL").get(id) as Note | undefined; if (!before) return false;
-  const sets: string[] = ["updated_at=datetime('now')"], a: unknown[] = [];
+  const sets: string[] = ["updated_at=datetime('now')", "rev=rev+1"], a: unknown[] = [];
   const title = p.title !== undefined ? p.title.trim().slice(0, 200) : undefined, body = p.body !== undefined ? p.body.slice(0, 200_000) : undefined;
   if (title !== undefined) { sets.push("title=?"); a.push(title); } if (body !== undefined) { sets.push("body=?"); a.push(body); } if (p.pinned !== undefined) { sets.push("pinned=?"); a.push(p.pinned ? 1 : 0); }
   if (p.project_id !== undefined) { sets.push("project_id=?"); a.push(p.project_id); }
@@ -33,6 +33,21 @@ export function updateNote(id: number, p: { title?: string; body?: string; pinne
     return db.prepare(`UPDATE notes SET ${sets.join(",")} WHERE id=? AND deleted_at IS NULL`).run(...a, id).changes > 0;
   })();
 }
+export type SaveResult = { ok: true; rev: number } | { ok: false; conflict: true; current: { title: string; body: string; rev: number; updated_at: string } } | { ok: false; notFound: true };
+/**
+ * Save with edit-conflict protection. `baseRev` is the revision the editor loaded; if the note has moved on since (another tab or device saved),
+ * nothing is overwritten and the current text is returned. `force` overwrites anyway, first keeping what it replaces as a version.
+ */
+export function saveNote(id: number, p: { title?: string; body?: string; pinned?: boolean; project_id?: number | null }, baseRev?: number, force = false): SaveResult {
+  const cur = getNote(id); if (!cur) return { ok: false, notFound: true };
+  if (baseRev !== undefined && cur.rev !== baseRev) {
+    if (!force) return { ok: false, conflict: true, current: { title: cur.title, body: cur.body, rev: cur.rev, updated_at: cur.updated_at } };
+    if (cur.body.trim()) db.prepare("INSERT INTO note_versions (note_id, title, body) VALUES (?,?,?)").run(id, cur.title, cur.body); // keep the other device's text
+    record("note", id, "edited", { field: "overwrote changes made elsewhere" });
+  }
+  updateNote(id, p); return { ok: true, rev: getNote(id)!.rev };
+}
+export const noteRev = (id: number) => db.prepare("SELECT rev, title, body FROM notes WHERE id=? AND deleted_at IS NULL").get(id) as { rev: number; title: string; body: string } | undefined;
 export const noteVersions = (id: number) => db.prepare("SELECT id, title, body, at FROM note_versions WHERE note_id=? ORDER BY id DESC").all(id) as { id: number; title: string; body: string; at: string }[];
 /** Put an earlier version back. The current text is itself kept as a version first, so nothing is lost. */
 export function restoreNoteVersion(noteId: number, versionId: number): boolean {

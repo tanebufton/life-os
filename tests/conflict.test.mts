@@ -1,0 +1,11 @@
+import assert from "node:assert/strict";
+const N = await import("../src/lib/notes.ts");
+let n = 0; const ok = (m: string) => { n++; console.log("  ✓", m); };
+const id = N.createNote("Shared", "start"); const r0 = N.getNote(id)!.rev;
+let r = N.saveNote(id, { body: "laptop edit" }, r0); assert.equal(r.ok, true); const r1 = (r as any).rev; assert.equal(r1, r0 + 1); ok("a save with the current revision works and moves the revision on");
+r = N.saveNote(id, { body: "phone edit (stale)" }, r0); assert.equal(r.ok, false); assert.equal((r as any).conflict, true); assert.equal((r as any).current.body, "laptop edit"); assert.equal(N.getNote(id)!.body, "laptop edit"); ok("a save based on an older revision is refused, nothing is overwritten, and the current text is handed back");
+r = N.saveNote(id, { body: "phone edit (kept)" }, r0, true); assert.equal(r.ok, true); assert.equal(N.getNote(id)!.body, "phone edit (kept)"); assert.ok(N.noteVersions(id).some((v: any) => v.body === "laptop edit")); ok("'keep mine' overwrites, but the other device's text is saved as a version first");
+const before = N.getNote(id)!.rev; N.updateNote(id, { pinned: true }); assert.equal(N.getNote(id)!.rev, before + 1); assert.equal(N.saveNote(id, { title: "No base" }).ok, true); ok("saves without a revision (API, MCP, pin) still work and also count as edits");
+assert.equal((N.saveNote(99999, { body: "x" }, 0) as any).notFound, true); ok("a missing note is reported as missing");
+const a = N.getNote(id)!.rev; N.saveNote(id, { body: "phone edit (kept)" }, a); assert.equal(N.getNote(id)!.rev, a + 1); ok("saving identical text still counts as a save (the editor only calls when something changed)");
+console.log(`\n${n} checks passed`);

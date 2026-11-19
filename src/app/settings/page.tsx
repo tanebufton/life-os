@@ -7,7 +7,8 @@ import { PageHead } from "@/components/tasks";
 import { ThemeToggle } from "@/components/theme";
 import { addFeed, removeFeed, resetFeatures, saveCapacity, saveCurrency, saveLocation, saveNotifySettings, saveTimezone, spotifyDisconnect } from "@/lib/actions";
 import { currency } from "@/lib/money";
-import { MobileTabsEditor, TodayWidgetsEditor } from "@/components/layoutprefs";
+import { MobileTabsEditor, SidebarEditor, TodayWidgetsEditor } from "@/components/layoutprefs";
+import { parsePrefs } from "@/lib/sidebar";
 import { MAX_TABS, NAV, resolveTabs, visiblePages } from "@/lib/nav";
 import { WIDGETS } from "@/lib/widgets";
 import { recentEmailImports } from "@/lib/email";
@@ -21,6 +22,7 @@ import { TelegramButtons } from "@/components/settingsui";
 import { db } from "@/lib/db";
 import { unarchiveProjectAction } from "@/lib/actions5";
 import { BackupPanel } from "@/components/backupui";
+import { ImportPanel } from "@/components/importpanel";
 import * as Backup from "@/lib/backup";
 import { addCalFeedAction, removeCalFeedAction, saveQuietHours, saveTelegramToken, saveWorkHours, syncCalendarsAction, telegramRegen, telegramUnlink } from "@/lib/actions3";
 import { listFeeds as listCalFeeds } from "@/lib/calendar";
@@ -71,6 +73,7 @@ export default async function Settings({ searchParams }: { searchParams: Promise
       <Section id="layout" i={1} title="Layout" desc="Choose the tabs in your phone's bottom bar, and what shows on Today. Changes apply straight away.">
         <div className="space-y-5">
           <Panel title="Phone bottom bar" bodyClass="p-4">{(() => { const vis = visiblePages(f), chosen = resolveTabs(nv("mobile_tabs") || undefined, f), ids = chosen.map((c) => c.href), rest = vis.filter((p) => !ids.includes(p.href)); return <MobileTabsEditor items={[...chosen, ...rest].map((p) => ({ id: p.href, label: p.label, icon: p.icon, on: ids.includes(p.href) }))} />; })()}</Panel>
+          <Panel title="Desktop sidebar" bodyClass="p-4"><SidebarEditor pages={visiblePages(f).map((p) => ({ href: p.href, label: p.label, icon: p.icon, key: p.key, group: p.group, hidden: p.hidden, feature: p.feature }))} prefs={parsePrefs(nv("sidebar") || undefined)} /></Panel>
           <Panel title="Today widgets" bodyClass="p-4">{(() => { let order: string[] = [], hidden: string[] = []; try { const p = nv("today_widgets") ? JSON.parse(nv("today_widgets")) : null; if (p) { order = p.order ?? []; hidden = p.hidden ?? []; } } catch {} const ids = WIDGETS.map((w) => w.id), full = [...order.filter((i: string) => ids.includes(i)), ...ids.filter((i) => !order.includes(i))]; return <TodayWidgetsEditor items={full.map((id) => { const w = WIDGETS.find((x) => x.id === id)!; return { id, label: w.label + (w.feature && !f[w.feature] ? " (feature off)" : ""), on: !hidden.includes(id) }; })} />; })()}</Panel>
         </div>
       </Section>
@@ -182,6 +185,10 @@ export default async function Settings({ searchParams }: { searchParams: Promise
         <Section id="archived" i={8} title="Archived projects" desc="Archived projects are hidden from the sidebar. Their tasks are kept.">
           <Panel><ul>{arch.map((a) => <li key={a.id} className="flex items-center justify-between gap-3 border-b px-4 py-2.5 text-sm last:border-b-0"><span className="truncate">{a.name}</span><form action={async () => { "use server"; await unarchiveProjectAction(a.id); }}><button className="btn !h-7 text-xs">Restore</button></form></li>)}</ul></Panel>
         </Section>) : null; })()}
+
+      <Section id="import" i={8} title="Import" desc="Bring your tasks and notes across from another app.">
+        <Panel><ImportPanel /></Panel>
+      </Section>
 
       <Section id="data" i={8} title="Your data" desc="It's yours. Take a copy any time. Deleted tasks stay recoverable for 30 days.">
         <Panel bodyClass="divide-y">

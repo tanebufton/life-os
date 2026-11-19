@@ -8,6 +8,7 @@ import { Palette } from "@/components/palette";
 import { PwaRegister } from "@/components/pwa";
 import { listFilters } from "@/lib/misc";
 import { parsePrefs } from "@/lib/sidebar";
+import { tagColorCss } from "@/lib/tags";
 import { Hotkeys, MobileNav, Sidebar, Topbar, type NavProject } from "@/components/shell";
 import { db } from "@/lib/db";
 import { featureMap } from "@/lib/features";
@@ -32,7 +33,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     FROM tasks WHERE done_at IS NULL AND deleted_at IS NULL AND parent_id IS NULL`).get(t) as { due: number; open: number; doing: number; inbox: number };
   return (
     <html lang="en" data-theme="light" suppressHydrationWarning>
-      <head><script dangerouslySetInnerHTML={{ __html: "try{var t=localStorage.getItem('lifeos.theme');if(!t)t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.dataset.theme=t}catch(e){}" }} /></head>
+      <head><style dangerouslySetInnerHTML={{ __html: tagColorCss() }} /><script dangerouslySetInnerHTML={{ __html: "try{var t=localStorage.getItem('lifeos.theme');if(!t)t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.dataset.theme=t}catch(e){}" }} /></head>
       <body>
         <SessionProvider>
         <div className="flex h-dvh">

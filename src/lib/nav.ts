@@ -20,6 +20,7 @@ export const NAV: NavPage[] = [
   { href: "/matrix", label: "Priority matrix", icon: "matrix", key: "q", feature: "board", group: "explore", hidden: true },
   { href: "/now", label: "Do this now", icon: "now", key: "w", group: "explore", hidden: true },
   { href: "/assistant", label: "Assistant", icon: "sparkles", key: "z", feature: "ai", group: "explore" },
+  { href: "/tags", label: "Tags", icon: "inbox", key: "d", group: "explore" },
   { href: "/activity", label: "Activity", icon: "clock", key: "g", group: "explore" },
   { href: "/trash", label: "Trash", icon: "trash", key: "y", group: "explore", hidden: true },
   { href: "/review", label: "Plan & review", icon: "review", key: "r", feature: "review", group: "explore" },

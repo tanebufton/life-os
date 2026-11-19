@@ -1,3 +1,5 @@
+import { ReorderList } from "./reorder";
+import { byPosition } from "@/lib/tasks";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { diffDays, fmtMinutes, fmtTime, nice } from "@/lib/dates";
@@ -70,7 +72,7 @@ export function TaskGroups({ groups, empty }: { groups: Group[]; empty: ReactNod
       {shown.map((g) => (
         <section key={g.label} className="rise">
           <h3 className="flex items-baseline gap-2 border-b px-2 pb-1.5 pt-5 text-[13px] font-semibold first:pt-0"><span className={TONE[g.tone ?? "none"]}>{g.label}</span><span className="font-normal text-dim">{g.tasks.length}</span></h3>
-          <ul>{g.tasks.map((t) => <TaskRow key={t.id} t={t} />)}</ul>
+          <ReorderList>{g.tasks.map((t) => <TaskRow key={t.id} t={t} />)}</ReorderList>
         </section>
       ))}
     </div>
@@ -81,7 +83,7 @@ export function TaskGroups({ groups, empty }: { groups: Group[]; empty: ReactNod
 export function bucket(tasks: TaskRow[]): Group[] {
   const t = today();
   const used = new Set<number>();
-  const take = (f: (x: TaskRow) => boolean) => tasks.filter((x) => !used.has(x.id) && f(x) && used.add(x.id));
+  const take = (f: (x: TaskRow) => boolean) => byPosition(tasks.filter((x) => !used.has(x.id) && f(x) && used.add(x.id)));
   return [
     { label: "Overdue", tone: "danger", tasks: take((x) => !!x.due && x.due < t) },
     { label: "Today", tone: "ok", tasks: take((x) => x.due === t) },

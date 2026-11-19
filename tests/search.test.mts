@@ -1,0 +1,15 @@
+import assert from "node:assert/strict";
+const S = await import("../src/lib/search.ts"); const N = await import("../src/lib/notes.ts"); const G = await import("../src/lib/goals.ts"); const P = await import("../src/lib/people.ts"); const T = await import("../src/lib/tasks.ts"); const V = await import("../src/lib/voice.ts"); const F = await import("../src/lib/features.ts"); const { db } = await import("../src/lib/db.ts");
+let n = 0; const ok = (m: string) => { n++; console.log("  ✓", m); }; const kinds = (q: string, o?: any) => S.searchAll(q, o).groups.map((g: any) => g.kind);
+T.createTask({ title: "Book the zanzibar venue" }); N.createNote("Zanzibar trip plan", "We should visit Stone Town and the spice farm"); G.createGoal({ title: "Visit zanzibar", description: "holiday goal" }); P.createPerson({ name: "Zanzi Bar", notes: "knows the venue" }); V.saveMemo("remember zanzibar flights", "memo"); db.prepare("INSERT INTO projects (name) VALUES ('Zanzibar project')").run();
+assert.deepEqual(kinds("zanzibar").sort(), ["goal", "memo", "note", "project", "task"]); ok("one plain search finds tasks, notes, goals, voice memos and projects");
+assert.deepEqual(kinds("zanzi").includes("person"), true); ok("partial words match (people included)");
+const r = S.searchAll("stone town"); assert.ok(r.groups.find((g: any) => g.kind === "note")!.items[0].snippet.toLowerCase().includes("stone town")); assert.ok(!r.groups.find((g: any) => g.kind === "goal")); ok("multi-word search needs every word, and shows an excerpt around the match");
+assert.deepEqual(kinds("zanzibar #nothing"), []); assert.deepEqual(kinds("zanzibar is:any"), ["task"]); ok("task filters (#tag, is:) narrow the search to tasks");
+assert.equal(S.hasOperators("venue"), false); assert.equal(S.hasOperators("venue due:week"), true); assert.equal(S.hasOperators("#work"), true); ok("operators are detected");
+assert.deepEqual(kinds("zanzibar", { kinds: ["note"] }), ["note"]); ok("search can be limited to some kinds (used by the link picker)");
+F.setFeature("notes", false); F.setFeature("voice", false); assert.ok(!kinds("zanzibar").includes("note") && !kinds("zanzibar").includes("memo")); F.setFeature("notes", true); F.setFeature("voice", true); ok("switched-off features never show up in search");
+assert.deepEqual(kinds("100%_"), []); assert.deepEqual(kinds("\\"), []); ok("percent signs, underscores and backslashes are treated as plain text");
+const t = N.createNote("Deleted note zzzunique", "x"); N.deleteNote(t); assert.deepEqual(kinds("zzzunique"), []); ok("deleted notes don't appear");
+const sn = S.snippet("# Heading\n\nSome **bold** text with [a link](http://x) and more words after", ["link"]); assert.ok(sn.includes("a link") && !sn.includes("http") && !sn.includes("**")); ok("excerpts strip markdown");
+console.log(`\n${n} checks passed`);

@@ -5,6 +5,8 @@ import { PageHead } from "@/components/tasks";
 import { addPersonAction, archivePersonAction, followUpAction, logContactAction } from "@/lib/actions3";
 import { nice } from "@/lib/dates";
 import { TagField } from "@/components/meta";
+import { LinksPanel } from "@/components/links";
+import { listLinks } from "@/lib/links";
 import { entityTags } from "@/lib/entitytags";
 import { catchUpIn, interactions, listPeople, nextBirthday } from "@/lib/people";
 import { today } from "@/lib/time";
@@ -24,7 +26,7 @@ export default function People() {
                   <div className="text-xs text-mute">{p.last_contact ? `Last spoke ${nice(p.last_contact)}` : "No contact logged"}{p.cadence_days ? ` · every ${p.cadence_days} days` : ""}{b ? ` · birthday ${b.in === 0 ? "today" : `in ${b.in} days`}${b.age ? ` (${b.age})` : ""}` : ""}</div></div>
                 {n !== null && <span className={`lozenge ${n <= 0 ? "bg-warn/15 text-warn" : "bg-raise text-mute"}`}>{n <= 0 ? `${-n || 0}d overdue` : `in ${n}d`}</span>}</div>
               <div className="mt-2 flex flex-wrap gap-2 pl-12 text-xs"><form action={logContactAction.bind(null, p.id, "")}><button className="btn !px-2.5 !py-1">Log catch-up</button></form><form action={followUpAction.bind(null, p.id)}><button className="btn !px-2.5 !py-1">Add reminder task</button></form><form action={archivePersonAction.bind(null, p.id)}><button className="px-1 py-1 text-dim hover:text-danger">Remove</button></form></div>
-              <div className="mt-1.5 pl-12"><TagField kind="person" id={p.id} value={entityTags("person", p.id)} /></div>
+              <div className="mt-1.5 pl-12"><TagField kind="person" id={p.id} value={entityTags("person", p.id)} /><div className="-mt-2"><LinksPanel kind="person" id={p.id} links={listLinks("person", p.id)} /></div></div>
               {p.notes && <p className="mt-2 pl-12 text-[13px] text-mute">{p.notes}</p>}
               {interactions(p.id, 2).length > 0 && <p className="mt-1 pl-12 text-xs text-dim">{interactions(p.id, 2).map((x) => nice(x.date)).join(" · ")}</p>}
             </li>))}

@@ -35,6 +35,8 @@ export function describeEvent(e: Event): string {
     case "deleted": return "Deleted";
     case "restored": return "Restored";
     case "edited": return e.field ? `Edited ${e.field}${e.old && e.new ? ` (${e.old} → ${e.new})` : ""}` : "Edited";
+    case "linked": return `Linked to ${(e.field ?? "item").toLowerCase()}${e.new ? `: ${e.new}` : ""}`;
+    case "unlinked": return `Unlinked ${(e.field ?? "item").toLowerCase()}${e.old ? `: ${e.old}` : ""}`;
     case "changed": return e.old || e.new ? `${e.field}: ${e.old ?? "none"} → ${e.new ?? "none"}` : `${e.field} changed`;
     default: return `${e.action}${e.field ? ` ${e.field}` : ""}`;
   }

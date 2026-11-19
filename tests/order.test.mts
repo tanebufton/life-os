@@ -1,0 +1,14 @@
+import assert from "node:assert/strict";
+const T = await import("../src/lib/tasks.ts"); const S = await import("../src/lib/statuses.ts");
+let n = 0; const ok = (m: string) => { n++; console.log("  ✓", m); };
+const ids = ["a", "b", "c", "d"].map((t) => T.createTask({ title: "task " + t }));
+const order = (list: number[]) => T.byPosition(list.map((id) => T.getTask(id)!)).map((t: any) => t.title.slice(-1)).join("");
+assert.equal(order(ids), "abcd"); ok("without manual order, tasks keep their usual order");
+T.setTaskOrder([ids[2], ids[0]]); assert.equal(order(ids), "cabd"); ok("dragged tasks come first in the order set; the rest follow");
+T.setTaskOrder([ids[3], ids[2], ids[1], ids[0]]); assert.equal(order(ids), "dcba"); ok("a full reorder is exact");
+const e = T.createTask({ title: "task e" }); assert.equal(order([...ids, e]), "dcbae"); ok("new tasks go to the end");
+T.setTaskOrder([ids[0], ids[0], -1, 9999999, ids[1]]); assert.ok(order([ids[0], ids[1]]) === "ab"); ok("duplicates and invalid ids are ignored");
+const doing = S.statusByKey("doing")!; T.moveCard(ids[0], "doing", [ids[1], ids[0]]); assert.equal(T.getTask(ids[0])!.status, "doing"); assert.equal(T.getTask(ids[0])!.status_kind, "doing"); ok("dropping a card in another column changes its status and sets its place");
+T.moveCard(ids[2], "done", [ids[2]]); assert.ok(T.getTask(ids[2])!.done_at); ok("dropping into a Done column completes the task");
+T.deleteTask(ids[3]); T.setTaskOrder([ids[3], ids[1]]); assert.equal(T.getTask(ids[3])?.position ?? null, null); ok("deleted tasks aren't reordered");
+console.log(`\n${n} checks passed`);

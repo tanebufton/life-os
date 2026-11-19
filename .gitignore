@@ -5,3 +5,6 @@ data/*.db*
 demo-shots
 
 !.env.example
+
+tests/fixtures/*-wal
+tests/fixtures/*-shm

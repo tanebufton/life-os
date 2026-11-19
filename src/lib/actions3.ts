@@ -6,7 +6,7 @@ import { AiError, aiConfigured, ask, extractTasks, planDay, type Plan, type Prop
 import { isOn } from "./features";
 import { addKeyResult, createGoal, deleteGoal, deleteKeyResult, setGoalStatus, setKeyResult, type Goal } from "./goals";
 import { addComment, deleteComment, emptyTrash, deleteFilter, purgeTask, saveFilter, enrichLinkTask } from "./misc";
-import { createNote, deleteNote, getNote, noteByTitle, updateNote } from "./notes";
+import { createNote, deleteNote, getNote, noteByTitle, noteRev, saveNote, updateNote } from "./notes";
 import { archivePerson, createPerson, followUpTask, logContact, updatePerson } from "./people";
 import { autoSchedule, findSlot, toHm, workHours } from "./planner";
 import { getSetting, setSetting } from "./settings";
@@ -37,7 +37,15 @@ export async function saveWorkHours(fd: FormData) { for (const k of ["work_start
 
 // notes
 export async function newNoteAction() { const id = createNote("", ""); refresh(); redirect(`/notes/${id}`); }
-export async function saveNoteAction(id: number, p: { title?: string; body?: string; pinned?: boolean }) { const clash = p.title && noteByTitle(p.title); if (clash && clash.id !== id) return { ok: false as const, error: `A note called "${p.title}" already exists` }; updateNote(id, p); revalidatePath("/notes"); return { ok: true as const }; }
+export type NoteSave = { ok: true; rev: number } | { ok: false; error: string; conflict?: true; current?: { title: string; body: string; rev: number; updated_at: string } };
+/** Autosave for the note editor. `baseRev` is the revision the editor last saw; a stale one is refused with the current text so nothing is overwritten by accident. */
+export async function saveNoteAction(id: number, p: { title?: string; body?: string; pinned?: boolean }, baseRev?: number, force = false): Promise<NoteSave> {
+  const clash = p.title && noteByTitle(p.title); if (clash && clash.id !== id) return { ok: false, error: `A note called "${p.title}" already exists` };
+  const r = saveNote(id, p, baseRev, force); revalidatePath("/notes");
+  if (r.ok) return { ok: true, rev: r.rev }; if ("conflict" in r) return { ok: false, error: "This note was changed somewhere else", conflict: true, current: r.current }; return { ok: false, error: "That note no longer exists" };
+}
+export async function noteRevAction(id: number) { return noteRev(id) ?? null; }
+export async function saveAsNewNoteAction(title: string, body: string) { const id = createNote(`${(title || "Untitled").slice(0, 150)} (my edits)`, body); revalidatePath("/notes"); return id; }
 export async function deleteNoteAction(id: number) { deleteNote(id); refresh(); redirect("/notes"); }
 export async function openNoteByTitle(title: string) { const n = noteByTitle(title) ?? getNote(createNote(title, "")); return n!.id; }
 

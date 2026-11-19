@@ -8,6 +8,8 @@ import { AREAS, areaBalance, goalProgress, listGoals } from "@/lib/goals";
 import { today } from "@/lib/time";
 import { db } from "@/lib/db";
 import { History } from "@/components/history";
+import { LinksPanel } from "@/components/links";
+import { listLinks } from "@/lib/links";
 import { TagField } from "@/components/meta";
 import { entityTags } from "@/lib/entitytags";
 
@@ -33,6 +35,7 @@ export default function Goals() {
                   <form action={async (fd: FormData) => { "use server"; await setKrAction(k.id, Number(fd.get("v"))); }} className="flex items-center gap-1.5"><input name="v" defaultValue={k.current} inputMode="decimal" aria-label={`Progress for ${k.title}`} className="field !w-20 !py-1 text-right" /><span className="text-mute">/ {k.target} {k.unit}</span><button className="btn !px-2 !py-1 text-xs">Update</button></form>
                   <form action={deleteKrAction.bind(null, k.id)}><button className="text-xs text-dim hover:text-danger" aria-label="Remove key result">Remove</button></form></li>))}</ul>
               <form action={addKrAction.bind(null, g.id)} className="mt-3 flex flex-wrap gap-2"><input name="title" required placeholder="Add a key result, e.g. Run 100 km" className="field !w-auto min-w-48 flex-1" /><input name="target" required inputMode="decimal" placeholder="Target" className="field !w-24" /><input name="unit" placeholder="Unit" className="field !w-24" /><button className="btn">Add</button></form>
+              <LinksPanel kind="goal" id={g.id} links={listLinks("goal", g.id)} />
               <History entity="goal" id={g.id} />
               <div className="mt-3 flex gap-3 text-xs"><form action={goalStatusAction.bind(null, g.id, "done")}><button className="text-mute hover:text-fg">Mark achieved</button></form><form action={goalStatusAction.bind(null, g.id, "archived")}><button className="text-mute hover:text-fg">Archive</button></form><form action={deleteGoalAction.bind(null, g.id)}><button className="text-mute hover:text-danger">Delete</button></form></div>
             </Panel>); })}

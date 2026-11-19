@@ -119,11 +119,20 @@ function migrate(d: Database.Database) {
     CREATE INDEX IF NOT EXISTS activity_entity ON activity(entity, entity_id, id);
     CREATE TABLE IF NOT EXISTS note_versions (id INTEGER PRIMARY KEY, note_id INTEGER NOT NULL REFERENCES notes(id) ON DELETE CASCADE, title TEXT NOT NULL, body TEXT NOT NULL, at TEXT NOT NULL DEFAULT (datetime('now')));
     CREATE INDEX IF NOT EXISTS note_versions_note ON note_versions(note_id, id);
+    CREATE TABLE IF NOT EXISTS item_links (id INTEGER PRIMARY KEY, a_kind TEXT NOT NULL, a_id INTEGER NOT NULL, b_kind TEXT NOT NULL, b_id INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE (a_kind, a_id, b_kind, b_id));
+    CREATE INDEX IF NOT EXISTS item_links_b ON item_links(b_kind, b_id);
   `);
+  // Manual card/task order, note edit counter (for conflict detection) and tag colours. All optional, so nothing existing changes.
+  const t2 = (d.prepare("PRAGMA table_info(tasks)").all() as { name: string }[]).map((c) => c.name);
+  if (!t2.includes("position")) d.exec("ALTER TABLE tasks ADD COLUMN position REAL");
+  const n2 = (d.prepare("PRAGMA table_info(notes)").all() as { name: string }[]).map((c) => c.name);
+  if (!n2.includes("rev")) d.exec("ALTER TABLE notes ADD COLUMN rev INTEGER NOT NULL DEFAULT 0");
+  const g2 = (d.prepare("PRAGMA table_info(tags)").all() as { name: string }[]).map((c) => c.name);
+  if (!g2.includes("color")) d.exec("ALTER TABLE tags ADD COLUMN color TEXT");
 }
 
 /** Bump when the schema changes. Existing databases below this get an automatic safety copy before they are migrated. */
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 /**
  * Before upgrading an existing database to a newer schema, save a complete copy next to it (VACUUM INTO is safe while the app runs).
  * If this can't be written the upgrade stops rather than risk your data; set LIFEOS_SKIP_UPGRADE_BACKUP=1 to override. Keeps the newest 3.

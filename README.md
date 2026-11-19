@@ -36,6 +36,21 @@ quick-add syntax (`Pay rent every month #bills @home !high 31 march at 9am ~30m`
 **Board:** custom columns (add, rename, reorder, remove) with a *kind* (To do / In progress / Done) so counts and reminders keep working, optional **per-project columns**, add cards straight into a column, click a card to open it, and finished cards hide after N days. **Projects** are hubs: tasks, board, notes and goals. **Tags** on tasks, notes, goals and people. **History** on tasks, notes and goals (with restorable note versions) plus an Activity page. Voice is hold-to-talk: let go and it's added as a task.
 **Customise:** Reorder, hide or show sidebar pages from the LifeOS menu → Edit sidebar (desktop). Settings → Layout picks the (up to 4) tabs in the phone's bottom bar and the order of Today's side panels.
 
+## Also in it
+
+- Search across tasks, notes, goals, people, voice memos and projects (`⌘K` or `/search`)
+- Manual ordering of tasks and board cards (drag), board filters/sort, select mode with bulk edit, subtask progress on cards
+- Table view for tasks; week view (drag to reschedule) on Upcoming
+- Links between any two items (shown on both sides)
+- Tags page: rename, merge, recolour, delete
+- Import from Todoist CSV, generic CSV, and Markdown/text (Notion exports) in Settings, plus a fuller JSON export
+- Edit conflicts on notes are detected across devices (keep mine / use theirs / keep both)
+- Mobile board column tabs; sidebar editing in Settings
+
+## Upgrading
+
+`git pull` then `docker compose up -d --build web worker`. Database changes are additive, and a copy of your database is saved next to it before any schema upgrade (currently schema v4).
+
 ## Integrations
 | What | How |
 |---|---|

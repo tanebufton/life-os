@@ -9,8 +9,8 @@
 .row{display:flex;gap:8px;flex-wrap:wrap}button.b{padding:8px 12px;border-radius:8px;border:1px solid var(--line);background:transparent;color:inherit;font:inherit;cursor:pointer}button.b.p{background:var(--acc);border-color:var(--acc);color:#fff}button.b:disabled{opacity:.45;cursor:default}
 #msg{min-height:20px;font-size:13px}#msg.err{color:var(--bad)}#msg.ok{color:var(--ok)}a{color:var(--acc)}small{color:var(--mute)}
 </style></head><body>
-<div class="top"><button id="mic" aria-label="Start recording"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button><div id="hint">Starting the microphone…</div></div>
+<div class="top"><button id="mic" aria-label="Hold to talk" aria-pressed="false" style="touch-action:none;user-select:none"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button><div id="hint">Hold the button and speak.</div></div>
 <textarea id="t" placeholder="Your words appear here. You can edit them." aria-label="Transcript"></textarea>
 <div class="row"><button class="b p" id="task">Save as task</button><button class="b" id="note">Note</button><button class="b" id="memo">Memo</button><a href="options.html" target="_blank" style="margin-left:auto;align-self:center;font-size:12px">Settings</a></div>
-<div id="msg" role="status"></div><small>Ctrl/⌘ + Enter saves as a task. Say “call mum tomorrow at 5pm #family”.</small>
+<div id="msg" role="status"></div><small>Hold the button or the Space bar, speak, then let go to add a task. Or type and press Ctrl/⌘ + Enter. Try “call mum tomorrow at 5pm #family”.</small>
 <script src="common.js"></script><script src="recorder.js"></script></body></html>

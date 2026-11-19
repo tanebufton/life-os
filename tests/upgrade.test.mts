@@ -7,11 +7,25 @@ const tasksBefore = (() => { const d = new Database(dbp, { readonly: true }); co
 const open = () => spawnSync(process.execPath, ["node_modules/tsx/dist/cli.mjs", "tests/init-probe.mts"], { env: { ...process.env, LIFEOS_DB: dbp }, encoding: "utf8" });
 let r = open(); assert.equal(r.status, 0, r.stderr);
 const after = counts(dbp); for (const [t, n] of Object.entries(before)) assert.equal(after[t], n, `table ${t} lost or gained rows: ${n} -> ${after[t]}`); console.log("  ✓ every existing table keeps exactly its rows after upgrade");
-const d = new Database(dbp, { readonly: true }); assert.equal(d.pragma("user_version", { simple: true }), 3); assert.equal(JSON.stringify(d.prepare("SELECT id,title,status,done_at,due,project_id FROM tasks ORDER BY id").all()), tasksBefore); console.log("  ✓ tasks are byte-for-byte unchanged (titles, dates, statuses, done state)");
+const d = new Database(dbp, { readonly: true }); assert.equal(d.pragma("user_version", { simple: true }), 4); assert.equal(JSON.stringify(d.prepare("SELECT id,title,status,done_at,due,project_id FROM tasks ORDER BY id").all()), tasksBefore); console.log("  ✓ tasks are byte-for-byte unchanged (titles, dates, statuses, done state)");
 const st = d.prepare("SELECT key,name,kind FROM statuses WHERE project_id IS NULL ORDER BY position").all(); assert.deepEqual(st, [{ key: "todo", name: "To do", kind: "todo" }, { key: "doing", name: "In progress", kind: "doing" }, { key: "done", name: "Done", kind: "done" }]); console.log("  ✓ default board columns match the old three statuses exactly");
 const kinds = d.prepare("SELECT count(*) c FROM tasks t LEFT JOIN statuses s ON s.key=t.status WHERE s.key IS NULL").get() as { c: number }; assert.equal(kinds.c, 0); console.log("  ✓ every task's status maps to a column"); d.close();
 const copies = fs.readdirSync(dir).filter((f) => f.includes(".pre-upgrade-")); assert.equal(copies.length, 1, "exactly one safety copy"); const old = counts(path.join(dir, copies[0])); assert.deepEqual(old, before); console.log("  ✓ a complete safety copy of the OLD database was saved first");
 r = open(); assert.equal(r.status, 0); assert.equal(fs.readdirSync(dir).filter((f) => f.includes(".pre-upgrade-")).length, 1); console.log("  ✓ starting again doesn't make another copy");
 // a brand-new database needs no copy
 const fresh = path.join(dir, "fresh.db"); spawnSync(process.execPath, ["node_modules/tsx/dist/cli.mjs", "tests/init-probe.mts"], { env: { ...process.env, LIFEOS_DB: fresh } }); assert.equal(fs.readdirSync(dir).filter((f) => f.startsWith("fresh.db.pre-upgrade")).length, 0); console.log("  ✓ a fresh install makes no safety copy");
-fs.rmSync(dir, { recursive: true, force: true }); console.log("\n6 checks passed");
+fs.rmSync(dir, { recursive: true, force: true });
+
+// ---- the release before this one (schema v3) must also upgrade cleanly, keeping notes, tags, history and custom columns
+{
+  const d3 = fs.mkdtempSync(path.join(os.tmpdir(), "lifeos-upgrade3-")), db3 = path.join(d3, "lifeos.db"); fs.copyFileSync("tests/fixtures/v3-release.db", db3);
+  const b = counts(db3); const rows = (file: string, sql: string) => { const x = new Database(file, { readonly: true }); const r = JSON.stringify(x.prepare(sql).all()); x.close(); return r; };
+  const notesBefore = rows(db3, "SELECT id,title,body FROM notes ORDER BY id"), colsBefore = rows(db3, "SELECT key,name,kind,project_id FROM statuses ORDER BY id"), actBefore = rows(db3, "SELECT entity,entity_id,action,field FROM activity ORDER BY id");
+  const o = spawnSync(process.execPath, ["node_modules/tsx/dist/cli.mjs", "tests/init-probe.mts"], { env: { ...process.env, LIFEOS_DB: db3 }, encoding: "utf8" }); assert.equal(o.status, 0, o.stderr);
+  const a = counts(db3); for (const [t, n] of Object.entries(b)) assert.equal(a[t], n, `v3 table ${t}: ${n} -> ${a[t]}`); console.log("  ✓ v3 → v4: every table keeps its rows (notes, tags, history, versions, custom columns)");
+  assert.equal(rows(db3, "SELECT id,title,body FROM notes ORDER BY id"), notesBefore); assert.equal(rows(db3, "SELECT key,name,kind,project_id FROM statuses ORDER BY id"), colsBefore); assert.equal(rows(db3, "SELECT entity,entity_id,action,field FROM activity ORDER BY id"), actBefore); console.log("  ✓ v3 → v4: notes, board columns and activity are byte-for-byte unchanged");
+  const x = new Database(db3, { readonly: true }); assert.equal(x.pragma("user_version", { simple: true }), 4); assert.ok((x.prepare("PRAGMA table_info(tasks)").all() as any[]).some((c) => c.name === "position")); assert.ok((x.prepare("PRAGMA table_info(notes)").all() as any[]).some((c) => c.name === "rev")); assert.equal((x.prepare("SELECT count(*) c FROM tasks WHERE position IS NOT NULL").get() as any).c, 0); assert.equal((x.prepare("SELECT count(*) c FROM item_links").get() as any).c, 0); x.close(); console.log("  ✓ v3 → v4: new columns and tables exist and start empty (nothing existing was reordered or linked)");
+  assert.equal(fs.readdirSync(d3).filter((f) => f.includes(".pre-upgrade-v3-")).length, 1); const c = counts(path.join(d3, fs.readdirSync(d3).find((f) => f.includes(".pre-upgrade-v3-"))!)); assert.deepEqual(c, b); console.log("  ✓ v3 → v4: a safety copy of the v3 database was saved first");
+  fs.rmSync(d3, { recursive: true, force: true });
+}
+console.log("\nupgrade checks passed");
