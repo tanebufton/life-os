@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Board } from "@/components/board";
+import { BoardProjectSelect } from "@/components/boardprojectselect";
 import { BoardFilters } from "@/components/boardfilters";
 import { FilterChip } from "@/components/chip";
 import { ColumnsEditor, DoneWindow } from "@/components/columns";
@@ -35,7 +36,8 @@ export function BoardView({ sp, lockProject, base }: { sp: BoardParams; lockProj
   const cards = sorted([...open, ...done].filter(pass)), counts = Object.fromEntries(columns.map((c) => [c.key, queryTasks({ project: pid ?? undefined, state: "all", status: c.key, limit: 5000 }).length]));
   return (
     <>
-      {lockProject === undefined && <div className="mb-3 flex gap-1.5 overflow-x-auto md:mb-4 md:flex-wrap md:overflow-visible">
+      {lockProject === undefined && <BoardProjectSelect current={project ?? null} projects={projects.map((p) => ({ id: p.id, name: p.name, own: hasCustomColumns(p.id) }))} />}
+      {lockProject === undefined && <div className="mb-4 hidden flex-wrap gap-1.5 md:flex">
         <FilterChip href="/board" active={!project}>All projects</FilterChip>
         {projects.map((p) => <FilterChip key={p.id} href={`/board?project=${p.id}`} active={project === p.id} dot={p.color}>{p.name}{hasCustomColumns(p.id) ? <span className="text-dim">· own columns</span> : null}</FilterChip>)}
       </div>}

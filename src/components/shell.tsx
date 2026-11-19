@@ -48,7 +48,7 @@ export function Hotkeys({ features }: { features: Features }) {
 }
 
 const row = "flex min-h-[30px] items-center gap-2.5 rounded-md px-2 text-[14px] transition-colors";
-export function Sidebar({ counts, projects, features, filters = [], favourites = [], prefs: savedPrefs = EMPTY_PREFS }: { counts: Counts; projects: NavProject[]; features: Features; filters?: { id: number; name: string; query: string }[]; favourites?: Fav[]; prefs?: SidebarPrefs }) {
+export function Sidebar({ counts, projects, features, filters = [], favourites = [], prefs: savedPrefs = EMPTY_PREFS, drawer = false }: { drawer?: boolean; counts: Counts; projects: NavProject[]; features: Features; filters?: { id: number; name: string; query: string }[]; favourites?: Fav[]; prefs?: SidebarPrefs }) {
   const path = usePathname(), sp = useSearchParams();
   const router = useRouter(), [dropOn, setDropOn] = useState<number | null>(null);
   const isTaskDrag = (e: React.DragEvent) => e.dataTransfer.types.includes("application/x-lifeos-task");
@@ -163,7 +163,7 @@ export function Sidebar({ counts, projects, features, filters = [], favourites =
     return [out];
   });
   return (
-    <aside className="side hidden w-[260px] shrink-0 flex-col border-r bg-side md:flex">
+    <aside className={drawer ? "drawer fixed inset-y-0 left-0 z-50 flex w-[86%] max-w-[320px] flex-col overflow-y-auto border-r bg-side pt-[env(safe-area-inset-top)] shadow-2xl" : "side hidden w-[260px] shrink-0 flex-col border-r bg-side md:flex"}>
       <div className="px-2 pb-1 pt-2.5">
         <WorkspaceMenu editing={editing} onEdit={() => setEditing((e) => !e)} onReset={() => void resetSidebarAction().then((r) => toast(r.ok ? (r.message ?? "Done") : r.error))} hiddenPages={arranged.flatMap((g) => g.items).filter((i) => i.hidden).map((i) => i.page)} />
       </div>
@@ -194,6 +194,7 @@ export function Topbar({ today, projects }: { today: string; projects: NavProjec
   const c = crumbs(path, projects);
   return (
     <header className="topbar sticky top-0 z-20 shrink-0 border-b bg-bg/85 backdrop-blur"><div className="flex h-12 items-center gap-4 px-4 md:px-8">
+      <button onClick={() => window.dispatchEvent(new Event("lifeos:menu"))} aria-label="Open the menu" className="-ml-1 rounded-md p-1.5 text-mute hover:bg-raise hover:text-fg md:hidden"><Icon name="sidebar" size={19} /></button>
       <button onClick={toggleSidebar} aria-label="Show or hide the sidebar" title="Show or hide the sidebar ([)" className="-ml-1 hidden rounded-md p-1.5 text-mute hover:bg-raise hover:text-fg md:block"><Icon name="sidebar" size={17} /></button>
       <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-1.5 text-[14px] md:w-40">
         {c.map((x, i) => (<span key={i} className="flex min-w-0 items-center gap-1.5">{i > 0 && <span className="text-dim">/</span>}<span className={`truncate ${i === c.length - 1 ? "font-semibold" : "text-mute"}`}>{x}</span></span>))}
@@ -201,6 +202,21 @@ export function Topbar({ today, projects }: { today: string; projects: NavProjec
       <div className="mx-auto hidden w-full max-w-xl md:block"><CaptureForm today={today} variant="pill" /></div>
       <div className="ml-auto flex items-center gap-1.5 md:justify-end"><FocusChip /><button onClick={openPalette} aria-label="Search" title="Search (⌘K)" className="rounded-md p-1.5 text-mute hover:bg-raise hover:text-fg"><Icon name="search" size={18} /></button><button onClick={focusCapture} className="btn-primary hidden !h-8 md:inline-flex"><Icon name="plus" size={14} />New task</button></div>
     </div></header>
+  );
+}
+
+/** Phone: the sidebar as a slide-in menu, opened from the button in the top bar. */
+export function MobileDrawer(props: React.ComponentProps<typeof Sidebar>) {
+  const [open, setOpen] = useState(false), path = usePathname();
+  useEffect(() => { const f = () => setOpen(true); window.addEventListener("lifeos:menu", f); return () => window.removeEventListener("lifeos:menu", f); }, []);
+  useEffect(() => setOpen(false), [path]);
+  useEffect(() => { if (!open) return; const k = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false); window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }, [open]);
+  if (!open) return null;
+  return (
+    <div className="drawer-root fixed inset-0 z-50 md:hidden" role="dialog" aria-label="Menu">
+      <div className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
+      <div onClick={(e) => { if ((e.target as HTMLElement).closest("a")) setOpen(false); }}><Sidebar {...props} drawer /></div>
+    </div>
   );
 }
 
@@ -214,7 +230,7 @@ export function MobileNav({ counts, tabs }: { counts: Counts; tabs: NavPage[] })
         const on = isActive(path, p.href) || (p.href === "/more" && !tabs.some((t) => isActive(path, t.href)));
         return (
           <Link key={p.href} href={p.href} className={`flex min-w-0 flex-1 flex-col items-center gap-0.5 pb-1.5 pt-2 text-[10.5px] font-medium ${on ? "text-accent" : "text-mute"}`}>
-            <span className="relative"><Icon name={p.icon} size={22} />{badge[p.href] ? <span className="absolute -right-2.5 -top-1.5 min-w-4 rounded-full bg-danger px-1 text-center text-[10px] font-bold leading-4 text-white">{badge[p.href]}</span> : null}</span>
+            <span className="relative">{p.project ? <ProjectAvatar name={p.label} color={p.project.color} icon={p.project.icon ?? undefined} size={22} /> : <Icon name={p.icon} size={22} />}{badge[p.href] ? <span className="absolute -right-2.5 -top-1.5 min-w-4 rounded-full bg-danger px-1 text-center text-[10px] font-bold leading-4 text-white">{badge[p.href]}</span> : null}</span>
             <span className="max-w-full truncate px-0.5">{p.label === "My tasks" ? "Tasks" : p.label === "Plan & review" ? "Review" : p.label}</span>
           </Link>
         );

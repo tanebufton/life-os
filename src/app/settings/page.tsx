@@ -7,12 +7,13 @@ import { CopyBox, RegenButton, TestNotify, TokenManager } from "@/components/set
 import { FeatureSwitch } from "@/components/switch";
 import { PageHead } from "@/components/tasks";
 import { ThemeToggle } from "@/components/theme";
+import { TextScale } from "@/components/textscale";
 import { BrowserReminders } from "@/components/browserreminders";
 import { browserNotifyConfig } from "@/lib/browsernotify";
 import { saveVoiceProject, resetFeatures, saveCapacity, saveNotifySettings, saveTimezone } from "@/lib/actions";
 import { MobileTabsEditor, SidebarEditor, TodayWidgetsEditor } from "@/components/layoutprefs";
 import { parsePrefs } from "@/lib/sidebar";
-import { MAX_TABS, NAV, resolveTabs, visiblePages } from "@/lib/nav";
+import { MAX_TABS, NAV, projectTab, resolveTabs, visiblePages, type TabProject } from "@/lib/nav";
 import { WIDGETS, widgetOn } from "@/lib/widgets";
 import { recentEmailImports } from "@/lib/email";
 import { FEATURES, featureMap } from "@/lib/features";
@@ -74,12 +75,12 @@ export default async function Settings({ searchParams }: { searchParams: Promise
 
       <Section cur={tab} tab="general" id="layout" i={1} title="Layout" desc="Choose the tabs in your phone's bottom bar, and what shows on Today. Changes apply straight away.">
         <div className="space-y-5">
-          <Panel title="Phone bottom bar" bodyClass="p-4">{(() => { const vis = visiblePages(f), chosen = resolveTabs(nv("mobile_tabs") || undefined, f), ids = chosen.map((c) => c.href), rest = vis.filter((p) => !ids.includes(p.href)); return <MobileTabsEditor items={[...chosen, ...rest].map((p) => ({ id: p.href, label: p.label, icon: p.icon, on: ids.includes(p.href) }))} />; })()}</Panel>
+          <Panel title="Phone bottom bar" bodyClass="p-4">{(() => { const tp = (db.prepare("SELECT id, name, color, icon FROM projects WHERE archived=0 ORDER BY area, position, name").all() as TabProject[]), vis = [...visiblePages(f), ...tp.map(projectTab)], chosen = resolveTabs(nv("mobile_tabs") || undefined, f, tp), ids = chosen.map((c) => c.href), rest = vis.filter((p) => !ids.includes(p.href)); return <MobileTabsEditor items={[...chosen, ...rest].map((p) => ({ id: p.href, label: p.label, icon: p.icon, on: ids.includes(p.href) }))} />; })()}</Panel>
           <Panel title="Desktop sidebar" bodyClass="p-4"><SidebarEditor pages={visiblePages(f).map((p) => ({ href: p.href, label: p.label, icon: p.icon, key: p.key, group: p.group, hidden: p.hidden, feature: p.feature }))} prefs={parsePrefs(nv("sidebar") || undefined)} /></Panel>
           <Panel title="Today widgets" bodyClass="p-4">{(() => { let order: string[] = [], hidden: string[] = []; try { const p = nv("today_widgets") ? JSON.parse(nv("today_widgets")) : null; if (p) { order = p.order ?? []; hidden = p.hidden ?? []; } } catch {} const ids = WIDGETS.map((w) => w.id), full = [...order.filter((i: string) => ids.includes(i)), ...ids.filter((i) => !order.includes(i))]; return <TodayWidgetsEditor items={full.filter((id) => { const w = WIDGETS.find((x) => x.id === id)!; return widgetOn(w, (k) => f[k]); }).map((id) => { const w = WIDGETS.find((x) => x.id === id)!; return { id, label: w.label, on: !hidden.includes(id) }; })} />; })()}</Panel>
         </div>
       </Section>
-      <Section cur={tab} tab="general" i={2} title="Appearance" desc="Light or dark. LifeOS follows your system until you pick one."><Panel bodyClass="flex items-center justify-between p-4"><span className="text-sm">Theme</span><ThemeToggle label className="border" /></Panel></Section>
+      <Section cur={tab} tab="general" i={2} title="Appearance" desc="Light or dark. LifeOS follows your system until you pick one."><Panel bodyClass="space-y-4 p-4"><div className="flex items-center justify-between"><span className="text-sm">Theme</span><ThemeToggle label className="border" /></div><TextScale /></Panel></Section>
 
       {f.reminders && (<>
         <Section cur={tab} tab="reminders" id="browser-reminders" i={2} title="Browser reminders" desc="A pop-up while LifeOS is open, with Mark done and Snooze buttons, like Outlook."><Panel>{(() => { const b = browserNotifyConfig(); return <BrowserReminders on={b.on} lead={b.lead} snooze={b.snooze} />; })()}</Panel></Section>

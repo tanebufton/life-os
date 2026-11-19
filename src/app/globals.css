@@ -83,14 +83,20 @@ html[data-sidebar="collapsed"] .ptabs { display: flex !important; }
 @media (prefers-reduced-motion: reduce) { .save-pop { animation: none; } }
 
 /* A task shown inside the board's pop-up: just the task, none of the app around it */
-html[data-embed] .side, html[data-embed] .topbar, html[data-embed] .mobilenav, html[data-embed] .fab { display: none !important; }
+html[data-embed] .side, html[data-embed] .drawer-root, html[data-embed] .topbar, html[data-embed] .mobilenav, html[data-embed] .fab { display: none !important; }
 html[data-embed] .page { max-width: none; padding-top: 1rem; padding-bottom: 2rem; }
 
 /* Printing (and "Save as PDF"): just the page, no app around it, and let it flow over as many sheets as it needs */
 @media print {
-  .side, .topbar, .mobilenav, .fab, [data-no-print] { display: none !important; }
+  .side, .drawer-root, .topbar, .mobilenav, .fab, [data-no-print] { display: none !important; }
   html, body { background: #fff !important; color: #000 !important; }
   .shell { display: block !important; height: auto !important; }
   .shell main { overflow: visible !important; height: auto !important; }
   .page { max-width: none !important; padding: 0 !important; }
 }
+
+/* Touch screens: no scrollbars on the sideways-scrolling rows (swiping is enough) */
+@media (hover: none) { * { scrollbar-width: none; } *::-webkit-scrollbar { display: none; } }
+
+/* When the text size is changed with zoom, keep the app filling the screen */
+.shell { height: calc(100dvh / var(--z, 1)) !important; }

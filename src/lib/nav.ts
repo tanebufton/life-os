@@ -1,5 +1,5 @@
 import type { FeatureKey } from "./features";
-export type NavPage = { href: string; label: string; icon: string; key: string; feature?: FeatureKey; group: "main" | "life" | "explore"; hidden?: boolean };
+export type NavPage = { href: string; label: string; icon: string; key: string; feature?: FeatureKey; group: "main" | "life" | "explore"; hidden?: boolean; project?: { color: string; icon?: string | null } };
 export const NAV: NavPage[] = [
   { href: "/inbox", label: "Inbox", icon: "inbox", key: "i", group: "main" },
   { href: "/", label: "Today", icon: "today", key: "t", group: "main" },
@@ -26,8 +26,9 @@ export const visiblePages = (f: Features) => NAV.filter((p) => !p.feature || f[p
 
 export const MAX_TABS = 4;
 /** The user's chosen bottom-bar tabs (up to 4), falling back to sensible defaults. Only pages whose feature is on can appear. */
-export function resolveTabs(saved: string | undefined, f: Features): NavPage[] {
-  const vis = visiblePages(f);
+export type TabProject = { id: number; name: string; color: string; icon?: string | null };
+export function resolveTabs(saved: string | undefined, f: Features, projects: TabProject[] = []): NavPage[] {
+  const vis = [...visiblePages(f), ...projects.map((p) => projectTab(p))];
   let hrefs: string[] = [];
   try { const p = saved ? JSON.parse(saved) : null; if (Array.isArray(p)) hrefs = p.filter((x) => typeof x === "string"); } catch { /* use defaults */ }
   const chosen = hrefs.map((h) => vis.find((p) => p.href === h)).filter(Boolean) as NavPage[];
@@ -35,3 +36,6 @@ export function resolveTabs(saved: string | undefined, f: Features): NavPage[] {
   const pick = (h: string) => vis.find((p) => p.href === h);
   return [pick("/"), pick("/inbox"), pick("/tasks"), pick("/upcoming") ?? pick("/board")].filter(Boolean) as NavPage[];
 }
+
+/** A project can sit in the phone bar like a page does. */
+export const projectTab = (p: TabProject): NavPage => ({ href: `/projects/${p.id}`, label: p.name, icon: "list", key: "", group: "main", project: { color: p.color, icon: p.icon } });

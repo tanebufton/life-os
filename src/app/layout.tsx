@@ -14,7 +14,7 @@ import { listFavourites } from "@/lib/favourites";
 import { parsePrefs } from "@/lib/sidebar";
 import { tagColorCss } from "@/lib/tags";
 import { Content } from "@/components/content";
-import { Hotkeys, MobileNav, Sidebar, Topbar, type NavProject } from "@/components/shell";
+import { Hotkeys, MobileDrawer, MobileNav, Sidebar, Topbar, type NavProject } from "@/components/shell";
 import { db } from "@/lib/db";
 import { featureMap } from "@/lib/features";
 import { resolveTabs } from "@/lib/nav";
@@ -36,11 +36,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     FROM tasks WHERE done_at IS NULL AND deleted_at IS NULL AND parent_id IS NULL`).get(t) as { due: number; open: number; doing: number; inbox: number };
   return (
     <html lang="en" data-theme="light" suppressHydrationWarning>
-      <head><link rel="manifest" href="/manifest.webmanifest" crossOrigin="use-credentials" /><style dangerouslySetInnerHTML={{ __html: tagColorCss() }} /><script dangerouslySetInnerHTML={{ __html: "try{var t=localStorage.getItem('lifeos.theme');if(!t)t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.dataset.theme=t;if(window.name==='lifeos-embed')document.documentElement.dataset.embed='1';if(localStorage.getItem('lifeos.sidebar')==='collapsed')document.documentElement.dataset.sidebar='collapsed'}catch(e){}" }} /></head>
+      <head><link rel="manifest" href="/manifest.webmanifest" crossOrigin="use-credentials" /><style dangerouslySetInnerHTML={{ __html: tagColorCss() }} /><script dangerouslySetInnerHTML={{ __html: "try{var t=localStorage.getItem('lifeos.theme');if(!t)t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.dataset.theme=t;if(window.name==='lifeos-embed')document.documentElement.dataset.embed='1';var z=Number(localStorage.getItem('lifeos.scale'));if(z>=70&&z<=130&&z!==100){document.documentElement.style.zoom=z/100;document.documentElement.style.setProperty('--z',z/100)}if(localStorage.getItem('lifeos.sidebar')==='collapsed')document.documentElement.dataset.sidebar='collapsed'}catch(e){}" }} /></head>
       <body>
         <SessionProvider>
         <div className="shell flex h-dvh">
           <Sidebar counts={counts} projects={projects} features={features} filters={listFilters()} favourites={listFavourites()} prefs={parsePrefs(getSetting("sidebar"))} />
+          <MobileDrawer counts={counts} projects={projects} features={features} filters={listFilters()} favourites={listFavourites()} prefs={parsePrefs(getSetting("sidebar"))} />
           <div className="flex min-w-0 flex-1 flex-col">
             <main className="min-h-0 flex-1 overflow-y-auto">
               <Topbar today={t} projects={projects} />
@@ -48,7 +49,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </main>
           </div>
         </div>
-        <MobileNav counts={counts} tabs={resolveTabs(getSetting("mobile_tabs"), features)} />
+        <MobileNav counts={counts} tabs={resolveTabs(getSetting("mobile_tabs"), features, projects.map((p) => ({ id: p.id, name: p.name, color: p.color, icon: p.icon ?? null })))} />
         <PwaRegister />
         <ReminderWatcher enabled={features.reminders && browserNotifyConfig().on} />
         <CaptureFab today={t} projects={projects.map((p) => ({ id: p.id, name: p.name, color: p.color }))} />

@@ -128,7 +128,7 @@ export async function testNotification(): Promise<string> {
 export async function saveVoiceProject(fd: FormData) { const id = Number(str(fd, "project")) || 0; setSetting("voice_project", id ? String(id) : ""); refresh(); redirect("/settings?tab=connect#extension"); }
 // ---------- layout customization ----------
 export async function saveMobileTabs(hrefs: string[]) {
-  const ok = [...NAV, SETTINGS_PAGE].map((p) => p.href), clean = [...new Set(hrefs)].filter((h) => ok.includes(h)).slice(0, MAX_TABS);
+  const ok = [...NAV, SETTINGS_PAGE].map((p) => p.href), clean = [...new Set(hrefs)].filter((h) => ok.includes(h) || /^\/projects\/\d+$/.test(h)).slice(0, MAX_TABS);
   setSetting("mobile_tabs", JSON.stringify(clean)); refresh();
 }
 export async function resetMobileTabs() { setSetting("mobile_tabs", null); refresh(); }

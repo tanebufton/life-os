@@ -13,7 +13,7 @@ Next.js 15 · SQLite · a REST API, an MCP server for Claude, and a small backgr
 | ![Project](docs/screenshots/project.png) **Projects** are workspaces: overview, list, board, table, notes, goals | ![Notes](docs/screenshots/notes.png) **Notes**: pages and sub-pages, links, history, icons |
 | ![Tasks](docs/screenshots/tasks.png) **My tasks**: group by date, project or priority; move overdue in one click | ![Dark](docs/screenshots/board-dark.png) **Dark mode** |
 
-On a phone it uses a bottom bar and one board column at a time:
+On a phone it uses a bottom bar (which can hold a project of your choice), a slide-in menu with all your projects, one board column at a time, and a text-size setting:
 
 <img src="docs/screenshots/mobile-today.png" alt="Mobile" width="260">
 
