@@ -11,7 +11,8 @@ import { PROJECT_VIEWS } from "./projectviews";
 import { redirect } from "next/navigation";
 import { setSetting } from "./settings";
 import { parsePrefs } from "./sidebar";
-import { createTask, deleteTask, getTask, moveCard, parseQuickAdd, parseTags, setStatus, setTaskOrder, updateTask } from "./tasks";
+import { createTask, deleteTask, getTask, moveCard, parseQuickAdd, parseTags, queryTasks, reschedule, setStatus, setTaskOrder, updateTask } from "./tasks";
+import { today } from "./time";
 import { listStatuses } from "./statuses";
 import { addColumn, customizeProject, deleteColumn, moveColumn, renameColumn, resetProject, setColumnKind, type Kind } from "./statuses";
 
@@ -118,6 +119,10 @@ export async function moveProjectAction(id: number, dir: -1 | 1): Promise<R> {
   return run(() => { const p = db.prepare("SELECT area FROM projects WHERE id=?").get(id) as { area: string } | undefined; if (!p) throw new Error("That project is gone");
     const peers = (db.prepare("SELECT id FROM projects WHERE archived=0 AND area=? ORDER BY position, name COLLATE NOCASE").all(p.area) as { id: number }[]).map((r) => r.id), i = peers.indexOf(id), j = i + dir;
     if (i < 0 || j < 0 || j >= peers.length) return; [peers[i], peers[j]] = [peers[j], peers[i]]; const st = db.prepare("UPDATE projects SET position=? WHERE id=?"); db.transaction(() => peers.forEach((pid, k) => st.run(k + 1, pid)))(); });
+}
+export async function rescheduleOverdueAction(to: "today" | "tomorrow" | "nextweek"): Promise<R> {
+  return run(() => { if (!["today", "tomorrow", "nextweek"].includes(to)) throw new Error("Pick today, tomorrow or next week"); const t = today(), late = queryTasks({}).filter((x) => x.due && x.due < t && !x.parent_id);
+    db.transaction(() => { for (const x of late) reschedule(x.id, to); })(); return late.length ? `Moved ${late.length} task${late.length === 1 ? "" : "s"} to ${to === "nextweek" ? "next week" : to}` : "Nothing overdue"; });
 }
 export async function toggleFavouriteAction(kind: FavKind, id: number): Promise<R> { return run(() => (toggleFavourite(kind, id) ? "Added to favourites" : "Removed from favourites")); }
 export async function moveNoteAction(id: number, parentId: number | null): Promise<R> { return run(() => { const e = moveNote(id, parentId); if (e) throw new Error(e); return "Moved"; }); }

@@ -5,6 +5,7 @@ import { SubtaskList, TaskEditor } from "@/components/editor";
 import { StatusIcon } from "@/components/StatusIcon";
 import { db, Project } from "@/lib/db";
 import { isOn } from "@/lib/features";
+import { today } from "@/lib/time";
 import { describeRepeat, getTask, subtasks } from "@/lib/tasks";
 import { issueKey } from "@/lib/ui";
 import { addCommentAction, deleteCommentAction, saveTemplateFromTask } from "@/lib/actions3";
@@ -30,7 +31,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
   return (
     <div className="max-w-[1500px]">
       <div className="rise">
-        <TaskEditor focus={isOn("focus")} projects={projects} columns={columns} head={<>
+        <TaskEditor today={today()} focus={isOn("focus")} projects={projects} columns={columns} head={<>
         <div className="mb-1 flex items-center gap-2 text-xs text-mute">
           {parent && <><Link href={`/tasks/${parent.id}`} className="inline-flex max-w-[16rem] items-center gap-1 truncate hover:text-fg"><Icon name="chevRight" size={12} className="rotate-180" />{parent.title}</Link><span aria-hidden>/</span></>}
           <StatusIcon status={t.status_kind} size={15} /><span className="font-medium">{issueKey(t.project_name, t.id)}</span>

@@ -1,3 +1,4 @@
+import { getSetting } from "@/lib/settings";
 import Link from "next/link";
 import { FeatureGate } from "@/components/FeatureGate";
 import { DayAdd } from "@/components/dayadd";
@@ -31,7 +32,7 @@ export default async function Upcoming({ searchParams }: { searchParams: Promise
       <FeatureGate feature="upcoming"><div>{head}
         <div className="mb-3 flex items-center gap-2"><Link href={`/upcoming?view=week&d=${addDays(start, -7)}`} className="btn" aria-label="Previous week">‹</Link><Link href="/upcoming?view=week" className="btn">This week</Link><Link href={`/upcoming?view=week&d=${addDays(start, 7)}`} className="btn" aria-label="Next week">›</Link><span className="ml-2 text-sm font-medium">{nice(dates[0]).replace(/^\w+, /, "")} – {nice(dates[6]).replace(/^\w+, /, "")}</span></div>
         {overdue.length > 0 && start <= t && <p className="mb-3 text-xs text-danger">{overdue.length} overdue task{overdue.length === 1 ? "" : "s"} not shown here. <Link href="/upcoming" className="underline">See them in the agenda</Link>.</p>}
-        <WeekGrid days={days} />
+        <WeekGrid days={days} capacity={Number(getSetting("capacity_min") ?? 360)} />
       </div></FeatureGate>
     );
   }
@@ -40,11 +41,12 @@ export default async function Upcoming({ searchParams }: { searchParams: Promise
     const overdue = all.filter((x) => x.due! < t), by = (d: string) => all.filter((x) => x.due === d);
     return (
       <FeatureGate feature="upcoming"><div>{head}
-        <div className="mb-6 grid grid-cols-7 gap-1.5">{days.slice(0, 7).map((d) => { const n = by(d).length; return (
+        <div className="mb-6 grid grid-cols-7 gap-1.5">{days.slice(0, 7).map((d) => { const n = by(d).length, m = by(d).reduce((a, x) => a + (x.estimate ?? 0), 0), cap = Number(getSetting("capacity_min") ?? 360); return (
           <a key={d} href={`#d-${d}`} className={`rounded-xl border px-1 py-2 text-center transition hover:bg-raise ${d === t ? "border-accent/40 bg-accent/5" : ""}`}>
             <div className="text-[11px] font-medium text-mute">{new Intl.DateTimeFormat("en-NZ", { timeZone: "UTC", weekday: "short" }).format(new Date(d + "T00:00:00Z"))}</div>
             <div className="text-lg font-semibold leading-tight">{Number(d.slice(8))}</div>
-            <div className={`mt-0.5 text-[11px] ${n ? "font-medium text-accent" : "text-dim"}`}>{n ? `${n} ${n === 1 ? "task" : "tasks"}` : "·"}</div></a>); })}</div>
+            <div className={`mt-0.5 text-[11px] ${n ? "font-medium text-accent" : "text-dim"}`}>{n ? `${n} ${n === 1 ? "task" : "tasks"}` : "·"}</div>
+            {m > 0 && <div className="mx-2 mt-1"><div className="h-1 overflow-hidden rounded-full bg-raise"><div className={`h-full rounded-full ${m > cap * 1.1 ? "bg-danger" : m > cap * 0.85 ? "bg-warn" : "bg-ok"}`} style={{ width: `${Math.min(100, (m / cap) * 100)}%` }} /></div></div>}</a>); })}</div>
         <div className="space-y-5">
           {overdue.length > 0 && <Panel title="Overdue" count={overdue.length} i={1}><ul>{overdue.map((x) => <TaskRow key={x.id} t={x} />)}</ul></Panel>}
           {days.map((d, i) => { const list = by(d), mins = list.reduce((n, x) => n + (x.estimate ?? 0), 0); return (

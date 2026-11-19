@@ -1,3 +1,4 @@
+import { OverdueActions } from "./overdue";
 import { ReorderList } from "./reorder";
 import { byPosition } from "@/lib/tasks";
 import Link from "next/link";
@@ -71,7 +72,7 @@ export function TaskGroups({ groups, empty }: { groups: Group[]; empty: ReactNod
     <div>
       {shown.map((g) => (
         <section key={g.label} className="rise">
-          {g.label ? <h3 className="flex items-baseline gap-2 border-b px-2 pb-1.5 pt-5 text-[13px] font-semibold first:pt-0"><span className={TONE[g.tone ?? "none"]}>{g.label}</span><span className="font-normal text-dim">{g.tasks.length}</span></h3> : null}
+          {g.label ? <h3 className="flex items-baseline gap-2 border-b px-2 pb-1.5 pt-5 text-[13px] font-semibold first:pt-0"><span className={TONE[g.tone ?? "none"]}>{g.label}</span><span className="font-normal text-dim">{g.tasks.length}</span>{g.label === "Overdue" && g.tasks.length > 1 && <OverdueActions count={g.tasks.length} />}</h3> : null}
           <ReorderList>{g.tasks.map((t) => <TaskRow key={t.id} t={t} />)}</ReorderList>
         </section>
       ))}
@@ -80,6 +81,14 @@ export function TaskGroups({ groups, empty }: { groups: Group[]; empty: ReactNod
 }
 
 /** Bucket open tasks by urgency. */
+/** Other ways to group a list of tasks: by project, by priority, or not at all. */
+export function groupTasks(tasks: TaskRow[], mode: "date" | "project" | "priority" | "none"): Group[] {
+  if (mode === "date") return bucket(tasks);
+  if (mode === "none") return [{ label: "All tasks", tasks: byPosition(tasks) }];
+  if (mode === "priority") return [{ label: "High", tone: "danger", tasks: byPosition(tasks.filter((x) => x.priority > 0)) }, { label: "Normal", tasks: byPosition(tasks.filter((x) => x.priority === 0)) }, { label: "Low", tasks: byPosition(tasks.filter((x) => x.priority < 0)) }];
+  const names = [...new Set(tasks.map((x) => x.project_name ?? ""))].sort((a, b) => (a === "" ? 1 : b === "" ? -1 : a.localeCompare(b)));
+  return names.map((n) => ({ label: n || "No project", tasks: byPosition(tasks.filter((x) => (x.project_name ?? "") === n)) }));
+}
 export function bucket(tasks: TaskRow[]): Group[] {
   const t = today();
   const used = new Set<number>();

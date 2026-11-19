@@ -7,7 +7,6 @@ export const NAV: NavPage[] = [
   { href: "/tasks", label: "My tasks", icon: "list", key: "l", group: "main" },
   { href: "/board", label: "Board", icon: "board", key: "b", feature: "board", group: "main" },
   { href: "/planner", label: "Planner", icon: "planner", key: "p", feature: "planner", group: "main", hidden: true },
-  { href: "/voice", label: "Voice memos", icon: "mic", key: "v", feature: "voice", group: "life", hidden: true },
   { href: "/focus", label: "Focus", icon: "focus", key: "f", feature: "focus", group: "life" },
   { href: "/notes", label: "Notes", icon: "notes", key: "o", feature: "notes", group: "life" },
   { href: "/goals", label: "Goals", icon: "goals", key: "a", feature: "goals", group: "life" },
@@ -18,7 +17,7 @@ export const NAV: NavPage[] = [
   { href: "/tags", label: "Tags", icon: "inbox", key: "d", group: "explore" },
   { href: "/activity", label: "Activity", icon: "clock", key: "g", group: "explore" },
   { href: "/trash", label: "Trash", icon: "trash", key: "y", group: "explore", hidden: true },
-  { href: "/review", label: "Plan & review", icon: "review", key: "r", feature: "review", group: "explore" },
+  { href: "/review", label: "Plan & review", icon: "review", key: "r", feature: "review", group: "life" },
   { href: "/insights", label: "Insights", icon: "insights", key: "x", feature: "insights", group: "explore" },
 ];
 export const SETTINGS_PAGE: NavPage = { href: "/settings", label: "Settings", icon: "settings", key: "s", group: "main" };
