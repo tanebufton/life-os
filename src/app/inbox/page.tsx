@@ -6,18 +6,17 @@ import { PageHead, TaskGroups } from "@/components/tasks";
 import { isOn } from "@/lib/features";
 import { queryTasks } from "@/lib/tasks";
 import { MemoList } from "@/components/memolist";
-import { VoiceRecorder } from "@/components/voice";
 import { db } from "@/lib/db";
 import { listMemos } from "@/lib/voice";
 
 export const dynamic = "force-dynamic";
 export default async function Inbox({ searchParams }: { searchParams: Promise<{ shared?: string; tab?: string }> }) {
-  const { shared, tab: t } = await searchParams, voice = isOn("voice"), tab = voice && t === "memos" ? "memos" : "tasks", memos = voice ? listMemos(80) : [];
+  const { shared, tab: t } = await searchParams, memos = isOn("voice") ? listMemos(200) : [], voice = memos.length > 0, tab = voice && t === "memos" ? "memos" : "tasks";
   const unsorted = queryTasks({ inbox: true });
   const fromEmail = unsorted.filter((t) => t.source === "email"), fromShare = unsorted.filter((t) => t.source === "share");
   const rest = unsorted.filter((t) => t.source !== "email" && t.source !== "share");
   return (
-    <div className="max-w-4xl">
+    <div>
       <FlashToast shared={!!shared} base="/inbox" />
       <PageHead title="Inbox" sub={unsorted.length ? `${unsorted.length} to sort. Give each a date or project and it leaves the inbox.` : "Everything captured lands here until you sort it."} />
       {voice && (
@@ -27,7 +26,7 @@ export default async function Inbox({ searchParams }: { searchParams: Promise<{ 
               <Icon name={icon as string} size={15} className={tab === k ? "text-accent" : ""} />{label}{n ? <span className="text-xs text-dim">{n}</span> : null}</Link>))}
         </nav>)}
       {tab === "memos" ? (
-        <div className="space-y-8"><div className="rounded-2xl border bg-panel"><VoiceRecorder /></div><MemoList memos={memos} projects={new Map((db.prepare("SELECT id, name FROM projects").all() as { id: number; name: string }[]).map((p) => [p.id, p.name]))} /></div>
+        <div className="space-y-4"><div className="flex items-center justify-between gap-3"><p className="text-[13px] text-mute">Memos sent from the Chrome extension, Telegram or the API. To capture by voice, hold the mic in the add-task bar at the top.</p><a href="/inbox/memos/print" target="_blank" rel="noopener" className="btn shrink-0"><Icon name="download" size={14} />Export PDF</a></div><MemoList memos={memos} projects={new Map((db.prepare("SELECT id, name FROM projects").all() as { id: number; name: string }[]).map((p) => [p.id, p.name]))} /></div>
       ) : (<>
       <TaskGroups groups={[{ label: "From email", tone: "accent", tasks: fromEmail }, { label: "Shared to LifeOS", tasks: fromShare }, { label: "Unsorted", tasks: rest }]}
         empty={<>Inbox zero. Anything you capture without a date or project lands here.</>} />

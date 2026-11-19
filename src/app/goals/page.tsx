@@ -19,7 +19,7 @@ export default function Goals() {
   const t = today(), goals = listGoals(), done = listGoals("done"), bal = areaBalance().filter((a) => a.goals > 0), projects = db.prepare("SELECT id, name FROM projects WHERE archived=0").all() as { id: number; name: string }[];
   return (
     <FeatureGate feature="goals">
-      <div className="max-w-4xl">
+      <div>
         <PageHead title="Goals" sub="What you're working towards, by area of life" />
         {bal.length > 1 && <Panel i={0} className="mb-4" bodyClass="grid grid-cols-2 gap-x-6 gap-y-3 p-4 sm:grid-cols-4">{bal.map((a) => <div key={a.area}><div className="mb-1 flex justify-between text-xs"><span className="text-mute">{a.area}</span><span className="tabular-nums">{a.avg}%</span></div><Bar pct={a.avg} /></div>)}</Panel>}
         <div className="space-y-4">

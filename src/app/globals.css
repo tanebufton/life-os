@@ -85,3 +85,12 @@ html[data-sidebar="collapsed"] .ptabs { display: flex !important; }
 /* A task shown inside the board's pop-up: just the task, none of the app around it */
 html[data-embed] .side, html[data-embed] .topbar, html[data-embed] .mobilenav, html[data-embed] .fab { display: none !important; }
 html[data-embed] .page { max-width: none; padding-top: 1rem; padding-bottom: 2rem; }
+
+/* Printing (and "Save as PDF"): just the page, no app around it, and let it flow over as many sheets as it needs */
+@media print {
+  .side, .topbar, .mobilenav, .fab, [data-no-print] { display: none !important; }
+  html, body { background: #fff !important; color: #000 !important; }
+  .shell { display: block !important; height: auto !important; }
+  .shell main { overflow: visible !important; height: auto !important; }
+  .page { max-width: none !important; padding: 0 !important; }
+}

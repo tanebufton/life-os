@@ -24,3 +24,9 @@ E.setEntityTags("note", nid, ["Work", "ideas", "work", "#Ideas"]); assert.ok(txt
 // custom columns keep activity names consistent and per-project works
 const pid = Number(db.prepare("INSERT INTO projects (name) VALUES ('P')").run().lastInsertRowid); S.customizeProject(pid); S.addColumn(pid, "In review", "doing"); const t2 = T.createTask({ title: "In P", project_id: pid }); T.setStatus(t2, "In review"); assert.equal(T.getTask(t2)!.status_name, "In review"); assert.equal(T.getTask(t2)!.status_kind, "doing"); ok("a project's own column works for status changes");
 assert.ok(A.pruneActivity(365) >= 0); console.log(`\n${n} checks passed`);
+{
+  const N2 = await import("../src/lib/notes.ts"), A2 = await import("../src/lib/activity.ts");
+  const id = N2.createNote("", ""); for (const t of ["B", "Ba", "Bai", "Baikal", "Baikal RFP", "Baikal RFP - Test 1"]) N2.updateNote(id, { title: t });
+  const ev = A2.history("note", id).filter((e: any) => e.field === "Title"); assert.equal(ev.length, 1); assert.equal(ev[0].new, "Baikal RFP - Test 1"); console.log("  ✓ typing a title leaves one history entry, not one per keystroke");
+  N2.updateNote(id, { title: "Baikal RFP - Test 1x" }); N2.updateNote(id, { title: "Baikal RFP - Test 1" }); assert.equal(A2.history("note", id).filter((e: any) => e.field === "Title").length, 1); console.log("  ✓ changing it and changing it back adds nothing");
+}

@@ -9,6 +9,7 @@ import { arrange, withVisibility, EMPTY_PREFS, type SidebarPrefs } from "@/lib/s
 import { toast } from "sonner";
 import { NAV, SETTINGS_PAGE, visiblePages, type Features, type NavPage } from "@/lib/nav";
 import { CaptureForm } from "./capture";
+import { FocusChip } from "./focuschip";
 import { Icon } from "./Icon";
 import { ProjectAvatar } from "./Pill";
 import { ThemeToggle } from "./theme";
@@ -100,7 +101,7 @@ export function Sidebar({ counts, projects, features, filters = [], favourites =
   const chev = (open: boolean) => <Icon name="chevDown" size={12} className={`text-dim transition ${open ? "" : "-rotate-90"}`} />;
   const projectNav = (pid: number) => {
     const tab = path === `/projects/${pid}` ? (sp.get("tab") ?? "overview") : "";
-    const items = [["overview", "Overview", "today", true], ["list", "List", "list", true], ["board", "Board", "board", features.board], ["table", "Table", "grid", true], ["notes", "Notes", "notes", features.notes], ["memos", "Voice memos", "mic", features.voice], ["goals", "Goals", "goals", features.goals]] as const;
+    const items = [["overview", "Overview", "today", true], ["list", "List", "list", true], ["board", "Board", "board", features.board], ["table", "Table", "grid", true], ["notes", "Notes", "notes", features.notes], ["goals", "Goals", "goals", features.goals]] as const;
     return <div className="mb-1 ml-[15px] space-y-px border-l pl-2">{items.filter((i) => i[3]).map(([k, label, icon]) => <Link key={k} href={`/projects/${pid}?tab=${k}`} className={`${row} !min-h-[27px] text-[13px] ${tab === k || (k === "list" && tab === "tasks") ? "bg-raise font-medium" : "text-fg/75 hover:bg-raise/70"}`}><Icon name={icon} size={15} className={tab === k ? "text-accent" : "text-mute"} />{label}</Link>)}</div>;
   };
   const favSection = favourites.length > 0 ? (
@@ -198,7 +199,7 @@ export function Topbar({ today, projects }: { today: string; projects: NavProjec
         {c.map((x, i) => (<span key={i} className="flex min-w-0 items-center gap-1.5">{i > 0 && <span className="text-dim">/</span>}<span className={`truncate ${i === c.length - 1 ? "font-semibold" : "text-mute"}`}>{x}</span></span>))}
       </nav>
       <div className="mx-auto hidden w-full max-w-xl md:block"><CaptureForm today={today} variant="pill" /></div>
-      <div className="ml-auto flex items-center gap-1.5 md:justify-end"><button onClick={openPalette} aria-label="Search" title="Search (⌘K)" className="rounded-md p-1.5 text-mute hover:bg-raise hover:text-fg"><Icon name="search" size={18} /></button><button onClick={focusCapture} className="btn-primary hidden !h-8 md:inline-flex"><Icon name="plus" size={14} />New task</button></div>
+      <div className="ml-auto flex items-center gap-1.5 md:justify-end"><FocusChip /><button onClick={openPalette} aria-label="Search" title="Search (⌘K)" className="rounded-md p-1.5 text-mute hover:bg-raise hover:text-fg"><Icon name="search" size={18} /></button><button onClick={focusCapture} className="btn-primary hidden !h-8 md:inline-flex"><Icon name="plus" size={14} />New task</button></div>
     </div></header>
   );
 }

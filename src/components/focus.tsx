@@ -6,8 +6,8 @@ import { Panel } from "./Panel";
 
 // ---- shared helpers ----
 let audio: AudioContext | null = null;
-const unlockAudio = () => { try { audio ??= new AudioContext(); void audio.resume(); } catch {} };
-function beep(times = 3) {
+export const unlockAudio = () => { try { audio ??= new AudioContext(); void audio.resume(); } catch {} };
+export function beep(times = 3) {
   try {
     if (!audio) return;
     for (let i = 0; i < times; i++) {
@@ -17,17 +17,17 @@ function beep(times = 3) {
     }
   } catch {}
 }
-const notify = (title: string, body: string) => { try { if (Notification.permission === "granted") new Notification(title, { body }); } catch {} };
+export const notify = (title: string, body: string) => { try { if (Notification.permission === "granted") new Notification(title, { body }); } catch {} };
 const askNotify = () => { try { if (Notification.permission === "default") void Notification.requestPermission(); } catch {} };
-const mmss = (s: number) => `${Math.floor(s / 60).toString().padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`;
-function load<T>(key: string, fallback: T): T { try { const v = localStorage.getItem(key); return v ? (JSON.parse(v) as T) : fallback; } catch { return fallback; } }
-function save(key: string, v: unknown) { try { localStorage.setItem(key, JSON.stringify(v)); } catch {} }
+export const mmss = (s: number) => `${Math.floor(s / 60).toString().padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`;
+export function load<T>(key: string, fallback: T): T { try { const v = localStorage.getItem(key); return v ? (JSON.parse(v) as T) : fallback; } catch { return fallback; } }
+export function save(key: string, v: unknown) { try { localStorage.setItem(key, JSON.stringify(v)); } catch {} }
 
 // ---- pomodoro ----
-type Mode = "focus" | "short" | "long";
-type P = { mode: Mode; total: number; endsAt: number | null; left: number; taskId: number | null; cycles: number };
-const MINUTES: Record<Mode, number> = { focus: 25, short: 5, long: 15 };
-const LABEL: Record<Mode, string> = { focus: "Focus", short: "Short break", long: "Long break" };
+export type Mode = "focus" | "short" | "long";
+export type P = { mode: Mode; total: number; endsAt: number | null; left: number; taskId: number | null; cycles: number };
+export const MINUTES: Record<Mode, number> = { focus: 25, short: 5, long: 15 };
+export const LABEL: Record<Mode, string> = { focus: "Focus", short: "Short break", long: "Long break" };
 const initial: P = { mode: "focus", total: 25 * 60, endsAt: null, left: 25 * 60, taskId: null, cycles: 0 };
 
 export function Pomodoro({ tasks, presetTask }: { tasks: { id: number; title: string }[]; presetTask?: number | null }) {
@@ -120,7 +120,7 @@ export function Pomodoro({ tasks, presetTask }: { tasks: { id: number; title: st
 }
 
 // ---- free timers ----
-type T = { id: string; label: string; total: number; endsAt: number; done: boolean };
+export type T = { id: string; label: string; total: number; endsAt: number; done: boolean };
 export function Timers() {
   const [timers, setTimers] = useState<T[]>([]);
   const [now, setNow] = useState(0);

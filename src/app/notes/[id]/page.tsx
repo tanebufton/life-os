@@ -25,7 +25,7 @@ export default async function NotePage({ params }: { params: Promise<{ id: strin
   const options = noteTree((db.prepare("SELECT id, title, parent_id FROM notes WHERE deleted_at IS NULL ORDER BY title COLLATE NOCASE").all() as { id: number; title: string; parent_id: number | null }[]).filter((x) => !banned.has(x.id)));
   return (
     <FeatureGate feature="notes">
-      <div className="max-w-4xl">
+      <div className="max-w-5xl">
         <div className="mb-5 flex items-center justify-between gap-3 text-[13px] text-mute">
           <nav aria-label="Page path" className="flex min-w-0 flex-wrap items-center gap-1"><Link href="/notes" className="hover:text-fg">Notes</Link>{crumbs.map((c) => <span key={c.id} className="flex items-center gap-1"><span className="text-dim">/</span><Link href={`/notes/${c.id}`} className="max-w-[12rem] truncate hover:text-fg">{c.icon} {c.title || "Untitled"}</Link></span>)}</nav>
           <div className="flex shrink-0 gap-2">

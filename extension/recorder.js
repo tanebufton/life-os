@@ -24,3 +24,8 @@ async function save(as) {
 $("task").onclick = () => save("task"); $("note").onclick = () => save("note"); $("memo").onclick = () => save("memo");
 t.addEventListener("keydown", (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "Enter") save("task"); });
 setOn(false); if (!SR) { hint.textContent = "This browser has no speech recognition. You can still type below."; mic.disabled = true; } t.focus();
+
+// A toolbar popup can't show Chrome's microphone prompt (it closes first), so the one-time permission is granted on the options page.
+const perm = $("perm");
+(async () => { try { const st = await navigator.permissions.query({ name: "microphone" }); const show = () => { perm.hidden = st.state === "granted"; }; show(); st.onchange = show; } catch { /* unsupported: the error message will say */ } })();
+$("allow").onclick = () => { chrome.tabs.create({ url: chrome.runtime.getURL("options.html#mic") }); window.close(); };

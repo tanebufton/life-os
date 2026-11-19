@@ -1,6 +1,6 @@
 "use client";
 import { usePathname } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { quickAdd } from "@/lib/actions";
 import { fmtMinutes, fmtTime, nice } from "@/lib/dates";
 import { describeRepeat, parseQuickAdd } from "@/lib/parse";
@@ -44,7 +44,7 @@ export function CaptureForm({ today, variant, onDone }: { today: string; variant
   useEffect(() => { if (v.trim()) { try { localStorage.setItem(`lifeos:draft:${dk}`, JSON.stringify({ value: v, at: Date.now() })); } catch { /* ignore */ } } else dropDraft(dk); }, [v, dk]);
   const pid = usePathname().match(/^\/projects\/(\d+)/)?.[1];
   const parsed = useMemo(() => { if (!v.trim()) return null; try { return parseQuickAdd(v, today); } catch { return null; } }, [v, today]);
-  const sheet = variant === "sheet";
+  const sheet = variant === "sheet", formRef = useRef<HTMLFormElement>(null), base = useRef(""), vRef = useRef(""); vRef.current = v;
   const action = async (fd: FormData) => {
     if (!parsed?.title) return;
     const g = await guarded(`capture-save:${dk}`, v, async () => { await quickAdd(fd); });
@@ -53,13 +53,13 @@ export function CaptureForm({ today, variant, onDone }: { today: string; variant
   };
 
   return (
-    <form className="relative" action={action}>
+    <form ref={formRef} className="relative" action={action}>
       {pid && <input type="hidden" name="project_id" value={pid} />}
       <div className={`flex items-center gap-2 transition ${sheet ? "rounded-xl border bg-panel px-3 focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/25" : "rounded-full bg-raise px-3.5 hover:bg-raise/70 focus-within:bg-panel focus-within:shadow-[0_0_0_2px_rgb(var(--accent)/0.5)]"}`}>
         <Icon name={ok ? "check" : "plus"} size={16} className={ok ? "text-ok" : "text-mute"} />
         <input id={sheet ? undefined : "capture"} name="text" value={v} onChange={(e) => setV(e.target.value)} onFocus={() => setFocus(true)} onBlur={() => setTimeout(() => setFocus(false), 150)} autoFocus={sheet}
           autoComplete="off" enterKeyHint="done" placeholder={ok ? "Added!" : "Add a task…  e.g. Call mum friday #family"} className={`min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-mute ${sheet ? "py-3 text-base" : "py-2"}`} />
-        <Mic onText={(t) => { setV((x) => (x ? x + " " : "") + t); }} />
+        <Mic onStart={() => { base.current = vRef.current.trim(); }} onChange={(t) => setV((base.current ? base.current + " " : "") + t)} onDone={() => { setTimeout(() => formRef.current?.requestSubmit(), 60); }} />
         {!sheet && !v && <kbd className="hidden rounded border bg-panel px-1.5 text-[11px] text-dim lg:block">C</kbd>}
       </div>
       {sheet ? (
@@ -91,16 +91,36 @@ export function CaptureFab({ today }: { today: string }) {
   );
 }
 
-/** Voice capture via the browser's built-in speech recognition. Hidden where it isn't supported (e.g. Firefox). */
-function Mic({ onText }: { onText: (t: string) => void }) {
-  const [on, setOn] = useState(false), [can, setCan] = useState(false);
-  useEffect(() => { setCan(typeof window !== "undefined" && !!((window as never as Record<string, unknown>).SpeechRecognition || (window as never as Record<string, unknown>).webkitSpeechRecognition)); }, []);
+type Rec = { lang: string; continuous: boolean; interimResults: boolean; onresult: (e: { results: ArrayLike<{ isFinal: boolean; 0: { transcript: string } }> }) => void; onend: () => void; onerror: (e: { error: string }) => void; start: () => void; stop: () => void };
+/**
+ * Voice for the add-task bar. Hold the button and talk, let go and the task is added. Or tap once to start and again to stop.
+ * Uses the browser's built-in speech recognition (hidden where it isn't available, e.g. Firefox).
+ */
+function Mic({ onStart, onChange, onDone }: { onStart: () => void; onChange: (text: string) => void; onDone: (text: string) => void }) {
+  const [on, setOn] = useState(false), [can, setCan] = useState(false), [tap, setTap] = useState(false), [err, setErr] = useState("");
+  const rec = useRef<Rec | null>(null), text = useRef(""), finishing = useRef(false), mode = useRef<"hold" | "tap" | null>(null), downAt = useRef(0), ignoreUp = useRef(false);
+  useEffect(() => { const w = window as never as Record<string, unknown>; setCan(!!(w.SpeechRecognition || w.webkitSpeechRecognition)); return () => rec.current?.stop(); }, []);
   if (!can) return null;
   const start = () => {
-    const W = window as never as Record<string, new () => { lang: string; interimResults: boolean; onresult: (e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void; onend: () => void; onerror: () => void; start: () => void }>;
-    const R = W.SpeechRecognition || W.webkitSpeechRecognition, r = new R(); r.lang = navigator.language || "en-NZ"; r.interimResults = false;
-    r.onresult = (e) => { const t = Array.from(e.results).map((x) => x[0].transcript).join(" ").trim(); if (t) onText(t); }; r.onend = () => setOn(false); r.onerror = () => setOn(false);
-    setOn(true); r.start();
+    const W = window as never as Record<string, new () => Rec>, R = W.SpeechRecognition || W.webkitSpeechRecognition; setErr(""); text.current = ""; onStart();
+    const r = new R(); r.lang = navigator.language || "en-NZ"; r.continuous = true; r.interimResults = true;
+    r.onresult = (e) => { text.current = Array.from(e.results).map((x) => x[0].transcript).join(" ").replace(/\s+/g, " ").trim(); onChange(text.current); };
+    r.onerror = (e) => { setErr(e.error === "not-allowed" || e.error === "service-not-allowed" ? "Microphone blocked. Allow it in the address bar." : e.error === "no-speech" ? "Didn't hear anything." : "Voice isn't available right now."); setOn(false); setTap(false); mode.current = null; finishing.current = false; };
+    r.onend = () => { setOn(false); setTap(false); mode.current = null; if (finishing.current) { finishing.current = false; if (text.current) onDone(text.current); } };
+    rec.current = r; mode.current = "hold"; downAt.current = Date.now(); setOn(true); r.start();
   };
-  return <button type="button" onClick={start} disabled={on} aria-label="Dictate a task" title="Dictate" className={`rounded-full p-1 ${on ? "animate-pulse text-danger" : "text-mute hover:text-fg"}`}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><rect x="9" y="3" width="6" height="12" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg></button>;
+  const finish = () => { if (rec.current) { finishing.current = true; rec.current.stop(); } };
+  const press = () => { if (on && mode.current === "tap") { ignoreUp.current = true; finish(); return; } if (!on) start(); };
+  const release = () => { if (ignoreUp.current) { ignoreUp.current = false; return; } if (!on || mode.current !== "hold") return; if (Date.now() - downAt.current < 350) { mode.current = "tap"; setTap(true); return; } finish(); };
+  return (
+    <span className="relative flex shrink-0 items-center">
+      <button type="button" aria-label={on ? "Listening" : "Hold to talk"} aria-pressed={on} title={on ? (tap ? "Tap again to add" : "Let go to add the task") : "Hold to talk, let go to add the task (or tap to start and stop)"}
+        onContextMenu={(e) => e.preventDefault()} onPointerDown={(e) => { e.preventDefault(); (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); press(); }} onPointerUp={release} onPointerCancel={release}
+        className={`relative grid h-8 w-8 touch-none select-none place-items-center rounded-full transition ${on ? "scale-110 bg-danger text-white" : "bg-accent/15 text-accent hover:bg-accent hover:text-ink"}`}>
+        {on && <span className="absolute inset-0 animate-ping rounded-full bg-danger/40" aria-hidden />}
+        <Icon name="mic" size={16} className="relative" />
+      </button>
+      {(err || (on && tap)) && <span className="absolute right-0 top-full z-40 mt-2 whitespace-nowrap rounded-lg border bg-panel px-2.5 py-1 text-xs shadow-md" role="status">{err || "Listening… tap to add"}</span>}
+    </span>
+  );
 }

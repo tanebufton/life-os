@@ -16,7 +16,19 @@ export const currentActor = () => als.getStore()?.actor ?? processActor;
 export type Entity = "task" | "note" | "goal";
 export type Event = { id: number; entity: Entity; entity_id: number; action: string; field: string | null; old: string | null; new: string | null; actor: string; at: string };
 const cut = (v: unknown) => (v === null || v === undefined || v === "" ? null : String(v).replace(/\s+/g, " ").trim().slice(0, 160) || null);
+/** Fields that change a little at a time as you type (an autosaving title, a tags box). Several changes within a few minutes become one entry. */
+const COALESCE = new Set(["Title", "Tags"]);
 export function record(entity: Entity, id: number, action: string, o: { field?: string; old?: unknown; new?: unknown } = {}) {
+  try {
+    if (action === "changed" && o.field && COALESCE.has(o.field)) {
+      const actor = currentActor().slice(0, 40), last = db.prepare("SELECT id, old, actor FROM activity WHERE entity=? AND entity_id=? AND action='changed' AND field=? AND at >= datetime('now','-10 minutes') ORDER BY id DESC LIMIT 1").get(entity, id, o.field) as { id: number; old: string | null; actor: string } | undefined;
+      if (last && last.actor === actor) {
+        if ((cut(o.new) ?? null) === (last.old ?? null)) db.prepare("DELETE FROM activity WHERE id=?").run(last.id); // typed it back to how it was: nothing changed
+        else db.prepare("UPDATE activity SET new=?, at=datetime('now') WHERE id=?").run(cut(o.new), last.id);
+        return;
+      }
+    }
+  } catch { /* history must never break a save */ }
   try { db.prepare("INSERT INTO activity (entity, entity_id, action, field, old, new, actor) VALUES (?,?,?,?,?,?,?)").run(entity, id, action, o.field ?? null, cut(o.old), cut(o.new), currentActor().slice(0, 40)); } catch { /* the trail must never break the change itself */ }
 }
 /** Record one event per field that actually changed. */

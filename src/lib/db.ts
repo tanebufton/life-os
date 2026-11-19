@@ -89,11 +89,6 @@ function migrate(d: Database.Database) {
   `);
   d.exec("UPDATE tasks SET status='done' WHERE done_at IS NOT NULL AND status!='done'");
   d.exec("DELETE FROM tasks WHERE deleted_at IS NOT NULL AND deleted_at < datetime('now','-30 days')");
-  if (!(d.prepare("SELECT count(*) AS n FROM feeds").get() as { n: number }).n) {
-    const ins = d.prepare("INSERT INTO feeds (url, title) VALUES (?,?)");
-    ins.run("https://hnrss.org/frontpage", "Hacker News");
-    ins.run("https://feeds.bbci.co.uk/news/world/rss.xml", "BBC World");
-  }
   // Board columns. A status is a column with a "kind" (todo/doing/done) so counts, reminders and Today keep working with custom names.
   // project_id NULL = the default set; a project can own its own set. Keys are unique across all sets, so a key alone identifies a column.
   d.exec(`CREATE TABLE IF NOT EXISTS statuses (

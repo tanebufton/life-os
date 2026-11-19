@@ -9,8 +9,6 @@ import { ProjectEditor } from "@/components/projectedit";
 import { TaskTable } from "@/components/tasktable";
 import { TaskGroups, TaskRow, bucket } from "@/components/tasks";
 import { ReorderList } from "@/components/reorder";
-import { MemoList } from "@/components/memolist";
-import { VoiceRecorder } from "@/components/voice";
 import { addGoalAction } from "@/lib/actions3";
 import { newNoteInProjectAction } from "@/lib/actions5";
 import { db, Project } from "@/lib/db";
@@ -22,7 +20,6 @@ import { isFavourite } from "@/lib/favourites";
 import { hasCustomColumns } from "@/lib/statuses";
 import { queryTasks } from "@/lib/tasks";
 import { projectKey } from "@/lib/ui";
-import { listMemos } from "@/lib/voice";
 
 export const dynamic = "force-dynamic";
 type SP = BoardParams & { tab?: string; dir?: string };
@@ -33,13 +30,12 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   const p = db.prepare("SELECT * FROM projects WHERE id=?").get(id) as Project | undefined;
   if (!p) notFound();
   const open = queryTasks({ project: id }), doneCount = queryTasks({ project: id, state: "done", limit: 5000 }).length;
-  const notes = isOn("notes") ? listNotes({ project: id }) : [], goals = isOn("goals") ? listGoals().filter((g) => g.project_id === id) : [], memos = isOn("voice") ? listMemos(60, id) : [];
+  const notes = isOn("notes") ? listNotes({ project: id }) : [], goals = isOn("goals") ? listGoals().filter((g) => g.project_id === id) : [];
   const tabs = [
     { k: "overview", label: "Overview", icon: "today" }, { k: "list", label: "List", icon: "list", n: open.length },
     ...(isOn("board") ? [{ k: "board", label: "Board", icon: "board" }] : []), { k: "table", label: "Table", icon: "grid" },
     ...(isOn("notes") ? [{ k: "notes", label: "Notes", icon: "notes", n: notes.length }] : []),
-    ...(isOn("voice") ? [{ k: "memos", label: "Voice memos", icon: "mic", n: memos.length }] : []),
-    ...(isOn("goals") ? [{ k: "goals", label: "Goals", icon: "goals", n: goals.length }] : []),
+        ...(isOn("goals") ? [{ k: "goals", label: "Goals", icon: "goals", n: goals.length }] : []),
   ];
   // No view in the address: open to the project's chosen view (if it's still available), else the overview.
   if (!sp.tab && p.default_view && tabs.some((t) => t.k === p.default_view)) redirect(`/projects/${id}?tab=${p.default_view}`);
@@ -72,24 +68,20 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
           <div className="space-y-4">
             <Panel title="Progress" i={1} bodyClass="p-4"><div className="flex items-baseline gap-4"><div><div className="text-2xl font-semibold tabular-nums">{open.length}</div><div className="text-xs text-mute">open</div></div><div><div className="text-2xl font-semibold tabular-nums">{doneCount}</div><div className="text-xs text-mute">done</div></div></div></Panel>
             {isOn("notes") && <Panel title="Notes" count={notes.length} i={2} right={<Link href={href("notes")} className="text-xs text-accent hover:underline">Open</Link>}><ul>{notes.slice(0, 4).map((n) => <li key={n.id} className="border-b last:border-b-0"><Link href={`/notes/${n.id}`} className="block truncate px-4 py-2 text-[14px] hover:bg-raise/50">{n.title || "Untitled"}</Link></li>)}{!notes.length && <li className="px-4 py-4 text-sm text-mute">No notes yet.</li>}</ul></Panel>}
-            {isOn("voice") && <Panel title="Voice memos" count={memos.length} i={3} right={<Link href={href("memos")} className="text-xs text-accent hover:underline">Open</Link>}><ul>{memos.slice(0, 3).map((m) => <li key={m.id} className="border-b px-4 py-2 text-[13px] last:border-b-0"><span className="line-clamp-2">{m.text}</span></li>)}{!memos.length && <li className="px-4 py-4 text-sm text-mute">No memos yet.</li>}</ul></Panel>}
           </div>
         </div>
       )}
-      {tab === "list" && <div className="max-w-4xl"><TaskGroups groups={bucket(open)} empty="No open tasks here yet. New tasks you add from this page land in this project." /><AddTaskRow /></div>}
+      {tab === "list" && <div><TaskGroups groups={bucket(open)} empty="No open tasks here yet. New tasks you add from this page land in this project." /><AddTaskRow /></div>}
       {tab === "board" && <BoardView sp={sp} lockProject={id} base={href("board")} />}
       {tab === "table" && <TaskTable hideProject rows={open} sort={sort} dir={dir} base={(o) => href("table", Object.entries(o).filter(([, v]) => v).map(([k, v]) => `&${k}=${encodeURIComponent(v as string)}`).join(""))} />}
       {tab === "table" && <div className="mt-2"><AddTaskRow /></div>}
       {tab === "notes" && (
-        <div className="max-w-4xl"><div className="mb-3 flex justify-end"><form action={newNoteInProjectAction.bind(null, id)}><button className="btn-primary"><Icon name="plus" size={14} />New note</button></form></div><Panel i={0}>
+        <div><div className="mb-3 flex justify-end"><form action={newNoteInProjectAction.bind(null, id)}><button className="btn-primary"><Icon name="plus" size={14} />New note</button></form></div><Panel i={0}>
           <ul>{noteTree(notes).map((n) => <li key={n.id} className="border-b last:border-b-0"><Link href={`/notes/${n.id}`} style={{ paddingLeft: 16 + n.depth * 22 }} className="flex items-center gap-2 py-2.5 pr-4 text-[14px] hover:bg-raise/50">{n.icon ? <span aria-hidden>{n.icon}</span> : <Icon name="notes" size={15} className="text-mute" />}<span className="truncate">{n.title || "Untitled"}</span><span className="ml-auto text-xs text-dim">{n.updated_at.slice(0, 10)}</span></Link></li>)}
             {!notes.length && <li className="px-4 py-10 text-center text-sm text-mute">No notes in this project yet.</li>}</ul></Panel></div>
       )}
-      {tab === "memos" && (
-        <div className="max-w-2xl space-y-8"><div className="rounded-2xl border bg-panel"><VoiceRecorder projectId={id} /></div><MemoList memos={memos} /></div>
-      )}
       {tab === "goals" && (
-        <div className="max-w-4xl space-y-3">{goals.map((g) => { const pr = goalProgress(g).pct; return <Panel key={g.id} i={0} bodyClass="p-4"><div className="flex items-baseline justify-between gap-3"><Link href="/goals" className="font-semibold hover:underline">{g.title}</Link><span className="tabular-nums text-mute">{pr}%</span></div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-raise"><div className="h-full rounded-full bg-accent" style={{ width: `${pr}%` }} /></div></Panel>; })}
+        <div className="space-y-3">{goals.map((g) => { const pr = goalProgress(g).pct; return <Panel key={g.id} i={0} bodyClass="p-4"><div className="flex items-baseline justify-between gap-3"><Link href="/goals" className="font-semibold hover:underline">{g.title}</Link><span className="tabular-nums text-mute">{pr}%</span></div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-raise"><div className="h-full rounded-full bg-accent" style={{ width: `${pr}%` }} /></div></Panel>; })}
           <form action={addGoalAction} className="flex gap-2"><input type="hidden" name="project_id" value={id} /><input name="title" required placeholder="New goal for this project" aria-label="New goal" className="field" /><button className="btn">Add goal</button></form></div>
       )}
     </div>

@@ -17,7 +17,7 @@ export default async function All({ searchParams }: { searchParams: Promise<{ ta
   const table = view === "table";
   const q = (o: Record<string, string | undefined>) => { const p = new URLSearchParams(Object.entries(o).filter(([, v]) => v) as [string, string][]).toString(); return `/tasks${p ? "?" + p : ""}`; };
   return (
-    <div className="max-w-4xl">
+    <div>
       <FlashToast deleted={Number(deleted) || undefined} base="/tasks" />
       <PageHead title={tag ? `#${tag}` : "My tasks"} sub={`${open.length} open`} right={<><div className="inline-flex rounded-md border p-0.5 text-xs" role="group" aria-label="View"><Link href={q({ tag, done })} className={`rounded px-2.5 py-1 ${!table ? "bg-raise font-medium" : "text-mute"}`}>List</Link><Link href={q({ tag, done, view: "table" })} className={`rounded px-2.5 py-1 ${table ? "bg-raise font-medium" : "text-mute"}`}>Table</Link></div>{!table && <Link href={q({ tag, done, select: "1" })} className="btn">Select</Link>}<Link href={q({ tag, done: done ? undefined : "1" })} className="btn">{done ? "Hide completed" : "Show completed"}</Link></>} />
       {tags.length > 0 && (

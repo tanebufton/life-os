@@ -132,7 +132,7 @@ export default async function Settings({ searchParams }: { searchParams: Promise
         <Section cur={tab} tab="connect" id="api" i={5} title="API & calendar feed" desc="Let bots, iOS Shortcuts and scripts add and read tasks, and see your due dates in any calendar app.">
           <Panel title="API tokens"><TokenManager tokens={listTokens()} />
             <div className="border-t px-4 py-3"><p className="mb-2 text-xs text-mute">Example: add a task</p><Code>{`curl -X POST ${origin}/api/v1/tasks \\\n  -H "Authorization: Bearer lifeos_…" -H "Content-Type: application/json" \\\n  -d '{"text":"Call mum tomorrow at 5pm #family"}'`}</Code>
-              <p className="mt-2 text-xs text-dim">Also: GET /api/v1/tasks, /search?q=, /brief · PATCH/DELETE /tasks/:id · POST /tasks/:id/complete · /habits · /journal</p></div></Panel>
+              <p className="mt-2 text-xs text-dim">Also: GET /api/v1/tasks, /search?q=, /brief · PATCH/DELETE /tasks/:id · POST /tasks/:id/complete</p></div></Panel>
           <Panel title="Calendar feed (iCal)" i={1} className="mt-4" bodyClass="space-y-3 px-4 pb-4">
             <p className="text-[13px] text-mute">Subscribe in Google Calendar, Apple Calendar or Outlook (“add calendar from URL”). Tasks with a date appear as events; repeats come through too.</p>
             <CopyBox value={`${origin}/api/ical/${icalSecret()}.ics`} /><div className="flex items-center gap-2"><RegenButton which="ical" /><span className="text-xs text-dim">Anyone with this link can read your task titles. Regenerate if it leaks.</span></div>

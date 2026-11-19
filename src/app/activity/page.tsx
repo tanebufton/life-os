@@ -13,7 +13,7 @@ export default async function Activity({ searchParams }: { searchParams: Promise
   const title = (e: { entity: string; entity_id: number }) => (e.entity === "task" ? (db.prepare("SELECT title FROM tasks WHERE id=?").get(e.entity_id) as { title: string } | undefined)?.title : e.entity === "note" ? (db.prepare("SELECT title FROM notes WHERE id=?").get(e.entity_id) as { title: string } | undefined)?.title : (db.prepare("SELECT title FROM goals WHERE id=?").get(e.entity_id) as { title: string } | undefined)?.title) ?? "(deleted)";
   const href = (e: { entity: string; entity_id: number }) => (e.entity === "task" ? `/tasks/${e.entity_id}` : e.entity === "note" ? `/notes/${e.entity_id}` : "/goals");
   return (
-    <div className="max-w-4xl">
+    <div>
       <PageHead title="Activity" sub="Everything that changed, newest first. Each task, note and goal also has its own History." />
       <div className="mb-4 flex flex-wrap gap-1.5">{KINDS.map((x) => <FilterChip key={x.key} href={x.key === "all" ? "/activity" : `/activity?kind=${x.key}`} active={(kind ?? "all") === x.key}>{x.label}</FilterChip>)}</div>
       <Panel i={0}><ul>{events.map((e) => (

@@ -23,7 +23,7 @@ export default async function Review({ searchParams }: { searchParams: Promise<{
     const overdue = open.filter((x) => x.due && x.due < t), today_ = open.filter((x) => x.due === t), unsorted = queryTasks({ inbox: true });
     const planned = today_.reduce((n, x) => n + (x.estimate ?? 0), 0), cap = Number(getSetting("capacity_min") ?? 360), ratio = cap ? planned / cap : 0;
     return (
-      <FeatureGate feature="review"><div className="max-w-4xl">{head}
+      <FeatureGate feature="review"><div>{head}
         <div className="space-y-5">
           <Panel title="1 · Overdue: decide each one" count={overdue.length} i={1}><TriageList today={t} items={overdue.map(item)} actions={["today", "tomorrow", "nextweek", "someday", "done", "drop"]} empty="Nothing overdue. Nice." /></Panel>
           <Panel title="2 · Today's plan" count={today_.length} i={2} right={<span className={ratio > 1 ? "font-medium text-warn" : ""}>{fmtMinutes(planned)} of {fmtMinutes(cap)}</span>}>
@@ -39,7 +39,7 @@ export default async function Review({ searchParams }: { searchParams: Promise<{
   const byDay = new Map<string, typeof r.done>(); for (const d of r.done) byDay.set(d.done_date, [...(byDay.get(d.done_date) ?? []), d]);
   const stat = (v: React.ReactNode, l: string) => <div className="px-4 py-3.5"><div className="text-2xl font-semibold leading-none">{v}</div><div className="mt-1.5 text-xs text-mute">{l}</div></div>;
   return (
-    <FeatureGate feature="review"><div className="max-w-4xl">{head}
+    <FeatureGate feature="review"><div>{head}
       <div className="space-y-5">
         <Panel i={1} bodyClass="grid grid-cols-2 divide-x sm:grid-cols-4">
           {stat(r.done.length, "Completed this week")}{stat(r.overdue.length, "Overdue now")}{isOn("focus") ? stat(<>{r.focusMinutes}<span className="text-sm font-medium text-mute"> min</span></>, "Focused") : stat(r.nextWeek.length, "Due next week")}{stat(r.undated, "Unsorted in inbox")}

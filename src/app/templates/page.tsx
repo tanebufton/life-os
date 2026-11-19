@@ -9,7 +9,7 @@ export default function Templates() {
   const tpls = listTemplates();
   return (
     <FeatureGate feature="templates">
-      <div className="max-w-4xl">
+      <div>
         <PageHead title="Templates" sub="Reusable checklists. One click makes the task and its steps." right={<form action={installStarterTemplatesAction}><button className="btn">Add starter templates</button></form>} />
         <div className="grid gap-4 sm:grid-cols-2">
           {tpls.map((t, i) => <Panel key={t.id} i={i} bodyClass="flex h-full flex-col p-4"><h2 className="text-[15px] font-semibold">{t.name}</h2><p className="text-xs text-mute">{t.description || t.data.title}</p>

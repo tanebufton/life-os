@@ -28,7 +28,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
   const comments = listComments(t.id);
   const columns = Object.fromEntries([["0", listStatuses(null)], ...projects.map((p) => [String(p.id), listStatuses(p.id)])].map(([k, v]) => [k, (v as ReturnType<typeof listStatuses>).map((c) => ({ key: c.key, name: c.name, kind: c.kind }))]));
   return (
-    <div className="max-w-[1100px]">
+    <div className="max-w-[1500px]">
       <div className="rise">
         <TaskEditor focus={isOn("focus")} projects={projects} columns={columns} head={<>
         <div className="mb-1 flex items-center gap-2 text-xs text-mute">

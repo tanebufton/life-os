@@ -38,7 +38,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head><style dangerouslySetInnerHTML={{ __html: tagColorCss() }} /><script dangerouslySetInnerHTML={{ __html: "try{var t=localStorage.getItem('lifeos.theme');if(!t)t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.dataset.theme=t;if(window.name==='lifeos-embed')document.documentElement.dataset.embed='1';if(localStorage.getItem('lifeos.sidebar')==='collapsed')document.documentElement.dataset.sidebar='collapsed'}catch(e){}" }} /></head>
       <body>
         <SessionProvider>
-        <div className="flex h-dvh">
+        <div className="shell flex h-dvh">
           <Sidebar counts={counts} projects={projects} features={features} filters={listFilters()} favourites={listFavourites()} prefs={parsePrefs(getSetting("sidebar"))} />
           <div className="flex min-w-0 flex-1 flex-col">
             <main className="min-h-0 flex-1 overflow-y-auto">

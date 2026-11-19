@@ -7,5 +7,6 @@ button{margin-top:16px;padding:8px 14px;border-radius:8px;border:0;background:#1
 <label for="project">Send voice memos to</label><select id="project" style="width:100%;padding:8px 10px;border:1px solid #8884;border-radius:8px;font:inherit;background:transparent;color:inherit"><option value="">LifeOS default (or no project)</option></select><p class="h">Pick a project and every memo and task you record here is filed under it. The list appears after you save and test.</p>
 <details><summary>Behind Cloudflare Access? (optional)</summary><p class="h">Create a service token in Cloudflare Zero Trust and add a policy that allows it on <code>/api/v1/*</code>.</p>
 <label for="cfId">CF-Access-Client-Id</label><input id="cfId" autocomplete="off"><label for="cfSecret">CF-Access-Client-Secret</label><input id="cfSecret" type="password" autocomplete="off"></details>
-<button id="save">Save &amp; test</button><div id="m" role="status"></div>
+<button id="save">Save &amp; test</button>
+<h2 style="font-size:16px;margin-top:28px" id="mic">Microphone</h2><p class="h">Chrome only shows the microphone prompt on a normal page, so allow it here once. The toolbar recorder then works for good.</p><button id="allowmic" class="s" style="margin-left:0">Allow the microphone</button><div id="micmsg" role="status" style="margin-top:8px;min-height:20px"></div><div id="m" role="status"></div>
 <script src="common.js"></script><script src="options.js"></script></body></html>

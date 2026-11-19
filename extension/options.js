@@ -13,3 +13,10 @@ $("save").onclick = async () => {
     const r = await fetch(v.base + "/api/v1/voice?limit=1", { headers: h }); if (r.status === 401) return say("Saved, but LifeOS rejected the token.", "err"); if (r.ok) { const j = await r.json().catch(() => ({})); if (j.projects) { await chrome.storage.local.set({ projects: j.projects }); fillProjects(j.projects, v.project); } } if (r.status === 404) return say("Saved, but the Voice memos feature is off in LifeOS (Settings → Features).", "err"); if (!r.ok) return say("Saved, but LifeOS answered " + r.status, "err"); say("Connected ✓ Click the toolbar icon (or press Alt+Shift+V) to record.", "ok"); }
   catch { say("Saved, but I couldn't reach that address.", "err"); }
 };
+
+$("allowmic").onclick = async () => {
+  const mm = $("micmsg");
+  try { const s = await navigator.mediaDevices.getUserMedia({ audio: true }); s.getTracks().forEach((t) => t.stop()); mm.textContent = "Microphone allowed ✓ Close this tab and click the toolbar icon."; mm.className = "ok"; }
+  catch { mm.textContent = "The microphone is blocked. Click the lock/camera icon in the address bar, allow it, and try again."; mm.className = "err"; }
+};
+if (location.hash === "#mic") $("allowmic").focus();

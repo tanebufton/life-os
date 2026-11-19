@@ -1,12 +1,8 @@
-// Opens (or focuses) the small recorder window. A window, not the toolbar popup, because Chrome closes popups
-// when the microphone permission prompt appears, which would make the first recording fail.
-let winId = null;
-async function openRecorder() {
-  if (winId !== null) { try { await chrome.windows.update(winId, { focused: true }); return; } catch { winId = null; } }
-  const w = await chrome.windows.create({ url: "recorder.html", type: "popup", width: 400, height: 470 });
-  winId = w.id;
-}
-chrome.windows.onRemoved.addListener((id) => { if (id === winId) winId = null; });
-chrome.action.onClicked.addListener(openRecorder);
-chrome.commands.onCommand.addListener((c) => { if (c === "record") openRecorder(); });
+// The recorder is the toolbar popup. The keyboard shortcut opens that same popup.
+// (If the browser can't open it from a shortcut, fall back to a small window.)
+chrome.commands.onCommand.addListener(async (c) => {
+  if (c !== "record") return;
+  try { await chrome.action.openPopup(); }
+  catch { await chrome.windows.create({ url: "recorder.html", type: "popup", width: 400, height: 470 }); }
+});
 chrome.runtime.onInstalled.addListener(async ({ reason }) => { if (reason === "install") chrome.runtime.openOptionsPage(); });

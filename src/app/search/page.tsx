@@ -21,7 +21,7 @@ export default async function Search({ searchParams }: { searchParams: Promise<{
   const tasks = q ? searchTasks(q, 100) : [], others = q && !ops ? searchAll(q, { limit: 25, kinds: ["note", "goal", "memo", "project"] }).groups : [];
   const count = tasks.length + others.reduce((n, g) => n + g.items.length, 0), filters = listFilters();
   return (
-    <div className="max-w-4xl">
+    <div>
       <PageHead title="Search" sub={q ? `${count} ${count === 1 ? "result" : "results"}` : "Search tasks, notes, goals and voice memos, or filter tasks"} />
       <form className="mb-6"><div className="flex items-center gap-2.5 rounded-xl border bg-panel px-3.5 focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/25"><Icon name="search" size={17} className="text-mute" />
         <input name="q" defaultValue={q} autoFocus placeholder="e.g. venue, or invoice #bills due:week" className="w-full bg-transparent py-3 text-[15px] outline-none placeholder:text-dim" /></div></form>
