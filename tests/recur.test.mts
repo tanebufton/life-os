@@ -1,0 +1,10 @@
+import assert from "node:assert/strict";
+const T = await import("../src/lib/tasks.ts"); const S = await import("../src/lib/statuses.ts"); const { db } = await import("../src/lib/db.ts");
+const pid = Number(db.prepare("INSERT INTO projects (name, color) VALUES ('Recur', '#123456')").run().lastInsertRowid);
+const cols = S.listStatuses(pid), first = cols[0].key;
+const id = T.createTask({ title: "Monthly report", project_id: pid, repeat: "monthly", due: "2020-01-31", status: cols.find((c: any) => c.kind === "doing")?.key ?? first });
+const r = T.completeTask(id)!;
+assert.ok(r.next_due); assert.equal(T.getTask(id)!.status, first); assert.equal(T.getTask(id)!.done_at, null);
+console.log("  ✓ a repeating task returns to the far-left column when completed");
+const done = db.prepare("SELECT count(*) n FROM tasks WHERE title='Monthly report' AND done_at IS NOT NULL").get() as { n: number }; assert.equal(done.n, 1);
+console.log("  ✓ the finished occurrence is kept in Done");

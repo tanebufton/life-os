@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { deleteTaskInline, moveTask, restoreTaskAction } from "@/lib/actions";
 import { TaskLightbox } from "./lightbox";
 import { addCardAction, bulkBoardAction, moveCardAction, type BulkOp } from "@/lib/actions5";
-import { nice } from "@/lib/dates";
+import { fmtMinutes, nice } from "@/lib/dates";
 import { issueKey } from "@/lib/ui";
 import { StatusIcon } from "./StatusIcon";
 import { Icon } from "./Icon";
@@ -14,7 +14,7 @@ import { Pill } from "./Pill";
 
 type Kind = "todo" | "doing" | "done";
 export type Column = { id: number; key: string; name: string; kind: Kind };
-export type Card = { id: number; title: string; status: string; priority: number; due: string | null; project_name: string | null; project_color: string | null; tags: string[]; repeat: string | null; sub_total?: number; sub_done?: number };
+export type Card = { id: number; title: string; status: string; priority: number; due: string | null; project_name: string | null; project_color: string | null; tags: string[]; repeat: string | null; estimate?: number | null; sub_total?: number; sub_done?: number };
 const lift = "shadow-[0_1px_1px_rgb(9_30_66/0.25),0_0_1px_rgb(9_30_66/0.31)] dark:shadow-none dark:border";
 
 export function Board({ columns, cards, today, projectId = null, hiddenNote, toolbar }: { columns: Column[]; cards: Card[]; today: string; projectId?: number | null; hiddenNote?: React.ReactNode; toolbar?: React.ReactNode }) {
@@ -25,7 +25,7 @@ export function Board({ columns, cards, today, projectId = null, hiddenNote, too
   const toggle = (id: number) => setSel((s) => { const n = new Set(s); if (!n.delete(id)) n.add(id); return n; });
   const bulk = (o: BulkOp) => start(async () => { const r = await bulkBoardAction([...sel], o); toast(r.ok ? (r.message ?? "Done") : r.error); if (r.ok && o.op === "delete") { setSel(new Set()); setSelecting(false); } }); // other changes keep the selection, so you can apply several in a row
   const kindOf = (key: string): Kind => columns.find((c) => c.key === key)?.kind ?? "todo";
-  const move = (id: number, status: string) => start(async () => { setItems({ id, status }); const r = await moveTask(id, status); if (!r.ok) toast(r.error ?? "Couldn't move that card"); });
+  const move = (id: number, status: string) => start(async () => { const rep = items.find((x) => x.id === id)?.repeat; setItems({ id, status: rep && kindOf(status) === "done" ? columns[0].key : status }); const r = await moveTask(id, status); if (!r.ok) toast(r.error ?? "Couldn't move that card"); });
   /** Drop `id` into `status`, just before card `before` (or at the end), keeping the column's manual order. */
   const place = (id: number, status: string, before: number | null) => start(async () => {
     setItems({ id, status, before });
@@ -58,8 +58,8 @@ export function Board({ columns, cards, today, projectId = null, hiddenNote, too
         return (
           <section key={col.key} onDragOver={(e) => { e.preventDefault(); setOver(col.key); }} onDragLeave={() => setOver(null)}
             onDrop={(e) => { e.preventDefault(); setOver(null); const id = Number(e.dataTransfer.getData("text/plain")); if (id) place(id, col.key, null); }}
-            className={`rise w-full shrink-0 rounded-xl bg-raise/60 p-1.5 transition md:block md:w-[272px] ${mobileCol === col.key ? "" : "hidden"} ${over === col.key ? "ring-2 ring-accent/50" : ""}`} style={{ ["--i" as string]: ci }}>
-            <h2 className="flex items-center gap-1.5 px-1.5 pb-1.5 pt-1 text-[12px] font-semibold text-mute"><StatusIcon status={col.kind} size={12} /><span className="truncate">{col.name}</span><span className="font-medium text-dim">{list.length}</span></h2>
+            className={`rise w-full shrink-0 rounded-xl bg-raise/60 p-1.5 transition md:block md:min-h-[calc(100dvh-17rem)] md:w-auto md:min-w-[272px] md:max-w-[480px] md:flex-1 ${mobileCol === col.key ? "" : "hidden"} ${over === col.key ? "ring-2 ring-accent/50" : ""}`} style={{ ["--i" as string]: ci }}>
+            <h2 className="flex items-center gap-1.5 px-1.5 pb-1.5 pt-1 text-[12px] font-semibold text-mute"><StatusIcon status={col.kind} size={12} /><span className="truncate">{col.name}</span><span className="font-medium text-dim">{list.length}</span>{col.kind !== "done" && list.some((c) => c.estimate) && <span className="ml-auto font-normal text-dim" title="Estimated time in this column">{fmtMinutes(list.reduce((n, c) => n + (c.estimate ?? 0), 0))}</span>}</h2>
             <ul className="space-y-1.5">
               {list.map((c) => {
                 const done = col.kind === "done";
@@ -67,16 +67,16 @@ export function Board({ columns, cards, today, projectId = null, hiddenNote, too
                 return (
                   <li key={c.id} draggable onDragStart={(e) => { e.dataTransfer.setData("text/plain", String(c.id)); e.dataTransfer.setData("application/x-lifeos-task", String(c.id)); }} onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); e.stopPropagation(); setOver(null); const id = Number(e.dataTransfer.getData("text/plain")); if (!id || id === c.id) return; const r = e.currentTarget.getBoundingClientRect(), after = e.clientY > r.top + r.height / 2, i = list.findIndex((x) => x.id === c.id), next = after ? list[i + 1]?.id ?? null : c.id; place(id, col.key, next); }} onClick={(e) => open(e, c.id)} onKeyDown={(e) => { if (e.key === "Enter") open(e, c.id); }} tabIndex={0} role="link" aria-label={`Open ${c.title}`}
                     title={issueKey(c.project_name, c.id)}
-                    className={`group relative cursor-pointer rounded-lg bg-panel px-2.5 py-2 outline-none transition hover:bg-raise/40 focus-visible:ring-2 focus-visible:ring-accent/50 active:cursor-grabbing ${lift}`}>
+                    className={`group relative cursor-pointer rounded-lg bg-panel px-2.5 py-2 ${c.priority > 0 && !done ? "border-l-[3px] border-l-danger" : ""} outline-none transition hover:bg-raise/40 focus-visible:ring-2 focus-visible:ring-accent/50 active:cursor-grabbing ${lift}`}>
                     {selecting && <input type="checkbox" checked={sel.has(c.id)} onChange={() => toggle(c.id)} aria-label={`Select ${c.title}`} className="absolute left-2.5 top-2.5 h-4 w-4" />}
                     <div className={`flex items-start gap-2 ${selecting ? "pl-6" : ""} pr-12`}>
                       {!selecting && <button type="button" aria-label={done ? `Reopen ${c.title}` : `Complete ${c.title}`} title={done ? "Reopen" : "Mark done"} onClick={() => complete(c)} className={`mt-[2px] grid h-[16px] w-[16px] shrink-0 place-items-center rounded-full border-[1.5px] transition ${done ? "border-ok bg-ok text-white" : "border-fg/35 text-transparent hover:border-ok hover:text-ok"}`}><Icon name="check" size={10} /></button>}
                       <Link href={`/tasks/${c.id}`} draggable={false} onClick={(e) => { if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return; e.preventDefault(); if (selecting) toggle(c.id); else setLightbox(c.id); }} className={`block text-[13.5px] leading-snug ${done ? "text-dim line-through" : ""}`}>{c.title}</Link></div>
-                    {(c.tags.length > 0 || !!c.sub_total || c.repeat || c.due || c.priority !== 0) && (
+                    {(c.tags.length > 0 || !!c.sub_total || c.repeat || c.due || c.priority !== 0 || !!c.estimate || (projectId === null && !!c.project_name)) && (
                       <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 pl-[24px] text-[11px] text-mute">
-                        {c.tags.map((g) => <Pill key={g} name={g} />)}
+                        {projectId === null && c.project_name && <span className="inline-flex items-center gap-1" title="Project"><span className="h-2 w-2 rounded-full" style={{ background: c.project_color ?? "currentColor" }} />{c.project_name}</span>}{c.tags.map((g) => <Pill key={g} name={g} />)}
                         {!!c.sub_total && <span className="inline-flex items-center gap-1" title={`${c.sub_done ?? 0} of ${c.sub_total} subtasks done`}><Icon name="list" size={11} />{c.sub_done ?? 0}/{c.sub_total}</span>}
-                        {c.repeat && <Icon name="repeat" size={12} />}
+                        {!!c.estimate && <span className="inline-flex items-center gap-1"><Icon name="clock" size={11} />{fmtMinutes(c.estimate)}</span>}{c.repeat && <Icon name="repeat" size={12} />}
                         {c.due && <span className={`inline-flex items-center gap-1 ${d}`}><Icon name="calendar" size={11} />{c.due === today ? "Today" : nice(c.due).split(", ")[1]}</span>}
                         {c.priority > 0 && <Icon name="chevUp2" size={13} className="text-danger" />}{c.priority < 0 && <Icon name="chevDown1" size={13} className="text-accent" />}
                       </div>)}

@@ -3,7 +3,7 @@ import { addDays, addMonths, weekday } from "./dates";
 import { describeRepeat, normalizeRepeat, repeatLabel, parseQuickAdd as parseQuick } from "./parse";
 import { localDate, today } from "./time";
 import { record, recordDiff } from "./activity";
-import { defaultColumn, kindOf, remapTaskStatus, resolveStatus, type Kind } from "./statuses";
+import { defaultColumn, kindOf, listStatuses, remapTaskStatus, resolveStatus, type Kind } from "./statuses";
 export { describeRepeat, normalizeRepeat, repeatLabel };
 
 /** A column key. The default columns use "todo", "doing" and "done"; projects can have their own. */
@@ -136,7 +136,7 @@ export function completeTask(id: number, doneKey?: string): { id: number; next_d
   const t = getTask(id);
   if (!t) return null;
   if (t.done_at) return { id };
-  const doneCol = (doneKey && resolveStatus(t.project_id, doneKey)?.kind === "done" ? resolveStatus(t.project_id, doneKey)! : defaultColumn(t.project_id, "done")).key, todoCol = defaultColumn(t.project_id, "todo").key;
+  const doneCol = (doneKey && resolveStatus(t.project_id, doneKey)?.kind === "done" ? resolveStatus(t.project_id, doneKey)! : defaultColumn(t.project_id, "done")).key, first = listStatuses(t.project_id)[0], todoCol = (first && first.kind !== "done" ? first : defaultColumn(t.project_id, "todo")).key; // the next occurrence starts in the far-left column
   if (t.repeat) {
     const next = db.transaction(() => {
       const h = db.prepare("INSERT INTO tasks (title,notes,project_id,priority,due,due_time,estimate,status,done_at,source) VALUES (?,?,?,?,?,?,?,?, datetime('now'), ?)")
