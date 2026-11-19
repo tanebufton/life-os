@@ -50,7 +50,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <MobileNav counts={counts} tabs={resolveTabs(getSetting("mobile_tabs"), features)} />
         <PwaRegister />
         <ReminderWatcher enabled={features.reminders && browserNotifyConfig().on} />
-        <CaptureFab today={t} />
+        <CaptureFab today={t} projects={projects.map((p) => ({ id: p.id, name: p.name, color: p.color }))} />
         </SessionProvider>
         <Toaster position="bottom-center" offset={{ bottom: 88 }} mobileOffset={{ bottom: 140 }} toastOptions={{ style: { background: "rgb(var(--panel))", color: "rgb(var(--fg))", border: "1px solid rgb(var(--line) / .12)", borderRadius: 12, fontFamily: "inherit" } }} />
         <Palette projects={projects} features={features} />

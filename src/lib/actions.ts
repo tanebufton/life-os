@@ -27,6 +27,12 @@ export async function quickAdd(fd: FormData) {
   if (pid && !t.project) t.project_id = pid;
   const day = str(fd, "due");
   if (/^\d{4}-\d{2}-\d{2}$/.test(day) && t.due === undefined) t.due = day;
+  const pr = Number(fd.get("priority"));
+  if ([1, -1].includes(pr) && !t.priority) t.priority = pr;
+  const notes = String(fd.get("notes") ?? "").trim().slice(0, 20000);
+  if (notes) t.notes = notes;
+  const extra = str(fd, "tags").split(/[\s,]+/).map((x) => x.replace(/^#/, "")).filter(Boolean).slice(0, 10);
+  if (extra.length) t.tags = [...(t.tags ?? []), ...extra];
   const id = createTask(t); void enrichLinkTask(id);
   refresh();
 }

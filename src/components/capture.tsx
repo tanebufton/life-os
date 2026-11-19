@@ -72,18 +72,67 @@ export function CaptureForm({ today, variant, onDone }: { today: string; variant
   );
 }
 
-export function CaptureFab({ today }: { today: string }) {
-  const [open, setOpen] = useState(false);
+type Proj = { id: number; name: string; color: string };
+const addDays = (d: string, n: number) => { const x = new Date(d + "T00:00:00Z"); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
+
+/** Phone quick add, in the style of a to-do app: title and notes, then a row of date / priority / tag / project, and a send button above the keyboard. */
+function QuickSheet({ today, projects, onDone }: { today: string; projects: Proj[]; onDone: () => void }) {
+  const path = usePathname(), ctxProject = path.match(/^\/projects\/(\d+)/)?.[1] ?? (path === "/board" ? new URLSearchParams(window.location.search).get("project") ?? undefined : undefined), formRef = useRef<HTMLFormElement>(null);
+  const [v, setV] = useState(""), [notes, setNotes] = useState(""), [due, setDue] = useState<string>(path === "/" || path === "/now" ? today : ""), [prio, setPrio] = useState(0), [tags, setTags] = useState(""), [proj, setProj] = useState(ctxProject ?? "");
+  const [pop, setPop] = useState<null | "date" | "prio" | "proj" | "tag">(null), [busy, setBusy] = useState(false), base = useRef(""), vRef = useRef(""); vRef.current = v;
+  const { guarded } = useSession();
+  const parsed = useMemo(() => { if (!v.trim()) return null; try { return parseQuickAdd(v, today); } catch { return null; } }, [v, today]);
+  const submit = async (fd: FormData) => {
+    if (!parsed?.title || busy) return; setBusy(true);
+    const g = await guarded("capture-save:sheet", v, async () => { await quickAdd(fd); });
+    setBusy(false); if (g.saved) onDone();
+  };
+  const effDue = parsed?.due ?? due, pname = projects.find((p) => String(p.id) === proj)?.name;
+  const chip = (on: boolean) => `inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3 text-[13px] ${on ? "border-accent/40 bg-accent/10 text-accent" : "text-mute"}`;
+  const item = "flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-[14px] hover:bg-raise";
+  return (
+    <form ref={formRef} action={submit}>
+      <input type="hidden" name="due" value={due} /><input type="hidden" name="priority" value={prio} /><input type="hidden" name="tags" value={tags} /><input type="hidden" name="project_id" value={proj} />
+      <input name="text" value={v} onChange={(e) => setV(e.target.value)} autoFocus autoComplete="off" enterKeyHint="done" aria-label="Task title" placeholder="What needs doing?" className="w-full bg-transparent py-1 text-[17px] font-medium outline-none placeholder:text-dim" />
+      <textarea name="notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} aria-label="Notes" placeholder="Notes" className="mt-1 w-full resize-none bg-transparent text-[14px] outline-none placeholder:text-dim" />
+      {parsed?.title && (parsed.due || parsed.tags || parsed.project || parsed.estimate || parsed.repeat || parsed.priority) ? <div className="mb-1"><Preview parsed={parsed} today={today} empty={false} /></div> : <p className="mb-1 text-[12px] text-dim">Tip: type “call mum friday #family !high” and the details are picked out for you.</p>}
+      {pop && <div className="mb-2 rounded-xl border bg-panel p-1.5 shadow-lg">
+        {pop === "date" && <>{([["Today", 0], ["Tomorrow", 1], ["Next week", 7]] as const).map(([l, n]) => <button type="button" key={l} className={item} onClick={() => { setDue(addDays(today, n)); setPop(null); }}><Icon name="calendar" size={15} className="text-mute" />{l}<span className="ml-auto text-xs text-dim">{nice(addDays(today, n)).split(", ")[0]}</span></button>)}
+          <label className={`${item} cursor-pointer`}><Icon name="calendar" size={15} className="text-mute" />Pick a date…<input type="date" value={due} onChange={(e) => { setDue(e.target.value); setPop(null); }} className="ml-auto bg-transparent text-sm" /></label>
+          {due && <button type="button" className={`${item} text-mute`} onClick={() => { setDue(""); setPop(null); }}>No date</button>}</>}
+        {pop === "prio" && ([[1, "High"], [0, "Normal"], [-1, "Low"]] as const).map(([n, l]) => <button type="button" key={l} className={`${item} ${prio === n ? "font-medium text-accent" : ""}`} onClick={() => { setPrio(n); setPop(null); }}><Icon name={n > 0 ? "chevUp2" : n < 0 ? "chevDown1" : "flag"} size={15} className={n > 0 ? "text-danger" : "text-mute"} />{l}</button>)}
+        {pop === "proj" && <div className="max-h-56 overflow-y-auto"><button type="button" className={`${item} ${!proj ? "font-medium text-accent" : ""}`} onClick={() => { setProj(""); setPop(null); }}><Icon name="inbox" size={15} className="text-mute" />Inbox</button>{projects.map((p) => <button type="button" key={p.id} className={`${item} ${String(p.id) === proj ? "font-medium text-accent" : ""}`} onClick={() => { setProj(String(p.id)); setPop(null); }}><span className="h-2.5 w-2.5 rounded-full" style={{ background: p.color }} />{p.name}</button>)}</div>}
+        {pop === "tag" && <div className="p-1.5"><input autoFocus value={tags} onChange={(e) => setTags(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); setPop(null); } }} placeholder="Tags, separated by spaces" aria-label="Tags" className="field" /></div>}
+      </div>}
+      <div className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto pb-0.5">
+        <button type="button" onClick={() => setPop(pop === "date" ? null : "date")} aria-label="Date" className={chip(!!effDue)}><Icon name="calendar" size={15} />{effDue ? (effDue === today ? "Today" : nice(effDue).split(", ")[1] ?? nice(effDue)) : "Date"}</button>
+        <button type="button" onClick={() => setPop(pop === "prio" ? null : "prio")} aria-label="Priority" className={chip(prio !== 0 || !!parsed?.priority)}><Icon name="flag" size={15} />{prio > 0 ? "High" : prio < 0 ? "Low" : "Priority"}</button>
+        <button type="button" onClick={() => setPop(pop === "tag" ? null : "tag")} aria-label="Tags" className={chip(!!tags.trim())}><Icon name="tag" size={15} />{tags.trim() ? tags.trim().split(/\s+/).slice(0, 2).join(" ") : "Tag"}</button>
+        <button type="button" onClick={() => setPop(pop === "proj" ? null : "proj")} aria-label="Project" className={chip(!!proj)}><Icon name="list" size={15} /><span className="max-w-[7rem] truncate">{pname ?? "Inbox"}</span></button>
+        </div>
+        <span className="flex shrink-0 items-center gap-1.5">
+          <Mic onStart={() => { base.current = vRef.current.trim(); }} onChange={(t) => setV((base.current ? base.current + " " : "") + t)} onDone={() => { setTimeout(() => formRef.current?.requestSubmit(), 60); }} />
+          <button aria-label="Add task" disabled={!parsed?.title || busy} className="grid h-10 w-10 place-items-center rounded-full bg-accent text-ink disabled:opacity-40"><Icon name="arrowUp" size={20} /></button>
+        </span>
+      </div>
+    </form>
+  );
+}
+
+export function CaptureFab({ today, projects = [] }: { today: string; projects?: Proj[] }) {
+  const [open, setOpen] = useState(false), [lift, setLift] = useState(0);
   useEffect(() => { const f = () => setOpen(true); window.addEventListener("lifeos:capture", f); return () => window.removeEventListener("lifeos:capture", f); }, []);
+  // keep the sheet just above the on-screen keyboard
+  useEffect(() => { if (!open) return; const vv = window.visualViewport; if (!vv) return; const f = () => setLift(Math.max(0, window.innerHeight - vv.height - vv.offsetTop)); f(); vv.addEventListener("resize", f); vv.addEventListener("scroll", f); return () => { vv.removeEventListener("resize", f); vv.removeEventListener("scroll", f); setLift(0); }; }, [open]);
+  useEffect(() => { if (!open) return; const k = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); }; window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }, [open]);
   return (
     <>
       <button onClick={() => setOpen(true)} aria-label="New task" className="fab fixed bottom-[76px] right-4 z-40 grid h-14 w-14 place-items-center rounded-full bg-accent text-ink shadow-[0_6px_18px_rgb(24_119_242/0.45)] transition active:scale-95 md:hidden"><Icon name="plus" size={26} /></button>
       {open && (
-        <div className="fixed inset-0 z-50 flex items-end bg-black/40 md:hidden" onMouseDown={(e) => e.target === e.currentTarget && setOpen(false)}>
-          <div className="w-full rounded-t-2xl bg-bg p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl">
-            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-fg/15" />
-            <div className="mb-3 flex items-center justify-between"><h2 className="text-base font-semibold">New task</h2><button onClick={() => setOpen(false)} aria-label="Close" className="rounded-full p-1.5 text-mute hover:bg-raise"><Icon name="x" size={18} /></button></div>
-            <CaptureForm today={today} variant="sheet" onDone={() => setOpen(false)} />
+        <div className="fixed inset-0 z-50 bg-black/40 md:hidden" onMouseDown={(e) => e.target === e.currentTarget && setOpen(false)} onTouchStart={(e) => e.target === e.currentTarget && setOpen(false)}>
+          <div role="dialog" aria-label="New task" style={{ bottom: lift }} className="absolute inset-x-0 rounded-t-2xl bg-bg px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-4 shadow-2xl">
+            <QuickSheet today={today} projects={projects} onDone={() => setOpen(false)} />
           </div>
         </div>
       )}
