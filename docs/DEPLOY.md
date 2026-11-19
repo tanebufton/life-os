@@ -4,19 +4,19 @@ Docker Compose on any always-on machine, a Cloudflare Tunnel in front (no open p
 
 ## What you need
 
-Measured on the production build with the demo database:
+Measured on the production build. "Idle" is a freshly started container in CI; "after use" is after browsing every page on a dev machine:
 
-| Piece | Memory (RSS) | Notes |
-|---|---|---|
-| `web` | ~240 MB | Next.js server |
-| `worker` | ~140 MB | reminders, scheduled backups, calendar sync, subscription auto-logging, email polling |
-| `mcp` (optional) | ~150 MB | only if you connect Claude / MCP clients |
+| Piece | Memory idle | Memory after use | Notes |
+|---|---|---|---|
+| `web` | ~110 MB | ~240 MB | Next.js server |
+| `worker` | ~70 MB | ~140 MB | reminders, scheduled backups, calendar sync, subscription auto-logging, email polling |
+| `mcp` (optional) | ~90 MB | ~150 MB | only if you connect Claude / MCP clients |
 | `cloudflared` | small | not measured |
 
 - **Runtime:** about **400 MB** for web + worker, about **550 MB** with MCP. A **1 GB** machine is fine, **2 GB** is comfortable.
 - **Building the image on the server** peaked at **~800 MB**, so on a 1 GB machine pull the prebuilt image (below) instead of building.
 - **CPU:** any modern single core is enough. One user, mostly idle. ARM works (Raspberry Pi 4/5, 64-bit OS): CI publishes `linux/arm64`.
-- **Disk:** the database is small (the seeded demo, a few months of data, is ~240 KB; a few years of heavy use is tens of MB). Allow **2 GB** for Docker images plus the volume. SQLite needs a real disk (not a network share).
+- **Disk:** the image is **1.55 GB unpacked (302 MB to download)**, so allow **4 GB** for Docker plus the volume. The database itself is small (the seeded demo is ~240 KB; a few years of heavy use is tens of MB). SQLite needs a real disk (not a network share).
 - **Network:** outbound only. No inbound ports, no public IP, no TLS to manage.
 - **Cost:** a Raspberry Pi or old laptop you own is $0; a small VPS (1–2 GB) is roughly $4–6 a month. Cloudflare Tunnel and Access (free plan, up to 50 users) cost nothing. R2 backups are effectively free at this size.
 - **Does not work:** Cloudflare Workers/Pages, Vercel or other serverless hosts (it needs a long-running process and a local disk).
