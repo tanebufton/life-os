@@ -18,6 +18,8 @@ const Prop = ({ icon, label, children }: { icon: string; label: string; children
 );
 
 /** Notion-style editor: every change saves itself, no Save button. */
+/** Enter commits a field that otherwise saves when you leave it. */
+const enterBlur = (e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); e.currentTarget.blur(); } };
 export function TaskEditor({ task, projects, focus, columns, head, children }: { task: EditorTask; projects: { id: number; name: string }[]; focus: boolean; columns?: Record<string, { key: string; name: string; kind: string }[]>; head?: React.ReactNode; children?: React.ReactNode }) {
   const router = useRouter();
   const [v, setV] = useState(task), [est, setEst] = useState(task.estimate ? `${task.estimate}m` : ""), [state, setState] = useState<"idle" | "saving" | "saved" | string>("idle");
@@ -59,9 +61,9 @@ export function TaskEditor({ task, projects, focus, columns, head, children }: {
           <Prop icon="list" label="Project"><select value={v.project_id ?? ""} onChange={(e) => changeProject(e.target.value ? Number(e.target.value) : null)} className="ghost max-w-full"><option value="">None</option>{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Prop>
           <Prop icon="calendar" label="Due date"><div className="flex min-w-0 flex-wrap gap-1.5"><input type="date" value={v.due ?? ""} onChange={(e) => { set("due", e.target.value || null); save(e.target.value ? { due: e.target.value } : { due: null, due_time: null }); if (!e.target.value) set("due_time", null); }} className="ghost !w-[9.5rem] shrink-0" />
             <input type="time" value={v.due_time ?? ""} disabled={!v.due} onChange={(e) => { set("due_time", e.target.value || null); save({ due_time: e.target.value || null }); }} className="ghost !w-[8.5rem] shrink-0 disabled:opacity-40" aria-label="Time" /></div></Prop>
-          <Prop icon="clock" label="Estimate"><input value={est} onChange={(e) => setEst(e.target.value)} onBlur={() => { const n = parseEst(est); if (n === undefined) setState("Try 30m, 1h or 90"); else { set("estimate", n); save({ estimate: n }); void flush(); } }} placeholder="e.g. 30m, 1.5h" className="ghost max-w-full" /></Prop>
-          <Prop icon="repeat" label="Repeat"><input value={v.repeat} onChange={(e) => set("repeat", e.target.value)} onBlur={() => { save({ repeat: v.repeat.trim() || null }); void flush(); }} placeholder="Doesn't repeat" title="Try: weekly, every 2 weeks, 15th of the month" className="ghost max-w-full" /></Prop>
-          <Prop icon="tag" label="Tags"><input value={v.tags} onChange={(e) => set("tags", e.target.value)} onBlur={() => { save({ tags: v.tags }); void flush(); }} placeholder="Add tags" title="Separate tags with spaces" className="ghost max-w-full" /></Prop>
+          <Prop icon="clock" label="Estimate"><input value={est} onChange={(e) => setEst(e.target.value)} onBlur={() => { const n = parseEst(est); if (n === undefined) setState("Try 30m, 1h or 90"); else { set("estimate", n); save({ estimate: n }); void flush(); } }} placeholder="e.g. 30m, 1.5h" onKeyDown={enterBlur} className="ghost max-w-full" /></Prop>
+          <Prop icon="repeat" label="Repeat"><input value={v.repeat} onChange={(e) => set("repeat", e.target.value)} onBlur={() => { save({ repeat: v.repeat.trim() || null }); void flush(); }} placeholder="Doesn't repeat" title="Try: weekly, every 2 weeks, 15th of the month" onKeyDown={enterBlur} className="ghost max-w-full" /></Prop>
+          <Prop icon="tag" label="Tags"><input value={v.tags} onChange={(e) => set("tags", e.target.value)} onBlur={() => { save({ tags: v.tags }); void flush(); }} placeholder="Add tags" title="Separate tags with spaces. Press Enter to save." onKeyDown={enterBlur} className="ghost max-w-full" /></Prop>
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2 border-t pt-3">
           {focus && <button className="btn !h-8" onClick={async () => { await startFocus(task.id); router.push(`/focus?task=${task.id}`); }}><Icon name="focus" size={15} className="text-accent" />Focus</button>}

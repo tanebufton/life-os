@@ -19,7 +19,7 @@ export function ImportPanel() {
     <div className="space-y-3 p-4">
       <p className="text-[13px] text-mute">Bring in tasks from <b>Todoist</b> (CSV export), any <b>CSV</b> with a title column (Notion databases, spreadsheets), and <b>Markdown or text files</b> as notes (Notion exports). Unzip archives first. Anything already here is skipped, so it&apos;s safe to run twice.</p>
       <div className="flex flex-wrap items-center gap-2"><input ref={input} type="file" multiple accept=".csv,.md,.markdown,.txt" aria-label="Files to import" onChange={(e) => void read(e.target.files)} className="text-[13px]" />
-        <input value={project} onChange={(e) => setProject(e.target.value)} onBlur={again} placeholder="Project (optional)" aria-label="Project for imported tasks" className="field !w-48" /></div>
+        <input value={project} onChange={(e) => setProject(e.target.value)} onBlur={again} onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }} placeholder="Project (optional)" aria-label="Project for imported tasks" className="field !w-48" /></div>
       {busy && !sum && <p className="text-[13px] text-mute">Reading…</p>}
       {err && <p className="text-[13px] text-danger" role="alert">{err}</p>}
       {sum && (

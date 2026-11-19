@@ -26,8 +26,8 @@ export function BrowserReminders({ on: initOn, lead: initLead, snooze: initSnooz
           : <><button className="btn-primary" onClick={turnOn}>Turn on browser reminders</button>{perm === "denied" && <span className="text-danger">Blocked by the browser. Allow notifications for this site first.</span>}{on && perm !== "granted" && perm !== "denied" && <span className="text-warn">On, but this browser hasn&apos;t allowed notifications yet.</span>}</>}
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
-        <label className="space-y-1.5 font-medium">Remind me before it&apos;s due (minutes)<input type="number" min={0} max={120} value={lead} onChange={(e) => setLead(e.target.value)} onBlur={() => save()} className="field" /></label>
-        <label className="space-y-1.5 font-medium">Snooze for (minutes)<input type="number" min={1} max={240} value={snooze} onChange={(e) => setSnooze(e.target.value)} onBlur={() => save()} className="field" /></label>
+        <label className="space-y-1.5 font-medium">Remind me before it&apos;s due (minutes)<input type="number" min={0} max={120} value={lead} onChange={(e) => setLead(e.target.value)} onBlur={() => save()} onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }} className="field" /></label>
+        <label className="space-y-1.5 font-medium">Snooze for (minutes)<input type="number" min={1} max={240} value={snooze} onChange={(e) => setSnooze(e.target.value)} onBlur={() => save()} onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }} className="field" /></label>
       </div>
       <p className="text-xs text-dim">For tasks with a time. While LifeOS is open in a tab, a notification appears with <b>Mark done</b> and <b>Snooze</b> buttons. Each browser you use needs turning on once. Closed tabs can&apos;t notify; for that, use the ntfy push below.</p>
     </div>
