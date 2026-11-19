@@ -126,9 +126,10 @@ export function CaptureFab({ today, projects = [] }: { today: string; projects?:
   // keep the sheet just above the on-screen keyboard
   useEffect(() => { if (!open) return; const vv = window.visualViewport; if (!vv) return; const f = () => setLift(Math.max(0, window.innerHeight - vv.height - vv.offsetTop)); f(); vv.addEventListener("resize", f); vv.addEventListener("scroll", f); return () => { vv.removeEventListener("resize", f); vv.removeEventListener("scroll", f); setLift(0); }; }, [open]);
   useEffect(() => { if (!open) return; const k = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); }; window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }, [open]);
+  const path = usePathname();
   return (
     <>
-      <button onClick={() => setOpen(true)} aria-label="New task" className="fab fixed bottom-[76px] right-4 z-40 grid h-14 w-14 place-items-center rounded-full bg-accent text-ink shadow-[0_6px_18px_rgb(24_119_242/0.45)] transition active:scale-95 md:hidden"><Icon name="plus" size={26} /></button>
+      {!path.startsWith("/settings") && <button onClick={() => setOpen(true)} aria-label="New task" className="fab fixed bottom-[76px] right-4 z-40 grid h-14 w-14 place-items-center rounded-full bg-accent text-ink shadow-[0_6px_18px_rgb(24_119_242/0.45)] transition active:scale-95 md:hidden"><Icon name="plus" size={26} /></button>}
       {open && (
         <div className="fixed inset-0 z-50 bg-black/40 md:hidden" onMouseDown={(e) => e.target === e.currentTarget && setOpen(false)} onTouchStart={(e) => e.target === e.currentTarget && setOpen(false)}>
           <div role="dialog" aria-label="New task" style={{ bottom: lift }} className="absolute inset-x-0 rounded-t-2xl bg-bg px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-4 shadow-2xl">

@@ -26,7 +26,7 @@ export function TagManager({ tags }: { tags: TagInfo[] }) {
           {confirm === t.name ? <span className="flex items-center gap-2 text-xs"><span>{t.total ? `Remove from ${t.total} item${t.total === 1 ? "" : "s"}?` : "Delete?"}</span><button className="btn !h-7 text-danger" disabled={busy} onClick={() => run(async () => { const r = await deleteTagAction(t.name); setConfirm(null); return r; })}>Delete</button><button className="text-mute underline" onClick={() => setConfirm(null)}>Cancel</button></span>
             : <button aria-label={`Delete ${t.name}`} className="text-xs text-dim hover:text-danger" onClick={() => setConfirm(t.name)}>Delete</button>}
         </li>))}
-        {!shown.length && <li className="px-4 py-10 text-center text-sm text-mute">{tags.length ? "No tags match." : "No tags yet. Add #tags to tasks, or tags to notes, goals and people."}</li>}</ul>
+        {!shown.length && <li className="px-4 py-10 text-center text-sm text-mute">{tags.length ? "No tags match." : "No tags yet. Add #tags to tasks, or tags to notes, and goals."}</li>}</ul>
       <p className="mt-3 text-xs text-dim">Rename a tag to the name of another tag to merge them. Deleting a tag only removes the tag, never the items.</p>
     </div>
   );
