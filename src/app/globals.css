@@ -70,3 +70,9 @@ input[type="date"]::-webkit-calendar-picker-indicator, input[type="time"]::-webk
 
 /* Sidebar hidden by the toggle (remembered in this browser) */
 html[data-sidebar="collapsed"] .side { display: none !important; }
+
+/* The project tab bar is for phones; on desktop the sidebar carries it. If the sidebar is hidden, the tabs come back. */
+html[data-sidebar="collapsed"] .ptabs { display: flex !important; }
+/* Reading-width pages sit in the middle of the space instead of hugging the left edge */
+main .max-w-4xl, main .max-w-3xl, main .max-w-2xl { margin-left: auto; margin-right: auto; }
+main .proj .max-w-4xl { margin-left: 0; margin-right: 0; }

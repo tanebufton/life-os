@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { addProject } from "@/lib/actions";
 import { resetSidebarAction, saveSidebarAction } from "@/lib/actions5";
@@ -47,7 +47,10 @@ export function Hotkeys({ features }: { features: Features }) {
 
 const row = "flex min-h-[30px] items-center gap-2.5 rounded-md px-2 text-[14px] transition-colors";
 export function Sidebar({ counts, projects, features, filters = [], prefs: savedPrefs = EMPTY_PREFS }: { counts: Counts; projects: NavProject[]; features: Features; filters?: { id: number; name: string; query: string }[]; prefs?: SidebarPrefs }) {
-  const path = usePathname();
+  const path = usePathname(), sp = useSearchParams();
+  const [collapsed, setCollapsed] = useState<string[]>(["life", "money", "explore", "filters"]);
+  useEffect(() => { try { const v = localStorage.getItem("lifeos.sb.collapsed"); if (v) setCollapsed(JSON.parse(v)); } catch { /* keep defaults */ } }, []);
+  const toggle = (k: string) => setCollapsed((c) => { const n = c.includes(k) ? c.filter((x) => x !== k) : [...c, k]; try { localStorage.setItem("lifeos.sb.collapsed", JSON.stringify(n)); } catch { /* ignore */ } return n; });
   const [adding, setAdding] = useState(false), [editing, setEditing] = useState(false), [prefs, setPrefs] = useState<SidebarPrefs>(savedPrefs), [drag, setDrag] = useState<string | null>(null);
   useEffect(() => setPrefs(savedPrefs), [savedPrefs]);
   const persist = (next: SidebarPrefs) => { setPrefs(next); void saveSidebarAction(next).then((r) => { if (!r.ok) toast(r.error); }); };
@@ -81,16 +84,51 @@ export function Sidebar({ counts, projects, features, filters = [], prefs: saved
       <button aria-label={hidden ? `Show ${p.label}` : `Hide ${p.label}`} aria-pressed={!hidden} disabled={p.href === "/"} onClick={() => persist(withVisibility(prefs, p, !hidden))} className="rounded p-0.5 text-mute hover:bg-raise hover:text-fg disabled:invisible"><Icon name={hidden ? "eyeoff" : "eye"} size={14} /></button>
     </div>
   );
-  const sections = arranged.map((g, gi) => {
+  const chev = (open: boolean) => <Icon name="chevDown" size={12} className={`text-dim transition ${open ? "" : "-rotate-90"}`} />;
+  const projectNav = (pid: number) => {
+    const tab = path === `/projects/${pid}` ? (sp.get("tab") ?? "overview") : "";
+    const items = [["overview", "Overview", "today", true], ["list", "List", "list", true], ["board", "Board", "board", features.board], ["table", "Table", "grid", true], ["notes", "Notes", "notes", features.notes], ["memos", "Voice memos", "mic", features.voice], ["goals", "Goals", "goals", features.goals]] as const;
+    return <div className="mb-1 ml-[15px] space-y-px border-l pl-2">{items.filter((i) => i[3]).map(([k, label, icon]) => <Link key={k} href={k === "overview" ? `/projects/${pid}` : `/projects/${pid}?tab=${k}`} className={`${row} !min-h-[27px] text-[13px] ${tab === k || (k === "list" && tab === "tasks") ? "bg-raise font-medium" : "text-fg/75 hover:bg-raise/70"}`}><Icon name={icon} size={15} className={tab === k ? "text-accent" : "text-mute"} />{label}</Link>)}</div>;
+  };
+  const projectsSection = (
+    <div key="projects" className="mt-4">
+      <div className="group flex items-center justify-between px-4 pb-1"><span className="text-xs font-semibold text-mute">Projects</span>
+        <button onClick={() => setAdding((a) => !a)} aria-label="New project" className="rounded p-0.5 text-mute opacity-0 transition hover:bg-raise hover:text-fg group-hover:opacity-100 focus:opacity-100"><Icon name={adding ? "x" : "plus"} size={14} /></button></div>
+      <div className="space-y-px px-2">
+        {adding && (
+          <form action={async (fd) => { await addProject(fd); setAdding(false); }} className="mb-1 flex gap-1.5 px-1">
+            <input name="name" required autoFocus placeholder="Project name" className="field !py-1" />
+            <input type="color" name="color" defaultValue="#1877f2" aria-label="Colour" className="h-8 w-9 shrink-0 cursor-pointer rounded-md border bg-transparent p-0.5" />
+          </form>
+        )}
+        {projects.map((p) => {
+          const here = path === `/projects/${p.id}`;
+          return (
+            <div key={p.id}>
+              <Link href={`/projects/${p.id}`} className={`${row} ${here && !sp.get("tab") ? "bg-raise font-medium" : here ? "font-medium" : "text-fg/80 hover:bg-raise/70"}`}>
+                <ProjectAvatar name={p.name} color={p.color} /><span className="flex-1 truncate">{p.name}</span>{p.open > 0 && <span className="text-xs text-dim">{p.open}</span>}
+              </Link>
+              {here && projectNav(p.id)}
+            </div>
+          );
+        })}
+        {!projects.length && !adding && <p className="px-2 py-1 text-xs text-dim">No projects yet.</p>}
+      </div>
+    </div>
+  );
+  const sections = arranged.flatMap((g, gi) => {
     const visible = g.items.filter((i) => !i.hidden);
-    if (!editing && !visible.length) return null;
-    return (
-      <div key={g.key} className={gi === 0 && !g.title ? "" : "mt-4"}>
-        {(g.title || editing) && <div className="flex items-center px-4 pb-1 text-xs font-semibold text-mute"><span className="flex-1">{g.title || "Top"}</span>
+    if (!editing && !visible.length) return g.key === "main" ? [projectsSection] : [];
+    const open = editing || !g.title || !collapsed.includes(g.key) || visible.some((i) => isActive(path, i.page.href));
+    const out = (
+      <div key={g.key} className={gi === 0 && !g.title ? "" : "mt-3"}>
+        {(g.title || editing) && <div className="flex items-center px-4 pb-1 text-xs font-semibold text-mute">
+          {editing || !g.title ? <span className="flex-1">{g.title || "Top"}</span> : <button onClick={() => toggle(g.key)} aria-expanded={open} className="-ml-1 flex flex-1 items-center gap-1 rounded px-1 py-0.5 text-left hover:bg-raise hover:text-fg">{chev(open)}{g.title}</button>}
           {editing && <><button aria-label={`Move ${g.title || "top"} group up`} onClick={() => bumpGroup(g.key, -1)} className="rounded p-0.5 hover:bg-raise"><Icon name="chevDown" size={13} className="rotate-180" /></button><button aria-label={`Move ${g.title || "top"} group down`} onClick={() => bumpGroup(g.key, 1)} className="rounded p-0.5 hover:bg-raise"><Icon name="chevDown" size={13} /></button></>}</div>}
-        <div className="space-y-px px-2">{(editing ? g.items : visible).map((i) => (editing ? editRow(i.page, i.hidden, g.key) : link(i.page)))}</div>
+        {open && <div className="space-y-px px-2">{(editing ? g.items : visible).map((i) => (editing ? editRow(i.page, i.hidden, g.key) : link(i.page)))}</div>}
       </div>
     );
+    return g.key === "main" ? [out, projectsSection] : [out];
   });
   return (
     <aside className="side hidden w-[260px] shrink-0 flex-col border-r bg-side md:flex">
@@ -104,26 +142,7 @@ export function Sidebar({ counts, projects, features, filters = [], prefs: saved
       <div className="mt-2 min-h-0 flex-1 overflow-y-auto pb-2">
         {sections}
         {editing && <div className="mx-3 mt-3 rounded-lg border border-dashed p-2.5 text-xs text-mute">Drag pages (or use the arrows) to reorder them. The eye hides a page from this list; it stays reachable from search (⌘K) and the LifeOS menu. <button className="mt-1.5 block font-medium text-accent hover:underline" onClick={() => setEditing(false)}>Done</button></div>}
-        {filters.length > 0 && <div className="mt-4"><div className="px-4 pb-1 text-xs font-semibold text-mute">Saved filters</div><div className="space-y-px px-2">{filters.map((f) => <Link key={f.id} href={`/search?q=${encodeURIComponent(f.query)}`} className={`${row} text-fg/80 hover:bg-raise/70`}><Icon name="search" size={16} className="text-mute" /><span className="truncate">{f.name}</span></Link>)}</div></div>}
-        <div className="group mt-4 flex items-center justify-between px-4"><span className="text-xs font-semibold text-mute">Projects</span>
-          <button onClick={() => setAdding((a) => !a)} aria-label="New project" className="rounded p-0.5 text-mute opacity-0 transition hover:bg-raise hover:text-fg group-hover:opacity-100 focus:opacity-100"><Icon name={adding ? "x" : "plus"} size={14} /></button></div>
-        <div className="mt-1 space-y-px px-2">
-          {adding && (
-            <form action={async (fd) => { await addProject(fd); setAdding(false); }} className="mb-1 flex gap-1.5 px-1">
-              <input name="name" required autoFocus placeholder="Project name" className="field !py-1" />
-              <input type="color" name="color" defaultValue="#1877f2" aria-label="Colour" className="h-8 w-9 shrink-0 cursor-pointer rounded-md border bg-transparent p-0.5" />
-            </form>
-          )}
-          {projects.map((p) => {
-            const on = path === `/projects/${p.id}`;
-            return (
-              <Link key={p.id} href={`/projects/${p.id}`} className={`${row} ${on ? "bg-raise font-medium" : "text-fg/80 hover:bg-raise/70"}`}>
-                <ProjectAvatar name={p.name} color={p.color} /><span className="flex-1 truncate">{p.name}</span>{p.open > 0 && <span className="text-xs text-dim">{p.open}</span>}
-              </Link>
-            );
-          })}
-          {!projects.length && !adding && <p className="px-2 py-1 text-xs text-dim">No projects yet.</p>}
-        </div>
+        {filters.length > 0 && <div className="mt-3"><button onClick={() => toggle("filters")} aria-expanded={!collapsed.includes("filters")} className="mx-3 flex items-center gap-1 rounded px-1 py-0.5 text-xs font-semibold text-mute hover:bg-raise hover:text-fg">{chev(!collapsed.includes("filters"))}Saved filters</button>{!collapsed.includes("filters") && <div className="mt-1 space-y-px px-2">{filters.map((f) => <Link key={f.id} href={`/search?q=${encodeURIComponent(f.query)}`} className={`${row} text-fg/80 hover:bg-raise/70`}><Icon name="search" size={16} className="text-mute" /><span className="truncate">{f.name}</span></Link>)}</div>}</div>}
       </div>
       <div className="space-y-px border-t px-2 py-2">
         <Link href="/settings" className={`${row} ${path === "/settings" ? "bg-raise font-medium" : "text-fg/80 hover:bg-raise/70"}`}><Icon name="settings" size={17} className="text-mute" />Settings</Link>

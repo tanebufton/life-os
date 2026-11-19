@@ -43,15 +43,15 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   const sort = sp.sort ?? "due", dir = sp.dir ?? "asc";
   const dueSoon = [...open].sort((a, b) => (a.due ?? "9999").localeCompare(b.due ?? "9999")).slice(0, 6);
   return (
-    <div>
+    <div className="proj">
       <div className="rise flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3"><ProjectAvatar name={p.name} color={p.color} size={36} />
           <div className="min-w-0"><h1 className="truncate text-[26px] font-bold leading-tight tracking-tight">{p.name}</h1>
             <p className="text-[13px] text-mute">{projectKey(p.name)} · {open.length} open{hasCustomColumns(id) ? " · own board columns" : ""}</p></div></div>
-        <div className="flex items-center gap-2"><form action={archiveProject.bind(null, id)}><button className="btn text-mute hover:!text-danger">Archive</button></form></div>
+        <div className="flex flex-wrap items-center gap-2"><ProjectEditor id={id} name={p.name} color={p.color} /><form action={archiveProject.bind(null, id)}><button className="btn text-mute hover:!text-danger">Archive</button></form></div>
       </div>
-      <div className="mt-3"><ProjectEditor id={id} name={p.name} color={p.color} /></div>
-      <nav aria-label="Project views" className="mb-6 flex gap-0.5 overflow-x-auto border-b">
+      <div className="mb-5 mt-1 hidden md:block" />
+      <nav aria-label="Project views" className="ptabs mb-6 flex gap-0.5 overflow-x-auto border-b md:hidden">
         {tabs.map((t) => { const on = t.k === tab; return (
           <Link key={t.k} href={t.k === "overview" ? base : href(t.k)} aria-current={on ? "page" : undefined} className={`-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-[14px] ${on ? "border-accent font-medium text-fg" : "border-transparent text-mute hover:text-fg"}`}>
             <Icon name={t.icon} size={15} className={on ? "text-accent" : ""} />{t.label}{t.n ? <span className="text-xs text-dim">{t.n}</span> : null}</Link>); })}
