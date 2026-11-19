@@ -5,6 +5,9 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { addSubtask, deleteTaskInline, duplicateTaskAction, patchTask, restoreTaskAction, startFocus, toggleTask } from "@/lib/actions";
 import { Icon } from "./Icon";
+import { MarkdownField } from "./mdfield";
+import { ago, clearDraft, peekDraft } from "@/lib/drafts";
+import { RestoreBanner, useSession } from "./session";
 
 export type EditorTask = { id: number; title: string; notes: string; status: "todo" | "doing" | "done"; priority: number; project_id: number | null; due: string | null; due_time: string | null; estimate: number | null; repeat: string; tags: string };
 const parseEst = (s: string): number | null | undefined => { const m = s.trim().toLowerCase().match(/^(\d+(?:\.\d+)?)\s*(h|hr|hrs|m|min|mins)?$/); if (!s.trim()) return null; if (!m) return undefined; const n = parseFloat(m[1]); return Math.max(1, Math.round(m[2]?.startsWith("h") ? n * 60 : n)); };
@@ -17,18 +20,25 @@ const Prop = ({ icon, label, children }: { icon: string; label: string; children
 export function TaskEditor({ task, projects, focus, children }: { task: EditorTask; projects: { id: number; name: string }[]; focus: boolean; children?: React.ReactNode }) {
   const router = useRouter();
   const [v, setV] = useState(task), [est, setEst] = useState(task.estimate ? `${task.estimate}m` : ""), [state, setState] = useState<"idle" | "saving" | "saved" | string>("idle");
-  const timer = useRef<ReturnType<typeof setTimeout>>(undefined), pending = useRef<Record<string, unknown>>({});
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined), pending = useRef<Record<string, unknown>>({}), unsaved = useRef<Record<string, unknown>>({});
+  const { guarded } = useSession(), dkey = `task:${task.id}`, [found, setFound] = useState<{ value: Record<string, unknown>; at: number } | null>(null);
   useEffect(() => () => clearTimeout(timer.current), []);
+  useEffect(() => { const d = peekDraft<Record<string, unknown>>(dkey); if (d && Object.keys(d.value ?? {}).length) setFound(d); }, [dkey]);
   const flush = async () => {
     const p = pending.current; pending.current = {}; if (!Object.keys(p).length) return;
-    setState("saving"); const r = await patchTask(task.id, p);
-    setState(r.ok ? "saved" : r.error);
+    Object.assign(unsaved.current, p); setState("saving");
+    const g = await guarded(dkey, unsaved.current, () => patchTask(task.id, { ...unsaved.current }), () => { unsaved.current = {}; setState("saved"); });
+    if (g.saved) { unsaved.current = {}; setState("saved"); }
+    else if (g.reason && g.reason !== "error") setState("Not saved yet. Kept safely in this browser");
+    else setState((g.result as { error?: string } | undefined)?.error ?? "Couldn't save. Try again");
   };
   const save = (patch: Record<string, unknown>, delay = 0) => { Object.assign(pending.current, patch); clearTimeout(timer.current); timer.current = setTimeout(() => void flush(), delay); };
   const set = <K extends keyof EditorTask>(k: K, val: EditorTask[K]) => setV((s) => ({ ...s, [k]: val }));
   const err = state !== "idle" && state !== "saving" && state !== "saved";
+  const restore = () => { if (!found) return; const p = found.value; setV((s) => ({ ...s, ...(p as Partial<EditorTask>), repeat: p.repeat === undefined ? s.repeat : String(p.repeat ?? ""), tags: p.tags === undefined ? s.tags : String(p.tags ?? "") })); if (typeof p.estimate === "number") setEst(`${p.estimate}m`); save(p); setFound(null); };
   return (
     <>
+      {found && <RestoreBanner at={ago(found.at)} what="edits to this task" onRestore={restore} onDiscard={() => { clearDraft(dkey); setFound(null); }} />}
       <div className="mb-1 flex h-5 items-center justify-end text-xs text-dim" aria-live="polite">{state === "saving" ? "Saving…" : state === "saved" ? <span className="inline-flex items-center gap-1 text-ok"><Icon name="check" size={12} />Saved</span> : err ? <span className="text-danger">{state}</span> : ""}</div>
       <input value={v.title} onChange={(e) => { set("title", e.target.value); if (e.target.value.trim()) save({ title: e.target.value }, 700); }} onBlur={() => void flush()} aria-label="Title"
         className="mb-5 w-full rounded-md bg-transparent px-1 py-1 text-[30px] font-bold leading-tight tracking-tight outline-none hover:bg-raise/60 focus:bg-raise/60" />
@@ -42,8 +52,7 @@ export function TaskEditor({ task, projects, focus, children }: { task: EditorTa
         <Prop icon="repeat" label="Repeat"><input value={v.repeat} onChange={(e) => set("repeat", e.target.value)} onBlur={() => { save({ repeat: v.repeat.trim() || null }); void flush(); }} placeholder="Doesn't repeat (try: weekly, every 2 weeks)" className="ghost max-w-md" /></Prop>
         <Prop icon="inbox" label="Tags"><input value={v.tags} onChange={(e) => set("tags", e.target.value)} onBlur={() => { save({ tags: v.tags }); void flush(); }} placeholder="Add tags, separated by spaces" className="ghost max-w-md" /></Prop>
       </div>
-      <textarea value={v.notes} onChange={(e) => { set("notes", e.target.value); save({ notes: e.target.value }, 800); }} onBlur={() => void flush()} rows={8} placeholder="Add notes… links are picked up automatically"
-        className="ghost mt-4 min-h-40 resize-y !px-1 !py-2 text-[15px] leading-relaxed" />
+      <MarkdownField className="mt-4" value={v.notes} onChange={(x) => { set("notes", x); save({ notes: x }, 800); }} onBlur={() => void flush()} rows={8} label="Notes" placeholder="Add notes. Markdown works: **bold**, lists, checklists. Links are picked up automatically." defaultMode={v.notes ? "view" : "edit"} />
       {children}
       <div className="mt-6 flex flex-wrap items-center gap-2 border-t pt-4">
         {focus && <button className="btn" onClick={async () => { await startFocus(task.id); router.push(`/focus?task=${task.id}`); }}><Icon name="focus" size={15} className="text-accent" />Start focus</button>}

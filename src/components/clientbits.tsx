@@ -5,6 +5,9 @@ import { Icon } from "./Icon";
 import { aiAccept, aiApplyPlan, aiAsk, aiExtract, aiPlan, autoScheduleAction, saveNoteAction } from "@/lib/actions3";
 import type { Plan, Proposal } from "@/lib/ai";
 import { renderMarkdown } from "@/lib/markdown";
+import { ago, clearDraft, peekDraft } from "@/lib/drafts";
+import { RestoreBanner, useSession } from "./session";
+import { MarkdownField } from "./mdfield";
 
 export function AutoSchedule({ date }: { date: string }) {
   const [p, go] = useTransition();
@@ -13,18 +16,21 @@ export function AutoSchedule({ date }: { date: string }) {
 
 /** Markdown note editor: autosaves, with an edit/preview toggle. Preview HTML is rendered on the server and passed in. */
 export function NoteEditor({ id, title, body, links }: { id: number; title: string; body: string; links: Record<string, number> }) {
-  const [t, setT] = useState(title), [b, setB] = useState(body), [saved, setSaved] = useState<"saved" | "saving" | "err">("saved"), [mode, setMode] = useState<"edit" | "view">(body ? "view" : "edit");
-  const first = useRef(true), timer = useRef<ReturnType<typeof setTimeout>>(undefined), [err, setErr] = useState("");
-  useEffect(() => { if (first.current) { first.current = false; return; } setSaved("saving"); clearTimeout(timer.current); timer.current = setTimeout(async () => { const r = await saveNoteAction(id, { title: t, body: b }); setSaved(r.ok ? "saved" : "err"); setErr(r.ok ? "" : r.error); }, 600); return () => clearTimeout(timer.current); }, [t, b, id]);
+  const { guarded } = useSession(), key = `note:${id}`;
+  const [t, setT] = useState(title), [b, setB] = useState(body), [saved, setSaved] = useState<"saved" | "saving" | "kept" | "err">("saved");
+  const first = useRef(true), timer = useRef<ReturnType<typeof setTimeout>>(undefined), [err, setErr] = useState(""), [found, setFound] = useState<{ value: { title: string; body: string }; at: number } | null>(null);
+  useEffect(() => { const d = peekDraft<{ title: string; body: string }>(key); if (d && (d.value.title !== title || d.value.body !== body)) setFound(d); else if (d) clearDraft(key); }, [key, title, body]);
+  useEffect(() => {
+    if (first.current) { first.current = false; return; } setSaved("saving"); clearTimeout(timer.current);
+    timer.current = setTimeout(async () => { const g = await guarded(key, { title: t, body: b }, () => saveNoteAction(id, { title: t, body: b }), () => setSaved("saved")); if (g.saved) { setSaved("saved"); setErr(""); } else if (g.reason && g.reason !== "error") setSaved("kept"); else { setSaved("err"); setErr((g.result as { error?: string } | undefined)?.error ?? "Couldn't save"); } }, 600);
+    return () => clearTimeout(timer.current);
+  }, [t, b, id, key, guarded]);
   return (
     <div>
+      {found && <RestoreBanner at={ago(found.at)} what="edits to this note" onRestore={() => { setT(found.value.title); setB(found.value.body); setFound(null); }} onDiscard={() => { clearDraft(key); setFound(null); }} />}
       <input value={t} onChange={(e) => setT(e.target.value)} placeholder="Untitled" aria-label="Title" className="w-full bg-transparent text-[28px] font-bold tracking-tight outline-none placeholder:text-dim md:text-[32px]" />
-      <div className="mb-3 mt-2 flex items-center gap-3 text-xs text-mute">
-        <div className="inline-flex rounded-md border p-0.5">{(["edit", "view"] as const).map((m) => <button key={m} onClick={() => setMode(m)} className={`rounded px-2.5 py-1 ${mode === m ? "bg-raise font-medium text-fg" : ""}`}>{m === "edit" ? "Write" : "Preview"}</button>)}</div>
-        <span>{saved === "saving" ? "Saving…" : saved === "err" ? <span className="text-danger">{err || "Couldn't save"}</span> : "Saved"}</span>
-      </div>
-      {mode === "edit" ? <textarea value={b} onChange={(e) => setB(e.target.value)} placeholder={"Write in Markdown. Link notes with [[Note title]]."} aria-label="Note body" className="field min-h-[50vh] w-full resize-y font-mono text-[13.5px] leading-relaxed" />
-        : <article className="prose-note" dangerouslySetInnerHTML={{ __html: renderMarkdown(b, (x) => links[x.toLowerCase()] ?? null) || "<p class=\"text-mute\">Nothing here yet.</p>" }} />}
+      <div className="mb-3 mt-2 h-4 text-xs text-mute" aria-live="polite">{saved === "saving" ? "Saving…" : saved === "kept" ? <span className="text-warn">Not saved yet. Kept safely in this browser</span> : saved === "err" ? <span className="text-danger">{err || "Couldn't save"}</span> : "Saved"}</div>
+      <MarkdownField value={b} onChange={setB} links={links} label="Note body" rows={18} defaultMode={body ? "view" : "edit"} placeholder="Write in Markdown. Link notes with [[Note title]]." />
     </div>
   );
 }

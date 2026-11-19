@@ -6,6 +6,8 @@ import { fmtMoney, parseMoneyQuick } from "@/lib/moneyfmt";
 import { fmtMinutes, fmtTime, nice } from "@/lib/dates";
 import { describeRepeat, parseQuickAdd } from "@/lib/parse";
 import { Icon } from "./Icon";
+import { clearDraft as dropDraft, peekDraft as getDraft } from "@/lib/drafts";
+import { useSession } from "./session";
 import { Pill } from "./Pill";
 
 const SYNTAX: [string, string][] = [["#tag", "label it"], ["@project", "file it in a project"], ["!high  !low  !doing", "priority or status"], ["tomorrow · friday · in 3 days", "due date"], ["daily · weekdays · every 2 weeks", "repeat"]];
@@ -40,11 +42,19 @@ function Preview({ v, parsed, today, empty, mq, cur }: { v: string; parsed: Retu
 export type MoneyCtx = { cats: string[]; currency: string } | null;
 export function CaptureForm({ today, variant, onDone, money }: { today: string; variant: "pill" | "sheet"; onDone?: () => void; money?: MoneyCtx }) {
   const [v, setV] = useState(""), [focus, setFocus] = useState(false), [ok, setOk] = useState(false);
+  const { guarded } = useSession(), dk = `capture:${variant}`;
+  useEffect(() => { const d = getDraft<string>(dk); if (d?.value?.trim()) setV(d.value); }, [dk]);
+  useEffect(() => { if (v.trim()) { try { localStorage.setItem(`lifeos:draft:${dk}`, JSON.stringify({ value: v, at: Date.now() })); } catch { /* ignore */ } } else dropDraft(dk); }, [v, dk]);
   const pid = usePathname().match(/^\/projects\/(\d+)/)?.[1];
   const parsed = useMemo(() => { if (!v.trim()) return null; try { return parseQuickAdd(v, today); } catch { return null; } }, [v, today]);
   const sheet = variant === "sheet";
   const mq = money ? parseMoneyQuick(v, today, money.cats) : null;
-  const action = async (fd: FormData) => { if (mq) { await quickSpend(v); setV(""); setOk(true); setTimeout(() => setOk(false), 1800); onDone?.(); return; } if (!parsed?.title) return; await quickAdd(fd); setV(""); setOk(true); setTimeout(() => setOk(false), 1800); onDone?.(); };
+  const action = async (fd: FormData) => {
+    if (!mq && !parsed?.title) return;
+    const g = await guarded(`capture-save:${dk}`, v, async () => { if (mq) await quickSpend(v); else await quickAdd(fd); });
+    if (!g.saved) return; // text stays in the box (and in local storage) until it really saved
+    setV(""); setOk(true); setTimeout(() => setOk(false), 1800); onDone?.();
+  };
 
   return (
     <form className="relative" action={action}>

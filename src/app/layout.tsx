@@ -1,5 +1,6 @@
 import "@fontsource-variable/inter";
 import { Toaster } from "sonner";
+import { SessionProvider } from "@/components/session";
 import "./globals.css";
 import { CaptureFab } from "@/components/capture";
 import { ListKeys, ShortcutsHelp } from "@/components/keys";
@@ -32,6 +33,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" data-theme="light" suppressHydrationWarning>
       <head><script dangerouslySetInnerHTML={{ __html: "try{var t=localStorage.getItem('lifeos.theme');if(!t)t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.dataset.theme=t}catch(e){}" }} /></head>
       <body>
+        <SessionProvider>
         <div className="flex h-dvh">
           <Sidebar counts={counts} projects={projects} features={features} filters={listFilters()} />
           <div className="flex min-w-0 flex-1 flex-col">
@@ -44,6 +46,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <MobileNav counts={counts} tabs={resolveTabs(getSetting("mobile_tabs"), features)} />
         <PwaRegister />
         <CaptureFab today={t} money={money} />
+        </SessionProvider>
         <Toaster position="bottom-center" offset={{ bottom: 88 }} mobileOffset={{ bottom: 140 }} toastOptions={{ style: { background: "rgb(var(--panel))", color: "rgb(var(--fg))", border: "1px solid rgb(var(--line) / .12)", borderRadius: 12, fontFamily: "inherit" } }} />
         <Palette projects={projects} features={features} />
         <Hotkeys features={features} />
