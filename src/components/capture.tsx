@@ -98,14 +98,14 @@ function QuickSheet({ today, projects, onDone }: { today: string; projects: Proj
     setBusy(false); if (g.saved) onDone();
   };
   const effDue = parsed?.due ?? due, pname = projects.find((p) => String(p.id) === proj)?.name;
-  const chip = (on: boolean) => `inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3 text-[13px] ${on ? "border-accent/40 bg-accent/10 text-accent" : "text-mute"}`;
+  const chip = (on: boolean) => `inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-full text-[13px] ${on ? "bg-accent/10 px-3 text-accent" : "w-10 text-mute hover:bg-raise"}`;
   const item = "flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-[14px] hover:bg-raise";
   return (
     <form ref={formRef} action={submit}>
       <input type="hidden" name="due" value={due} /><input type="hidden" name="priority" value={prio} /><input type="hidden" name="tags" value={tags} /><input type="hidden" name="project_id" value={proj} />
-      <input name="text" value={v} onChange={(e) => setV(e.target.value)} autoFocus autoComplete="off" enterKeyHint="done" aria-label="Task title" placeholder="What needs doing?" className="w-full bg-transparent py-1 text-[17px] font-medium outline-none placeholder:text-dim" />
-      <textarea name="notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} aria-label="Notes" placeholder="Notes" className="mt-1 w-full resize-none bg-transparent text-[14px] outline-none placeholder:text-dim" />
-      {parsed?.title && (parsed.due || parsed.tags || parsed.project || parsed.estimate || parsed.repeat || parsed.priority) ? <div className="mb-1"><Preview parsed={parsed} today={today} empty={false} /></div> : <p className="mb-1 text-[12px] text-dim">Tip: type “call mum friday #family !high” and the details are picked out for you.</p>}
+      <input name="text" value={v} onChange={(e) => setV(e.target.value)} autoFocus autoComplete="off" enterKeyHint="done" aria-label="Task title" placeholder="What needs doing?" className="w-full bg-transparent py-1.5 text-[18px] font-medium outline-none placeholder:text-dim" />
+      <textarea name="notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={1} aria-label="Notes" placeholder="Add notes" onInput={(e) => { const t = e.currentTarget; t.style.height = "auto"; t.style.height = Math.min(t.scrollHeight, 120) + "px"; }} className="w-full resize-none bg-transparent py-1 text-[14px] outline-none placeholder:text-dim" />
+      {parsed?.title && (parsed.due || parsed.tags || parsed.project || parsed.estimate || parsed.repeat || parsed.priority) ? <div className="mb-1"><Preview parsed={parsed} today={today} empty={false} /></div> : null}
       {pop && <div className="mb-2 rounded-xl border bg-panel p-1.5 shadow-lg">
         {pop === "date" && <>{([["Today", 0], ["Tomorrow", 1], ["Next week", 7]] as const).map(([l, n]) => <button type="button" key={l} className={item} onClick={() => { setDue(addDays(today, n)); setPop(null); }}><Icon name="calendar" size={15} className="text-mute" />{l}<span className="ml-auto text-xs text-dim">{nice(addDays(today, n)).split(", ")[0]}</span></button>)}
           <label className={`${item} cursor-pointer`}><Icon name="calendar" size={15} className="text-mute" />Pick a date…<input type="date" value={due} onChange={(e) => { setDue(e.target.value); setPop(null); }} className="ml-auto bg-transparent text-sm" /></label>
@@ -114,12 +114,12 @@ function QuickSheet({ today, projects, onDone }: { today: string; projects: Proj
         {pop === "proj" && <div className="max-h-56 overflow-y-auto"><button type="button" className={`${item} ${!proj ? "font-medium text-accent" : ""}`} onClick={() => { setProj(""); setPop(null); }}><Icon name="inbox" size={15} className="text-mute" />Inbox</button>{projects.map((p) => <button type="button" key={p.id} className={`${item} ${String(p.id) === proj ? "font-medium text-accent" : ""}`} onClick={() => { setProj(String(p.id)); setPop(null); }}><span className="h-2.5 w-2.5 rounded-full" style={{ background: p.color }} />{p.name}</button>)}</div>}
         {pop === "tag" && <div className="p-1.5"><input autoFocus value={tags} onChange={(e) => setTags(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); setPop(null); } }} placeholder="Tags, separated by spaces" aria-label="Tags" className="field" /></div>}
       </div>}
-      <div className="flex items-center gap-2">
-        <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto pb-0.5">
-        <button type="button" onClick={() => setPop(pop === "date" ? null : "date")} aria-label="Date" className={chip(!!effDue)}><Icon name="calendar" size={15} />{effDue ? (effDue === today ? "Today" : nice(effDue).split(", ")[1] ?? nice(effDue)) : "Date"}</button>
-        <button type="button" onClick={() => setPop(pop === "prio" ? null : "prio")} aria-label="Priority" className={chip(prio !== 0 || !!parsed?.priority)}><Icon name="flag" size={15} />{prio > 0 ? "High" : prio < 0 ? "Low" : "Priority"}</button>
-        <button type="button" onClick={() => setPop(pop === "tag" ? null : "tag")} aria-label="Tags" className={chip(!!tags.trim())}><Icon name="tag" size={15} />{tags.trim() ? tags.trim().split(/\s+/).slice(0, 2).join(" ") : "Tag"}</button>
-        <button type="button" onClick={() => setPop(pop === "proj" ? null : "proj")} aria-label="Project" className={chip(!!proj)}><Icon name="list" size={15} /><span className="max-w-[7rem] truncate">{pname ?? "Inbox"}</span></button>
+      <div className="mt-1 flex items-center gap-2">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-0.5">
+        <button type="button" onClick={() => setPop(pop === "date" ? null : "date")} aria-label="Date" className={chip(!!effDue)}><Icon name="calendar" size={15} />{effDue ? (effDue === today ? "Today" : nice(effDue).split(", ")[1] ?? nice(effDue)) : null}</button>
+        <button type="button" onClick={() => setPop(pop === "prio" ? null : "prio")} aria-label="Priority" className={chip(prio !== 0 || !!parsed?.priority)}><Icon name="flag" size={15} />{prio > 0 ? "High" : prio < 0 ? "Low" : null}</button>
+        <button type="button" onClick={() => setPop(pop === "tag" ? null : "tag")} aria-label="Tags" className={chip(!!tags.trim())}><Icon name="tag" size={15} />{tags.trim() ? tags.trim().split(/\s+/).slice(0, 2).join(" ") : null}</button>
+        <button type="button" onClick={() => setPop(pop === "proj" ? null : "proj")} aria-label="Project" className={chip(!!proj)}><Icon name="list" size={15} />{pname && <span className="max-w-[7rem] truncate">{pname}</span>}</button>
         </div>
         <span className="flex shrink-0 items-center gap-1.5">
           <Mic onStart={() => { base.current = vRef.current.trim(); }} onChange={(t) => setV((base.current ? base.current + " " : "") + t)} onDone={() => { setTimeout(() => formRef.current?.requestSubmit(), 60); }} />
