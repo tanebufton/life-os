@@ -4,6 +4,7 @@ import { BoardFilters } from "@/components/boardfilters";
 import { FilterChip } from "@/components/chip";
 import { ColumnsEditor, DoneWindow } from "@/components/columns";
 import { getSetting } from "@/lib/settings";
+import { Icon } from "@/components/Icon";
 import { Panel } from "@/components/Panel";
 import { db, Project } from "@/lib/db";
 import { hasCustomColumns, listStatuses } from "@/lib/statuses";
@@ -14,9 +15,10 @@ export type BoardParams = { project?: string; columns?: string; done?: string; q
 /** The board itself (filters, columns, cards). Used by /board and by the Board tab inside a project. `base` is the page it sits on. */
 export function BoardView({ sp, lockProject, base }: { sp: BoardParams; lockProject?: number; base: string; extra?: string; actions?: (columnsHref: string) => React.ReactNode }) {
   const project = lockProject ?? (Number(sp.project) || undefined);
-  const projects = db.prepare("SELECT * FROM projects WHERE archived=0 ORDER BY name").all() as Project[];
+  const projects = db.prepare("SELECT * FROM projects WHERE archived=0 ORDER BY area='', area COLLATE NOCASE, position, name COLLATE NOCASE").all() as Project[];
   const current = project ? projects.find((p) => p.id === project) : undefined, pid = current ? current.id : null;
   const columns = listStatuses(pid), custom = hasCustomColumns(pid);
+  const columnsHref = lockProject === undefined ? `/board?${pid ? `project=${pid}&` : ""}columns=${sp.columns ? "" : "1"}`.replace(/[?&]$/, "") : sp.columns ? base : `${base}${base.includes("?") ? "&" : "?"}columns=1`;
   // "All projects" shows the default columns. Projects with their own columns have their own board, linked below.
   const own = projects.filter((p) => hasCustomColumns(p.id));
   const keep = (t: { project_id: number | null }) => (pid !== null ? true : !t.project_id || !own.some((p) => p.id === t.project_id));
@@ -39,7 +41,7 @@ export function BoardView({ sp, lockProject, base }: { sp: BoardParams; lockProj
       </div>}
       {sp.columns && <Panel title={current ? `Columns for ${current.name}` : "Default columns"} i={0} className="mb-4 max-w-3xl"><ColumnsEditor projectId={pid} projectName={current?.name} columns={columns} custom={custom} counts={counts} /></Panel>}
       {lockProject === undefined && pid === null && own.length > 0 && <p className="mb-3 text-xs text-mute">These projects have their own columns, so they aren&apos;t shown here: {own.map((p, i) => <span key={p.id}>{i ? ", " : ""}<Link href={`/board?project=${p.id}`} className="text-accent hover:underline">{p.name}</Link></span>)}.</p>}
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-x-6 gap-y-2"><BoardFilters tags={allTags} /><DoneWindow days={days} showingAll={showAll} base={lockProject === undefined ? `/board${pid ? `?project=${pid}` : ""}` : base} /></div>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-x-6 gap-y-2"><BoardFilters tags={allTags} /><div className="flex items-center gap-4"><DoneWindow days={days} showingAll={showAll} base={lockProject === undefined ? `/board${pid ? `?project=${pid}` : ""}` : base} /><Link href={columnsHref} aria-pressed={!!sp.columns} className={`btn ${sp.columns ? "!border-accent/40 !bg-accent/10 !text-accent" : ""}`}><Icon name="settings" size={14} />Columns</Link></div></div>
       <Board columns={columns} cards={cards} today={today()} projectId={pid} hiddenNote={hidden > 0 ? <p className="mt-2 px-2 text-xs text-dim">{hidden} older finished card{hidden === 1 ? "" : "s"} hidden. <Link className="text-accent hover:underline" href={lockProject === undefined ? `/board?${pid ? `project=${pid}&` : ""}done=all` : `${base}${base.includes("?") ? "&" : "?"}done=all`}>Show all</Link></p> : null} />
     </>
   );

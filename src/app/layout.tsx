@@ -6,6 +6,8 @@ import { CaptureFab } from "@/components/capture";
 import { ListKeys, ShortcutsHelp } from "@/components/keys";
 import { Palette } from "@/components/palette";
 import { PwaRegister } from "@/components/pwa";
+import { ReminderWatcher } from "@/components/reminderwatcher";
+import { browserNotifyConfig } from "@/lib/browsernotify";
 import { listFilters } from "@/lib/misc";
 import { listFavourites } from "@/lib/favourites";
 import { parsePrefs } from "@/lib/sidebar";
@@ -28,7 +30,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const features = featureMap();
   const money = features.money ? { cats: listCategories("expense").map((c) => c.name), currency: currency() } : null;
   const projects = db.prepare(`SELECT p.id, p.name, p.color, p.icon, p.area, (SELECT count(*) FROM tasks k WHERE k.project_id=p.id AND k.done_at IS NULL AND k.deleted_at IS NULL AND k.parent_id IS NULL) AS open
-    FROM projects p WHERE p.archived=0 ORDER BY p.area='', p.area COLLATE NOCASE, p.name COLLATE NOCASE`).all() as NavProject[];
+    FROM projects p WHERE p.archived=0 ORDER BY p.area='', p.area COLLATE NOCASE, p.position, p.name COLLATE NOCASE`).all() as NavProject[];
   const counts = db.prepare(`SELECT
     count(CASE WHEN due IS NOT NULL AND due<=? THEN 1 END) AS due, count(*) AS open, count(CASE WHEN status IN (SELECT key FROM statuses WHERE kind='doing') THEN 1 END) AS doing,
     count(CASE WHEN project_id IS NULL AND due IS NULL THEN 1 END) AS inbox
@@ -49,6 +51,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </div>
         <MobileNav counts={counts} tabs={resolveTabs(getSetting("mobile_tabs"), features)} />
         <PwaRegister />
+        <ReminderWatcher enabled={features.reminders && browserNotifyConfig().on} />
         <CaptureFab today={t} money={money} />
         </SessionProvider>
         <Toaster position="bottom-center" offset={{ bottom: 88 }} mobileOffset={{ bottom: 140 }} toastOptions={{ style: { background: "rgb(var(--panel))", color: "rgb(var(--fg))", border: "1px solid rgb(var(--line) / .12)", borderRadius: 12, fontFamily: "inherit" } }} />

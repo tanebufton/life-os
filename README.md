@@ -62,13 +62,31 @@ quick-add syntax (`Pay rent every month #bills @home !high 31 march at 9am ~30m`
 - Edit conflicts on notes are detected across devices (keep mine / use theirs / keep both)
 - Mobile board column tabs; sidebar editing in Settings
 
+## More
+
+- Settings are organised into tabs (General, Reminders, Connections, Data & backup). The Chrome extension can be downloaded from Settings → Connections, with a default project for its voice memos.
+- Projects open to a view you choose (e.g. Board), can be reordered by dragging within their area, and tasks can be dragged onto a project in the sidebar to move them.
+- Voice memos live in the Inbox (a tab), and are filed under a project when recorded inside one. Planner is reachable from Today's Timeline button.
+- Browser reminders: while LifeOS is open, timed tasks pop up a notification with Mark done and Snooze (15 minutes by default).
+- Subscriptions: weekly, fortnightly, monthly, quarterly, half-yearly and yearly; a Pay run lists the charges in a week, fortnight, month or year so you can tick off what you've paid.
+
 ## Projects, layout
 
 Each project is its own workspace with tabs: Overview, List, Board, Table, Notes, Voice memos and Goals, all filtered to that project. Anything recorded or created inside a project is filed under it. The sidebar can be hidden with the button in the top bar (or `[`), and boards, tables, projects and the week view use the full width.
 
 ## Upgrading
 
-`git pull` then `docker compose --profile mcp up -d --build`. Run `npm test` first if you want to check a change before deploying. Database changes are additive, and a copy of your database is saved next to it before any schema upgrade (currently schema v5).
+Run `./update.sh` in your checkout. It pulls, builds the image once (web, worker and MCP share it), restarts what changed and tidies old images. Database changes are additive, and a copy of your database is saved next to it before any schema upgrade (currently schema v7).
+
+Builds reuse a compile cache, so the first one after this change is slow (several minutes on a small machine) and later ones are much quicker. If it is still slow, `docker compose build --progress=plain web` shows which step takes the time.
+
+**Fastest of all: run it without Docker.** On a small machine most of the time is Docker re-exporting the image, not compiling. Running the app directly keeps Next.js's build cache in the folder, so an update is usually under a minute:
+
+```
+git pull && npm ci && npm run build && sudo systemctl restart lifeos lifeos-worker lifeos-mcp
+```
+
+(or `pm2 restart all`). You'd run `npm start`, `npm run worker` and `npm run mcp` under systemd or pm2, with the same `.env`. Keep using Docker if you prefer the isolation.
 
 ## Integrations
 | What | How |

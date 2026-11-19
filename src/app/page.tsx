@@ -24,7 +24,7 @@ export default function Today() {
   const toDo = open.filter((x) => x.due && x.due <= t).length;
   const planned = open.filter((x) => x.due && x.due <= t).reduce((n, x) => n + (x.estimate ?? 0), 0);
   const widgets = resolveWidgets(getSetting("today_widgets"), isOn);
-  const emailNew = open.filter((x) => x.source === "email" && !x.due && !x.project_id).length;
+  const emailNew = f.email ? open.filter((x) => x.source === "email" && !x.due && !x.project_id).length : 0;
   // Undated tasks are "To do": the same tasks that sit in the board's To do column. Only tasks with no project AND no date are unsorted "Inbox" items, which have their own page.
   const unsorted = open.filter((x) => !x.project_id && !x.due).length, undated = open.filter((x) => !x.due && x.status_kind === "todo").length;
   const groups = bucket(open).filter((g) => g.label !== "Later").map((g) => (g.label === "No date" ? { ...g, label: "To do", tasks: g.tasks.slice(0, 8) } : g));
@@ -32,7 +32,7 @@ export default function Today() {
   return (
     <>
       <PageHead title="Today" sub={<>{date} · {toDo ? `${toDo} ${toDo === 1 ? "task" : "tasks"} to do` : "nothing due"}</>}
-        right={f.review ? <Link href="/review" className="btn"><Icon name="review" size={15} className="text-accent" />Plan my day</Link> : undefined} />
+        right={<>{f.planner && <Link href="/planner" className="btn"><Icon name="planner" size={15} className="text-mute" />Timeline</Link>}{f.review && <Link href="/review" className="btn"><Icon name="review" size={15} className="text-accent" />Plan my day</Link>}</>} />
       {emailNew > 0 && (
         <Link href="/inbox" className="rise mb-5 flex items-center gap-3 rounded-xl border border-accent/30 bg-accent/5 px-4 py-3 text-[14px] hover:bg-accent/10">
           <Icon name="mail" size={18} className="text-accent" /><span><b>{emailNew}</b> new {emailNew === 1 ? "task" : "tasks"} from email waiting in your inbox</span><Icon name="arrow" size={15} className="ml-auto text-accent" /></Link>)}

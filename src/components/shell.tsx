@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { addProject } from "@/lib/actions";
-import { resetSidebarAction, saveSidebarAction } from "@/lib/actions5";
+import { moveTaskToProjectAction, reorderProjectsAction, resetSidebarAction, saveSidebarAction } from "@/lib/actions5";
 import type { Fav } from "@/lib/favourites";
 import { arrange, withVisibility, EMPTY_PREFS, type SidebarPrefs } from "@/lib/sidebar";
 import { toast } from "sonner";
@@ -49,6 +49,17 @@ export function Hotkeys({ features }: { features: Features }) {
 const row = "flex min-h-[30px] items-center gap-2.5 rounded-md px-2 text-[14px] transition-colors";
 export function Sidebar({ counts, projects, features, filters = [], favourites = [], prefs: savedPrefs = EMPTY_PREFS }: { counts: Counts; projects: NavProject[]; features: Features; filters?: { id: number; name: string; query: string }[]; favourites?: Fav[]; prefs?: SidebarPrefs }) {
   const path = usePathname(), sp = useSearchParams();
+  const router = useRouter(), [dropOn, setDropOn] = useState<number | null>(null);
+  const isTaskDrag = (e: React.DragEvent) => e.dataTransfer.types.includes("application/x-lifeos-task");
+  const isProjDrag = (e: React.DragEvent) => e.dataTransfer.types.includes("application/x-lifeos-project");
+  const [dragProj, setDragProj] = useState<number | null>(null), [before, setBefore] = useState<number | null>(null);
+  /** Drop a project onto another in the same area: it takes that spot and the rest shuffle down. */
+  const dropProject = (target: NavProject) => {
+    const from = projects.find((x) => x.id === dragProj); setBefore(null); setDragProj(null);
+    if (!from || from.id === target.id || (from.area ?? "") !== (target.area ?? "")) return;
+    const ids = projects.filter((x) => (x.area ?? "") === (from.area ?? "")).map((x) => x.id).filter((i) => i !== from.id); ids.splice(ids.indexOf(target.id), 0, from.id);
+    void reorderProjectsAction(ids).then((r) => { if (!r.ok) toast(r.error); router.refresh(); });
+  };
   const [collapsed, setCollapsed] = useState<string[]>(["life", "money", "explore", "filters"]);
   useEffect(() => { try { const v = localStorage.getItem("lifeos.sb.collapsed"); if (v) setCollapsed(JSON.parse(v)); } catch { /* keep defaults */ } }, []);
   const toggle = (k: string) => setCollapsed((c) => { const n = c.includes(k) ? c.filter((x) => x !== k) : [...c, k]; try { localStorage.setItem("lifeos.sb.collapsed", JSON.stringify(n)); } catch { /* ignore */ } return n; });
@@ -89,7 +100,7 @@ export function Sidebar({ counts, projects, features, filters = [], favourites =
   const projectNav = (pid: number) => {
     const tab = path === `/projects/${pid}` ? (sp.get("tab") ?? "overview") : "";
     const items = [["overview", "Overview", "today", true], ["list", "List", "list", true], ["board", "Board", "board", features.board], ["table", "Table", "grid", true], ["notes", "Notes", "notes", features.notes], ["memos", "Voice memos", "mic", features.voice], ["goals", "Goals", "goals", features.goals]] as const;
-    return <div className="mb-1 ml-[15px] space-y-px border-l pl-2">{items.filter((i) => i[3]).map(([k, label, icon]) => <Link key={k} href={k === "overview" ? `/projects/${pid}` : `/projects/${pid}?tab=${k}`} className={`${row} !min-h-[27px] text-[13px] ${tab === k || (k === "list" && tab === "tasks") ? "bg-raise font-medium" : "text-fg/75 hover:bg-raise/70"}`}><Icon name={icon} size={15} className={tab === k ? "text-accent" : "text-mute"} />{label}</Link>)}</div>;
+    return <div className="mb-1 ml-[15px] space-y-px border-l pl-2">{items.filter((i) => i[3]).map(([k, label, icon]) => <Link key={k} href={`/projects/${pid}?tab=${k}`} className={`${row} !min-h-[27px] text-[13px] ${tab === k || (k === "list" && tab === "tasks") ? "bg-raise font-medium" : "text-fg/75 hover:bg-raise/70"}`}><Icon name={icon} size={15} className={tab === k ? "text-accent" : "text-mute"} />{label}</Link>)}</div>;
   };
   const favSection = favourites.length > 0 ? (
     <div key="favs" className="mt-3">
@@ -116,7 +127,10 @@ export function Sidebar({ counts, projects, features, filters = [], favourites =
           return (
             <div key={p.id}>
               {showArea && <div className="px-2 pb-0.5 pt-2 text-[11px] font-medium uppercase tracking-wide text-dim">{p.area || "Other"}</div>}
-              <Link href={`/projects/${p.id}`} className={`${row} ${here && !sp.get("tab") ? "bg-raise font-medium" : here ? "font-medium" : "text-fg/80 hover:bg-raise/70"}`}>
+              <Link href={`/projects/${p.id}`} draggable onDragStart={(e) => { e.dataTransfer.setData("application/x-lifeos-project", String(p.id)); e.dataTransfer.effectAllowed = "move"; setDragProj(p.id); }} onDragEnd={() => { setDragProj(null); setBefore(null); }}
+                onDragOver={(e) => { if (isTaskDrag(e)) { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDropOn(p.id); } else if (isProjDrag(e) && dragProj !== null && dragProj !== p.id) { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setBefore(p.id); } }} onDragLeave={() => { setDropOn((d) => (d === p.id ? null : d)); setBefore((d) => (d === p.id ? null : d)); }}
+                onDrop={(e) => { if (isProjDrag(e)) { e.preventDefault(); dropProject(p); return; } if (!isTaskDrag(e)) return; e.preventDefault(); setDropOn(null); const id = Number(e.dataTransfer.getData("application/x-lifeos-task")); void moveTaskToProjectAction(id, p.id).then((r) => { toast(r.ok ? (r.message ?? "Moved") : r.error); router.refresh(); }); }}
+                className={`${row} ${before === p.id ? "shadow-[0_-2px_0_0_rgb(var(--accent))]" : ""} ${dragProj === p.id ? "opacity-40" : ""} ${dropOn === p.id ? "bg-accent/15 ring-2 ring-accent" : here && !sp.get("tab") ? "bg-raise font-medium" : here ? "font-medium" : "text-fg/80 hover:bg-raise/70"}`}>
                 <ProjectAvatar name={p.name} color={p.color} icon={p.icon} /><span className="flex-1 truncate">{p.name}</span>{p.open > 0 && <span className="text-xs text-dim">{p.open}</span>}
               </Link>
               {here && projectNav(p.id)}
@@ -129,7 +143,11 @@ export function Sidebar({ counts, projects, features, filters = [], favourites =
   );
   const sections = arranged.flatMap((g, gi) => {
     const visible = g.items.filter((i) => !i.hidden);
-    if (!editing && !visible.length) return g.key === "main" ? [favSection, projectsSection] : [];
+    if (g.key === "projects") return editing
+      ? [<div key="projects-edit" className="mt-3"><div className="flex items-center px-4 pb-1 text-xs font-semibold text-mute"><span className="flex-1">Projects &amp; favourites</span>
+          <button aria-label="Move projects up" onClick={() => bumpGroup(g.key, -1)} className="rounded p-0.5 hover:bg-raise"><Icon name="chevDown" size={13} className="rotate-180" /></button><button aria-label="Move projects down" onClick={() => bumpGroup(g.key, 1)} className="rounded p-0.5 hover:bg-raise"><Icon name="chevDown" size={13} /></button></div></div>, favSection, projectsSection]
+      : [favSection, projectsSection];
+    if (!editing && !visible.length) return [];
     const open = editing || !g.title || !collapsed.includes(g.key) || visible.some((i) => isActive(path, i.page.href));
     const out = (
       <div key={g.key} className={gi === 0 && !g.title ? "" : "mt-3"}>
@@ -139,7 +157,7 @@ export function Sidebar({ counts, projects, features, filters = [], favourites =
         {open && <div className="space-y-px px-2">{(editing ? g.items : visible).map((i) => (editing ? editRow(i.page, i.hidden, g.key) : link(i.page)))}</div>}
       </div>
     );
-    return g.key === "main" ? [out, favSection, projectsSection] : [out];
+    return [out];
   });
   return (
     <aside className="side hidden w-[260px] shrink-0 flex-col border-r bg-side md:flex">

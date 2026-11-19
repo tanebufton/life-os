@@ -3,12 +3,15 @@ import { addDays, addMonths, diffDays } from "./dates";
 import { addTransaction, createCategory, getCategory } from "./money";
 import { today } from "./time";
 
-export type Cycle = "weekly" | "monthly" | "quarterly" | "yearly";
+export type Cycle = "weekly" | "fortnightly" | "monthly" | "quarterly" | "halfyearly" | "yearly";
 export type Sub = { id: number; name: string; amount_cents: number; cycle: Cycle; next_due: string; category_id: number | null; url: string; notes: string; trial_ends: string | null; status: "active" | "paused" | "cancelled"; remind_days: number; auto_log: number; color: string; started: string | null; cancelled_at: string | null };
-export const CYCLES: Cycle[] = ["weekly", "monthly", "quarterly", "yearly"];
-export const stepDate = (d: string, c: Cycle) => (c === "weekly" ? addDays(d, 7) : c === "monthly" ? addMonths(d, 1) : c === "quarterly" ? addMonths(d, 3) : addMonths(d, 12));
+export const CYCLES: Cycle[] = ["weekly", "fortnightly", "monthly", "quarterly", "halfyearly", "yearly"];
+export const CYCLE_LABEL: Record<Cycle, string> = { weekly: "Weekly", fortnightly: "Fortnightly", monthly: "Monthly", quarterly: "Quarterly", halfyearly: "Half-yearly", yearly: "Yearly" };
+export const CYCLE_SHORT: Record<Cycle, string> = { weekly: "wk", fortnightly: "fortnight", monthly: "mo", quarterly: "qtr", halfyearly: "6 mo", yearly: "yr" };
+export const stepDate = (d: string, c: Cycle) => (c === "weekly" ? addDays(d, 7) : c === "fortnightly" ? addDays(d, 14) : c === "monthly" ? addMonths(d, 1) : c === "quarterly" ? addMonths(d, 3) : c === "halfyearly" ? addMonths(d, 6) : addMonths(d, 12));
+export const stepBack = (d: string, c: Cycle) => (c === "weekly" ? addDays(d, -7) : c === "fortnightly" ? addDays(d, -14) : c === "monthly" ? addMonths(d, -1) : c === "quarterly" ? addMonths(d, -3) : c === "halfyearly" ? addMonths(d, -6) : addMonths(d, -12));
 /** Average cost per month (weekly = 52/12 per month, yearly = 1/12). */
-export const monthlyCents = (s: { amount_cents: number; cycle: Cycle }) => Math.round(s.amount_cents * ({ weekly: 52 / 12, monthly: 1, quarterly: 1 / 3, yearly: 1 / 12 }[s.cycle]));
+export const monthlyCents = (s: { amount_cents: number; cycle: Cycle }) => Math.round(s.amount_cents * ({ weekly: 52 / 12, fortnightly: 26 / 12, monthly: 1, quarterly: 1 / 3, halfyearly: 1 / 6, yearly: 1 / 12 }[s.cycle]));
 export const yearlyCents = (s: { amount_cents: number; cycle: Cycle }) => monthlyCents(s) * 12;
 
 export const listSubs = (status?: Sub["status"]): Sub[] => db.prepare(`SELECT * FROM subscriptions ${status ? "WHERE status=?" : ""} ORDER BY status='cancelled', next_due, name`).all(...(status ? [status] : [])) as Sub[];
@@ -71,3 +74,38 @@ export function subReminders(t = today()): { key: string; title: string; body: s
   }
   return out;
 }
+
+// ---------- pay run: tick off the charges you've paid, per week, fortnight, month or year ----------
+export type Period = "week" | "fortnight" | "month" | "year";
+export const PERIODS: { k: Period; label: string }[] = [{ k: "week", label: "Week" }, { k: "fortnight", label: "Fortnight" }, { k: "month", label: "Month" }, { k: "year", label: "Year" }];
+/** The date range for a period containing `anchor` (weeks start on Monday). */
+export function periodRange(period: Period, anchor: string): { from: string; to: string } {
+  if (period === "week") { const wd = (new Date(anchor + "T00:00:00Z").getUTCDay() + 6) % 7, from = addDays(anchor, -wd); return { from, to: addDays(from, 6) }; }
+  if (period === "fortnight") return { from: anchor, to: addDays(anchor, 13) };
+  if (period === "month") { const from = anchor.slice(0, 8) + "01"; return { from, to: addDays(addMonths(from, 1), -1) }; }
+  const y = anchor.slice(0, 4); return { from: `${y}-01-01`, to: `${y}-12-31` };
+}
+/** Move the anchor to the previous/next period. */
+export const shiftPeriod = (period: Period, anchor: string, dir: 1 | -1) => (period === "week" ? addDays(anchor, 7 * dir) : period === "fortnight" ? addDays(anchor, 14 * dir) : period === "month" ? addMonths(anchor.slice(0, 8) + "01", dir) : addMonths(anchor, 12 * dir));
+export type Charge = { sub_id: number; name: string; color: string; amount_cents: number; due: string; paid: boolean; paid_at: string | null };
+/** Every charge of an active subscription that falls in [from, to], oldest first, with whether you've ticked it as paid. */
+export function chargesBetween(from: string, to: string): Charge[] {
+  const paid = new Map((db.prepare("SELECT sub_id, due_date, paid_at FROM sub_paid WHERE due_date BETWEEN ? AND ?").all(from, to) as { sub_id: number; due_date: string; paid_at: string }[]).map((r) => [`${r.sub_id}:${r.due_date}`, r.paid_at]));
+  const out: Charge[] = [];
+  for (const s of listSubs("active")) {
+    const started = s.started ?? "";
+    let d = s.next_due, g = 0;
+    while (d > from && g++ < 800) d = stepBack(d, s.cycle);          // walk back to the first charge on or before the window...
+    for (g = 0; d <= to && g < 800; g++, d = stepDate(d, s.cycle)) { // ...then forward through it
+      if (d < from || (d < started && d < s.next_due)) continue;      // before the window, or before you added it
+      const at = paid.get(`${s.id}:${d}`) ?? null; out.push({ sub_id: s.id, name: s.name, color: s.color, amount_cents: s.amount_cents, due: d, paid: !!at, paid_at: at });
+    }
+  }
+  return out.sort((a, b) => a.due.localeCompare(b.due) || a.name.localeCompare(b.name));
+}
+export function setCharge(subId: number, due: string, paid: boolean): void {
+  if (!getSub(subId) || !/^\d{4}-\d{2}-\d{2}$/.test(due)) return;
+  if (paid) db.prepare("INSERT OR IGNORE INTO sub_paid (sub_id, due_date) VALUES (?,?)").run(subId, due); else db.prepare("DELETE FROM sub_paid WHERE sub_id=? AND due_date=?").run(subId, due);
+}
+/** Tick everything still unpaid in the range. Returns how many were ticked. */
+export function markRangePaid(from: string, to: string): number { let n = 0; for (const c of chargesBetween(from, to)) if (!c.paid) { setCharge(c.sub_id, c.due, true); n++; } return n; }

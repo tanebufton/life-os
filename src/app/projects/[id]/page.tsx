@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { AddTaskRow } from "@/components/addrow";
 import { BoardView, type BoardParams } from "@/components/boardview";
 import { Icon } from "@/components/Icon";
@@ -7,7 +7,8 @@ import { Panel } from "@/components/Panel";
 import { ProjectAvatar } from "@/components/Pill";
 import { ProjectEditor } from "@/components/projectedit";
 import { TaskTable } from "@/components/tasktable";
-import { TaskGroups, bucket } from "@/components/tasks";
+import { TaskGroups, TaskRow, bucket } from "@/components/tasks";
+import { ReorderList } from "@/components/reorder";
 import { MemoList } from "@/components/memolist";
 import { VoiceRecorder } from "@/components/voice";
 import { addGoalAction } from "@/lib/actions3";
@@ -40,30 +41,33 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
     ...(isOn("voice") ? [{ k: "memos", label: "Voice memos", icon: "mic", n: memos.length }] : []),
     ...(isOn("goals") ? [{ k: "goals", label: "Goals", icon: "goals", n: goals.length }] : []),
   ];
+  // No view in the address: open to the project's chosen view (if it's still available), else the overview.
+  if (!sp.tab && p.default_view && tabs.some((t) => t.k === p.default_view)) redirect(`/projects/${id}?tab=${p.default_view}`);
   const tab = tabs.some((t) => t.k === sp.tab) ? sp.tab! : sp.tab === "tasks" ? "list" : "overview";
   const base = `/projects/${id}`, href = (k: string, extra = "") => `${base}?tab=${k}${extra}`;
   const sort = sp.sort ?? "due", dir = sp.dir ?? "asc";
-  const dueSoon = [...open].sort((a, b) => (a.due ?? "9999").localeCompare(b.due ?? "9999")).slice(0, 6);
+  // Dated tasks first (soonest first), then undated ones with the newest on top, so something you just added is always in view.
+  const ordered = [...open].sort((a, b) => (a.due && b.due ? a.due.localeCompare(b.due) : a.due ? -1 : b.due ? 1 : b.id - a.id)), dueSoon = ordered.slice(0, 10), moreOpen = ordered.length - dueSoon.length;
   return (
     <div className="proj">
       <div className="rise flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3"><ProjectAvatar name={p.name} color={p.color} size={36} icon={p.icon} />
           <div className="min-w-0"><h1 className="truncate text-[26px] font-bold leading-tight tracking-tight">{p.name}</h1>
             <p className="text-[13px] text-mute">{p.area ? `${p.area} · ` : ""}{projectKey(p.name)} · {open.length} open{hasCustomColumns(id) ? " · own board columns" : ""}</p></div></div>
-        <div className="flex items-center gap-2"><FavouriteButton kind="project" id={id} on={isFavourite("project", id)} /><ProjectEditor id={id} name={p.name} color={p.color} icon={p.icon} area={p.area} areas={(db.prepare("SELECT DISTINCT area FROM projects WHERE area!='' ORDER BY area").all() as { area: string }[]).map((r) => r.area)} /></div>
+        <div className="flex items-center gap-2"><FavouriteButton kind="project" id={id} on={isFavourite("project", id)} /><ProjectEditor id={id} name={p.name} color={p.color} icon={p.icon} area={p.area} view={p.default_view} views={tabs.map((t) => ({ k: t.k, label: t.label }))} areas={(db.prepare("SELECT DISTINCT area FROM projects WHERE area!='' ORDER BY area").all() as { area: string }[]).map((r) => r.area)} /></div>
       </div>
       <div className="mb-6 hidden md:block" />
       <nav aria-label="Project views" className="ptabs mb-6 flex gap-0.5 overflow-x-auto border-b md:hidden">
         {tabs.map((t) => { const on = t.k === tab; return (
-          <Link key={t.k} href={t.k === "overview" ? base : href(t.k)} aria-current={on ? "page" : undefined} className={`-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-[14px] ${on ? "border-accent font-medium text-fg" : "border-transparent text-mute hover:text-fg"}`}>
+          <Link key={t.k} href={href(t.k)} aria-current={on ? "page" : undefined} className={`-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-[14px] ${on ? "border-accent font-medium text-fg" : "border-transparent text-mute hover:text-fg"}`}>
             <Icon name={t.icon} size={15} className={on ? "text-accent" : ""} />{t.label}{t.n ? <span className="text-xs text-dim">{t.n}</span> : null}</Link>); })}
       </nav>
 
       {tab === "overview" && (
         <div className="grid items-start gap-4 lg:grid-cols-3">
           <Panel title="Up next" count={open.length} i={0} className="lg:col-span-2" right={<Link href={href("list")} className="text-xs text-accent hover:underline">All tasks</Link>}>
-            <ul>{dueSoon.map((t) => <li key={t.id} className="border-b last:border-b-0"><Link href={`/tasks/${t.id}`} className="flex items-center gap-3 px-4 py-2.5 text-[14px] hover:bg-raise/50"><span className="truncate">{t.title}</span><span className="ml-auto shrink-0 text-xs text-mute">{t.due ?? ""}</span></Link></li>)}
-              {!dueSoon.length && <li className="px-4 py-8 text-center text-sm text-mute">Nothing open. Add a task from the List tab.</li>}</ul>
+            <div className="px-2"><ReorderList>{dueSoon.map((t) => <TaskRow key={t.id} t={t} />)}</ReorderList>
+              {!dueSoon.length && <p className="px-2 py-6 text-center text-sm text-mute">Nothing open yet. Add the first task below.</p>}<AddTaskRow />{moreOpen > 0 && <Link href={href("list")} className="block px-2 pb-2 pt-1 text-xs text-accent hover:underline">+{moreOpen} more in List</Link>}</div>
           </Panel>
           <div className="space-y-4">
             <Panel title="Progress" i={1} bodyClass="p-4"><div className="flex items-baseline gap-4"><div><div className="text-2xl font-semibold tabular-nums">{open.length}</div><div className="text-xs text-mute">open</div></div><div><div className="text-2xl font-semibold tabular-nums">{doneCount}</div><div className="text-xs text-mute">done</div></div></div></Panel>
@@ -75,8 +79,9 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
       {tab === "list" && <div className="max-w-4xl"><TaskGroups groups={bucket(open)} empty="No open tasks here yet. New tasks you add from this page land in this project." /><AddTaskRow /></div>}
       {tab === "board" && <BoardView sp={sp} lockProject={id} base={href("board")} />}
       {tab === "table" && <TaskTable hideProject rows={open} sort={sort} dir={dir} base={(o) => href("table", Object.entries(o).filter(([, v]) => v).map(([k, v]) => `&${k}=${encodeURIComponent(v as string)}`).join(""))} />}
+      {tab === "table" && <div className="mt-2"><AddTaskRow /></div>}
       {tab === "notes" && (
-        <div className="max-w-4xl"><Panel i={0} right={<form action={newNoteInProjectAction.bind(null, id)}><button className="font-medium text-accent hover:underline">New note</button></form>}>
+        <div className="max-w-4xl"><div className="mb-3 flex justify-end"><form action={newNoteInProjectAction.bind(null, id)}><button className="btn-primary"><Icon name="plus" size={14} />New note</button></form></div><Panel i={0}>
           <ul>{noteTree(notes).map((n) => <li key={n.id} className="border-b last:border-b-0"><Link href={`/notes/${n.id}`} style={{ paddingLeft: 16 + n.depth * 22 }} className="flex items-center gap-2 py-2.5 pr-4 text-[14px] hover:bg-raise/50">{n.icon ? <span aria-hidden>{n.icon}</span> : <Icon name="notes" size={15} className="text-mute" />}<span className="truncate">{n.title || "Untitled"}</span><span className="ml-auto text-xs text-dim">{n.updated_at.slice(0, 10)}</span></Link></li>)}
             {!notes.length && <li className="px-4 py-10 text-center text-sm text-mute">No notes in this project yet.</li>}</ul></Panel></div>
       )}

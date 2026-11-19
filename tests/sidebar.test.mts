@@ -10,3 +10,11 @@ assert.deepEqual(arrange(all, { ...EMPTY_PREFS, groups: ["explore"] }).map((x) =
 const trash = all.find((p) => p.href === "/trash")!, board = all.find((p) => p.href === "/board")!;
 assert.deepEqual(withVisibility(EMPTY_PREFS, board, true).hidden, ["/board"]); assert.deepEqual(withVisibility(withVisibility(EMPTY_PREFS, board, true), board, false).hidden, []); assert.deepEqual(withVisibility(EMPTY_PREFS, trash, false).shown, ["/trash"]); assert.deepEqual(withVisibility(withVisibility(EMPTY_PREFS, trash, false), trash, true).shown, []); ok("hide and show round-trip cleanly");
 console.log(`\n${n} checks passed`);
+{
+  const { arrange, GROUPS } = await import("../src/lib/sidebar.ts"); const { NAV } = await import("../src/lib/nav.ts");
+  const keys = (g: any[]) => g.map((x) => x.key);
+  assert.deepEqual(keys(arrange(NAV, { order: [], hidden: [], shown: [], groups: [] })).slice(0, 2), ["main", "projects"]); console.log("  ✓ Projects sits under the main pages by default");
+  const old = keys(arrange(NAV, { order: [], hidden: [], shown: [], groups: ["life", "main", "money", "explore"] })); assert.equal(old[old.indexOf("main") + 1], "projects"); console.log("  ✓ an order saved before Projects existed keeps Projects under main, not at the end");
+  const mine = keys(arrange(NAV, { order: [], hidden: [], shown: [], groups: ["main", "life", "projects", "money", "explore"] })); assert.deepEqual(mine.slice(0, 3), ["main", "life", "projects"]); console.log("  ✓ Life can be put above Projects without moving anything else");
+  assert.ok(GROUPS.some((g) => g.key === "projects"));
+}

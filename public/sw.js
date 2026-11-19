@@ -10,3 +10,14 @@ self.addEventListener("fetch", (e) => {
     e.respondWith(caches.open(CACHE).then(async (c) => { const hit = await c.match(r); const net = fetch(r).then((res) => { if (res.ok) c.put(r, res.clone()); return res; }).catch(() => hit); return hit || net; }));
   }
 });
+
+// Task reminders: the notification's buttons talk to LifeOS directly, so they work even if you don't switch to the tab.
+self.addEventListener("notificationclick", (e) => {
+  const n = e.notification, d = n.data || {}; n.close();
+  if (e.action === "done" || e.action === "snooze") {
+    e.waitUntil(fetch("/api/reminders", { method: "POST", headers: { "content-type": "application/json", "x-lifeos": "1" }, credentials: "same-origin", body: JSON.stringify({ id: d.id, action: e.action, minutes: d.snooze }) })
+      .then(() => self.clients.matchAll({ type: "window" }).then((cs) => cs.forEach((c) => c.postMessage({ type: "lifeos:refresh" })))).catch(() => {}));
+    return;
+  }
+  e.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((cs) => { const c = cs[0]; if (c) { if (d.url && "navigate" in c) c.navigate(d.url); return c.focus(); } return self.clients.openWindow(d.url || "/"); }));
+});

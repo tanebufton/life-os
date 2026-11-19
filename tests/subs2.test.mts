@@ -1,0 +1,17 @@
+import assert from "node:assert/strict";
+const S = await import("../src/lib/subs.ts"); const { db } = await import("../src/lib/db.ts");
+let n = 0; const ok = (m: string) => { n++; console.log("  ✓", m); };
+assert.equal(S.stepDate("2026-01-01", "fortnightly"), "2026-01-15"); assert.equal(S.stepDate("2026-01-31", "halfyearly"), "2026-07-31"); assert.equal(S.stepBack("2026-07-31", "halfyearly"), "2026-01-31"); ok("fortnightly and half-yearly step forwards and back");
+assert.equal(S.monthlyCents({ amount_cents: 2600, cycle: "fortnightly" }), 5633); assert.equal(S.monthlyCents({ amount_cents: 6000, cycle: "halfyearly" }), 1000); ok("monthly cost: fortnightly = 26/12, half-yearly = 1/6");
+assert.ok(S.CYCLES.includes("fortnightly") && S.CYCLES.includes("halfyearly")); ok("both are accepted billing cycles");
+assert.deepEqual(S.periodRange("week", "2026-11-19"), { from: "2026-11-16", to: "2026-11-22" }); assert.deepEqual(S.periodRange("month", "2026-11-19"), { from: "2026-11-01", to: "2026-11-30" }); assert.deepEqual(S.periodRange("year", "2026-11-19"), { from: "2026-01-01", to: "2026-12-31" }); assert.deepEqual(S.periodRange("fortnight", "2026-11-19"), { from: "2026-11-19", to: "2026-12-02" }); ok("week starts Monday; month and year are calendar; fortnight runs 14 days from the date");
+assert.equal(S.shiftPeriod("month", "2026-11-19", 1), "2026-12-01"); assert.equal(S.shiftPeriod("week", "2026-11-19", -1), "2026-11-12"); ok("previous/next period");
+const mk = (name: string, cents: number, cycle: any, next: string) => S.createSub({ name, amount_cents: cents, cycle, next_due: next });
+const f = mk("Gym", 1400, "fortnightly", "2026-11-20"), g = mk("Cloud", 6000, "halfyearly", "2026-12-10"), w = mk("Paper", 500, "weekly", "2026-11-18");
+db.prepare("UPDATE subscriptions SET started='2026-01-01'").run();
+const nov = S.chargesBetween("2026-11-01", "2026-11-30"); assert.deepEqual(nov.filter((c) => c.sub_id === f).map((c) => c.due), ["2026-11-06", "2026-11-20"]); assert.equal(nov.filter((c) => c.sub_id === w).length, 4); assert.equal(nov.filter((c) => c.sub_id === g).length, 0); ok("a month lists every fortnightly and weekly charge in it, and skips a half-yearly one that isn't due");
+const dec = S.chargesBetween("2026-12-01", "2026-12-31"); assert.deepEqual(dec.filter((c) => c.sub_id === g).map((c) => c.due), ["2026-12-10"]); ok("the half-yearly one shows in its month");
+S.setCharge(f, "2026-11-20", true); assert.equal(S.chargesBetween("2026-11-01", "2026-11-30").find((c) => c.sub_id === f && c.due === "2026-11-20")!.paid, true); assert.equal(S.chargesBetween("2026-11-01", "2026-11-30").find((c) => c.sub_id === f && c.due === "2026-11-06")!.paid, false); ok("paid is recorded per charge, not per subscription");
+const left = S.markRangePaid("2026-11-01", "2026-11-30"); assert.equal(left, 5); assert.ok(S.chargesBetween("2026-11-01", "2026-11-30").every((c) => c.paid)); assert.equal(S.markRangePaid("2026-11-01", "2026-11-30"), 0); ok("mark everything in the range paid, safely repeatable");
+S.setCharge(f, "2026-11-20", false); assert.equal(S.chargesBetween("2026-11-01", "2026-11-30").find((c) => c.sub_id === f && c.due === "2026-11-20")!.paid, false); ok("a charge can be un-ticked");
+console.log(`  ${n} checks`);

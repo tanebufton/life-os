@@ -22,7 +22,7 @@ export function WeekGrid({ days }: { days: Day[] }) {
           <ul className="space-y-1.5">
             {d.events.map((e, i) => <li key={`e${i}`} className="rounded-md border-l-[3px] px-2 py-1 text-[12px]" style={{ background: e.color + "1f", borderColor: e.color }}><span className="text-mute">{e.time ?? "All day"}</span> {e.title}</li>)}
             {d.tasks.map((t) => (
-              <li key={t.id} draggable onDragStart={(e) => e.dataTransfer.setData("text/plain", String(t.id))} className="cursor-grab rounded-lg border bg-panel p-2 text-[13px] shadow-sm hover:bg-raise/40 active:cursor-grabbing">
+              <li key={t.id} draggable onDragStart={(e) => { e.dataTransfer.setData("text/plain", String(t.id)); e.dataTransfer.setData("application/x-lifeos-task", String(t.id)); }} className="cursor-grab rounded-lg border bg-panel p-2 text-[13px] shadow-sm hover:bg-raise/40 active:cursor-grabbing">
                 <Link href={`/tasks/${t.id}`} draggable={false} className="block leading-snug hover:underline">{t.title}</Link>
                 {(t.time || t.priority > 0) && <div className="mt-1 flex items-center gap-2 text-[11px] text-mute">{t.time && <span>{fmtTime(t.time)}</span>}{t.priority > 0 && <span className="font-medium text-danger">High</span>}</div>}
               </li>))}

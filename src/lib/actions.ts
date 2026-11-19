@@ -190,6 +190,7 @@ export async function importCsv(text: string, dayFirst: boolean, invert: boolean
 export async function addSavingAction(fd: FormData) { const n = str(fd, "name"), t = cents(fd.get("target")); if (!n || !(t > 0)) return; createSaving(n, t, str(fd, "due") || null, str(fd, "color") || undefined); refresh(); }
 export async function contributeAction(id: number, dollars: number) { contributeSaving(id, toCents(dollars)); refresh(); }
 export async function archiveSavingAction(id: number) { archiveSaving(id); refresh(); }
+export async function saveVoiceProject(fd: FormData) { const id = Number(str(fd, "project")) || 0; setSetting("voice_project", id ? String(id) : ""); refresh(); redirect("/settings?tab=connect#extension"); }
 export async function saveCurrency(fd: FormData) { const c = str(fd, "currency").toUpperCase(); if (/^[A-Z]{3}$/.test(c)) { try { new Intl.NumberFormat("en", { style: "currency", currency: c }); setSetting("currency", c); } catch { redirect("/settings?err=" + encodeURIComponent(`Unknown currency "${c}"`)); } } refresh(); }
 
 // ---------- subscriptions ----------

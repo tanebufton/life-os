@@ -5,10 +5,11 @@ WORKDIR /app
 # Only needed if there is no prebuilt better-sqlite3 binary for the platform.
 RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN --mount=type=cache,target=/root/.npm npm ci
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN npm run build && npm prune --omit=dev
+# The cache mount keeps Next.js's compile cache between builds, so a small change rebuilds only what it touched.
+RUN --mount=type=cache,target=/app/.next/cache npm run build && npm prune --omit=dev
 
 FROM node:22-bookworm-slim
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 LIFEOS_DB=/data/lifeos.db HOSTNAME=0.0.0.0 PORT=3000

@@ -6,6 +6,5 @@ demo-shots
 .env*
 !.env.example
 docs
-extension
 tests
 *.md

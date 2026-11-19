@@ -7,6 +7,8 @@ import { addLink, removeLink, type LinkKind } from "./links";
 import { setEntityTags, type TagKind } from "./entitytags";
 import { createNote, moveNote, restoreNoteVersion, updateNote } from "./notes";
 import { toggleFavourite, type FavKind } from "./favourites";
+import { markRangePaid, setCharge } from "./subs";
+import { PROJECT_VIEWS } from "./projectviews";
 import { redirect } from "next/navigation";
 import { setSetting } from "./settings";
 import { parsePrefs } from "./sidebar";
@@ -43,9 +45,9 @@ export async function resetSidebarAction(): Promise<R> { return run(() => { setS
 export async function saveTagsAction(kind: TagKind, id: number, text: string): Promise<R> { return run(() => { if (!["note", "goal", "person"].includes(kind)) throw new Error("Can't tag that"); setEntityTags(kind, id, parseTags(text)); }); }
 export async function setNoteProjectAction(id: number, projectId: number | null): Promise<R> { return run(() => { updateNote(id, { project_id: projectId }); }); }
 export async function restoreNoteVersionAction(noteId: number, versionId: number): Promise<R> { return run(() => { if (!restoreNoteVersion(noteId, versionId)) throw new Error("That version is gone"); return "Restored. The text it replaced is kept as a version."; }); }
-export async function renameProjectAction(id: number, name: string, color: string, icon?: string, area?: string): Promise<R> {
+export async function renameProjectAction(id: number, name: string, color: string, icon?: string, area?: string, view?: string): Promise<R> {
   return run(() => { const n = name.replace(/\s+/g, " ").trim(); if (!n || n.length > 60) throw new Error("Give the project a name (up to 60 characters)"); if (!/^#[0-9a-fA-F]{6}$/.test(color)) throw new Error("Pick a colour");
-    if (db.prepare("SELECT 1 FROM projects WHERE lower(name)=lower(?) AND id!=? AND archived=0").get(n, id)) throw new Error("Another project already has that name"); db.prepare("UPDATE projects SET name=?, color=? WHERE id=?").run(n, color, id); if (icon !== undefined) db.prepare("UPDATE projects SET icon=? WHERE id=?").run(cleanIcon(icon), id); if (area !== undefined) db.prepare("UPDATE projects SET area=? WHERE id=?").run(area.replace(/\s+/g, " ").trim().slice(0, 40), id); return "Saved"; });
+    if (db.prepare("SELECT 1 FROM projects WHERE lower(name)=lower(?) AND id!=? AND archived=0").get(n, id)) throw new Error("Another project already has that name"); db.prepare("UPDATE projects SET name=?, color=? WHERE id=?").run(n, color, id); if (icon !== undefined) db.prepare("UPDATE projects SET icon=? WHERE id=?").run(cleanIcon(icon), id); if (view !== undefined) db.prepare("UPDATE projects SET default_view=? WHERE id=?").run(PROJECT_VIEWS.includes(view) ? (view === "overview" ? "" : view) : "", id); if (area !== undefined) db.prepare("UPDATE projects SET area=? WHERE id=?").run(area.replace(/\s+/g, " ").trim().slice(0, 40), id); return "Saved"; });
 }
 export async function unarchiveProjectAction(id: number): Promise<R> { return run(() => { db.prepare("UPDATE projects SET archived=0 WHERE id=?").run(id); return "Project restored"; }); }
 
@@ -94,6 +96,25 @@ export async function bulkBoardAction(ids: number[], o: BulkOp): Promise<R> {
 
 /** An emoji or a couple of characters. Anything longer is cut, so a paste can't fill the sidebar. */
 const cleanIcon = (v: string) => Array.from(v.trim()).slice(0, 8).join("");
+export async function moveTaskToProjectAction(taskId: number, projectId: number | null): Promise<R> {
+  return run(() => { const p = projectId ? (db.prepare("SELECT name FROM projects WHERE id=? AND archived=0").get(projectId) as { name: string } | undefined) : undefined; if (projectId && !p) throw new Error("That project is gone");
+    if (!updateTask(taskId, { project_id: projectId })) throw new Error("That task is gone"); return p ? `Moved to ${p.name}` : "Moved to the inbox"; });
+}
+export async function saveBrowserNotifyAction(on: boolean, lead: number, snooze: number): Promise<R> {
+  return run(() => { const l = Math.min(120, Math.max(0, Math.round(Number(lead) || 0))), s = Math.min(240, Math.max(1, Math.round(Number(snooze) || 15))); setSetting("notify_browser", on ? "1" : "0"); setSetting("notify_lead", String(l)); setSetting("notify_snooze", String(s)); return "Saved"; });
+}
+/** Save a new order for some projects (the ones in one area, top to bottom). Everything else keeps its place. */
+export async function reorderProjectsAction(ids: number[]): Promise<R> {
+  return run(() => { const clean = ids.filter((n) => Number.isInteger(n)); const st = db.prepare("UPDATE projects SET position=? WHERE id=?"); db.transaction(() => clean.forEach((id, i) => st.run(i + 1, id)))(); });
+}
+/** Nudge one project up or down within its area (for keyboards and phones, where dragging is awkward). */
+export async function moveProjectAction(id: number, dir: -1 | 1): Promise<R> {
+  return run(() => { const p = db.prepare("SELECT area FROM projects WHERE id=?").get(id) as { area: string } | undefined; if (!p) throw new Error("That project is gone");
+    const peers = (db.prepare("SELECT id FROM projects WHERE archived=0 AND area=? ORDER BY position, name COLLATE NOCASE").all(p.area) as { id: number }[]).map((r) => r.id), i = peers.indexOf(id), j = i + dir;
+    if (i < 0 || j < 0 || j >= peers.length) return; [peers[i], peers[j]] = [peers[j], peers[i]]; const st = db.prepare("UPDATE projects SET position=? WHERE id=?"); db.transaction(() => peers.forEach((pid, k) => st.run(k + 1, pid)))(); });
+}
+export async function setChargeAction(subId: number, due: string, paid: boolean): Promise<R> { return run(() => { setCharge(subId, due, paid); }); }
+export async function markRangePaidAction(from: string, to: string): Promise<R> { return run(() => { const n = markRangePaid(from, to); return n ? `Marked ${n} paid` : "Nothing left to mark"; }); }
 export async function toggleFavouriteAction(kind: FavKind, id: number): Promise<R> { return run(() => (toggleFavourite(kind, id) ? "Added to favourites" : "Removed from favourites")); }
 export async function moveNoteAction(id: number, parentId: number | null): Promise<R> { return run(() => { const e = moveNote(id, parentId); if (e) throw new Error(e); return "Moved"; }); }
 export async function newSubpageAction(parentId: number) { const id = createNote("", "", null, parentId); revalidatePath("/", "layout"); redirect(`/notes/${id}`); }
