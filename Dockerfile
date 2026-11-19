@@ -36,6 +36,9 @@ COPY --from=build --chown=node:node /app/mcp ./mcp
 COPY --from=build --chown=node:node /app/extension ./extension
 COPY --from=build --chown=node:node /app/package.json /app/next.config.mjs /app/tsconfig.json ./
 RUN mkdir -p /data && chown node:node /data
+# Which commit this image was built from (update.sh uses it to know whether a rebuild is needed). Kept last so it never invalidates the cache.
+ARG GIT_COMMIT=unknown
+LABEL lifeos.commit=$GIT_COMMIT
 VOLUME /data
 USER node
 EXPOSE 3000

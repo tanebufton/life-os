@@ -12,7 +12,7 @@ x-app: &app
 services:
   web:
     <<: *app
-    build: .   # built once, here. worker and mcp reuse the same image (they start after web is healthy)
+    build: { context: ., args: { GIT_COMMIT: "${GIT_COMMIT:-unknown}" } }   # built once, here. worker and mcp reuse the same image (they start after web is healthy)
     expose: ["3000"]
     ports: ["127.0.0.1:3000:3000"] # loopback only, so `tailscale serve` on the host can reach it (see docs/DEPLOY.md). Not exposed to the network.
 

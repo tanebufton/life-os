@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 # One command to update a Docker install: ./update.sh
-# Pulls the latest code, builds the image once (web, worker and mcp share it), restarts what changed, and clears old images.
+# Pulls the latest code, builds the image once (web, worker and mcp share it) if the code changed, restarts what changed, and clears old images.
 set -euo pipefail
 cd "$(dirname "$0")"
 start=$(date +%s)
-before=$(git rev-parse HEAD)
 git pull --ff-only
-after=$(git rev-parse HEAD)
-export DOCKER_BUILDKIT=1
-if [ "$before" = "$after" ] && docker image inspect "${LIFEOS_IMAGE:-life-os:local}" >/dev/null 2>&1 && [ "${1:-}" != "--rebuild" ]; then
-  echo "Already up to date, nothing to build. (Use ./update.sh --rebuild to force one.)"
+export DOCKER_BUILDKIT=1 GIT_COMMIT=$(git rev-parse HEAD)
+image="${LIFEOS_IMAGE:-life-os:local}"
+# The image records the commit it was built from, so this works even if you ran `git pull` yourself first.
+built=$(docker image inspect "$image" --format '{{ index .Config.Labels "lifeos.commit" }}' 2>/dev/null || true)
+if [ "$built" = "$GIT_COMMIT" ] && [ "${1:-}" != "--rebuild" ]; then
+  echo "The running image already has this version ($(git rev-parse --short HEAD)), nothing to build. (./update.sh --rebuild forces one.)"
 else
   t=$(date +%s)
   docker compose build web
