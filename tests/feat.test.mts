@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import http from "node:http";
 const L = (p: string) => import("../src/lib/" + p);
-const Cal = await L("calendar"), P = await L("planner"), MD = await L("markdown"), N = await L("notes"), G = await L("goals"), PE = await L("people"), TP = await L("templates"), X = await L("misc"), T = await L("tasks"), { db } = await L("db"), S = await L("settings"), { today } = await L("time"), D = await L("dates");
+const Cal = await L("calendar"), P = await L("planner"), MD = await L("markdown"), N = await L("notes"), G = await L("goals"), TP = await L("templates"), X = await L("misc"), T = await L("tasks"), { db } = await L("db"), S = await L("settings"), { today } = await L("time"), D = await L("dates");
 S.setSetting("timezone", "Pacific/Auckland"); process.env.LIFEOS_ALLOW_PRIVATE_FETCH = "1";
 let n = 0; const ok = (m: string) => { n++; console.log("  ✓", m); }; const t = today();
 
@@ -52,12 +52,6 @@ const kr = G.addKeyResult(g, "Weekly km", 40, "km"); G.setKeyResult(kr, 10); ass
 assert.throws(() => G.addKeyResult(g, "bad", 0)); G.setGoalStatus(g, "done"); assert.equal(G.goalProgress(G.getGoal(g)).pct, 100); assert.equal(G.listGoals().length, 0); ok("goals: validation, done goals leave the active list at 100%");
 G.createGoal({ title: "Save more", area: "Money" }); assert.equal(G.areaBalance().find((a: any) => a.area === "Money").goals, 1); ok("goals: life-area balance");
 
-// ---- people
-const p1 = PE.createPerson({ name: "Sam", birthday: D.addDays(t, 1).slice(5), cadence_days: 30, last_contact: D.addDays(t, -40) }), p2 = PE.createPerson({ name: "Alex", birthday: "1990-" + D.addDays(t, 5).slice(5), cadence_days: 14 });
-assert.equal(PE.catchUpIn(PE.getPerson(p1), t), -10); assert.equal(PE.overdueCatchUps(t)[0].p.name, "Sam"); PE.logContact(p1, "Coffee"); assert.equal(PE.catchUpIn(PE.getPerson(p1), t), 30); assert.equal(PE.overdueCatchUps(t).some((x: any) => x.p.id === p1), false); ok("people: catch-up cadence goes overdue and resets when you log contact");
-const nb = PE.nextBirthday(PE.getPerson(p2), t); assert.equal(nb.in, 5); assert.equal(nb.age, Number(nb.date.slice(0, 4)) - 1990); assert.equal(PE.upcomingBirthdays(7, t).length, 2); ok("people: next birthday + age, within-N-days list");
-const rem = PE.peopleReminders(t); assert.ok(rem.some((r: any) => /Sam's birthday tomorrow/.test(r.title))); assert.throws(() => PE.createPerson({ name: " " })); const ft = PE.followUpTask(p2); assert.equal(T.getTask(ft).title, "Catch up with Alex"); ok("people: birthday reminders, validation, follow-up task");
-
 // ---- templates
 assert.equal(TP.installStarterTemplates(), 4); assert.equal(TP.installStarterTemplates(), 0); const tpl = TP.listTemplates().find((x: any) => x.name === "Trip packing list"); const tid = TP.useTemplate(tpl.id, { due: D.addDays(t, 3) }); assert.equal(T.getTask(tid).due, D.addDays(t, 3)); assert.equal(T.getTask(tid).sub_total, 7); assert.deepEqual(T.getTask(tid).tags, ["travel"]); ok("templates: starters install once; use creates task + subtasks with the chosen date");
 const wk = TP.listTemplates().find((x: any) => x.name === "Weekly review"); const wid = TP.useTemplate(wk.id); assert.equal(T.getTask(wid).repeat, "1w"); assert.equal(T.getTask(wid).due, t); ok("templates: repeat carried over, repeating template defaults to today");
@@ -76,4 +70,3 @@ const od = T.createTask({ title: "Overdue high", due: D.addDays(t, -3), priority
 const m = X.matrix([T.getTask(od), T.getTask(later), T.getTask(T.createTask({ title: "Hi later", priority: 1, due: D.addDays(t, 30) })), T.getTask(T.createTask({ title: "Soon plain", due: t }))], t); assert.deepEqual([m.doNow.length, m.schedule.length, m.delegate.length, m.drop.length], [1, 1, 1, 1]); ok("matrix: four quadrants");
 srv.close(); page.close(); console.log(`\n${n} checks passed`); process.exit(0);
 // regression: a birthday without a year must not break the calendar feed
-{ const P = await import("../src/lib/people.ts"); const C = await import("../src/lib/ical.ts"); const id = P.createPerson({ name: "No Year", birthday: "03-14" }); const ics = C.buildIcs(""); assert.ok(ics.includes("No Year's birthday") && ics.includes("DTSTART;VALUE=DATE:20000314")); console.log("  ✓ ical: yearless birthday is included"); }

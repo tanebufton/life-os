@@ -1,12 +1,10 @@
 import Link from "next/link";
-import { Suspense } from "react";
 import { AddTaskRow } from "@/components/addrow";
 import { Panel } from "@/components/Panel";
-import { SpotifyPanel } from "@/components/spotify";
 import { PageHead, TaskGroups, bucket } from "@/components/tasks";
-import { EventsPanel, GoalsPanel, HabitsPanel, JournalPanel, MoneyPanel, PeoplePanel, RenewalsPanel } from "@/components/todaywidgets";
+import { EventsPanel, GoalsPanel } from "@/components/todaywidgets";
 import { Icon } from "@/components/Icon";
-import { NewsPanel, OverviewCard, WeatherPanel } from "@/components/widgets";
+import { OverviewCard } from "@/components/widgets";
 import { featureMap, isOn } from "@/lib/features";
 import { resolveWidgets } from "@/lib/widgets";
 import { focusToday } from "@/lib/focus";
@@ -15,7 +13,6 @@ import { doneToday, queryTasks } from "@/lib/tasks";
 import { today, tz } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
-const Skeleton = ({ h = "h-44", i = 0 }: { h?: string; i?: number }) => <Panel i={i} className={`${h} animate-pulse`}>{null}</Panel>;
 
 export default function Today() {
   const t = today(), f = featureMap();
@@ -45,16 +42,8 @@ export default function Today() {
           {widgets.map((id, i) => {
             switch (id) {
               case "glance": return <OverviewCard key={id} i={i + 1} done={doneToday()} focus={f.focus ? focusToday().minutes : undefined} overdue={overdue} planned={planned} capacity={Number(getSetting("capacity_min") ?? 360)} />;
-              case "habits": return <HabitsPanel key={id} i={i + 1} />;
-              case "journal": return <JournalPanel key={id} i={i + 1} />;
-              case "money": return <MoneyPanel key={id} i={i + 1} />;
               case "events": return <EventsPanel key={id} i={i + 1} />;
-              case "people": return <PeoplePanel key={id} i={i + 1} />;
               case "goals": return <GoalsPanel key={id} i={i + 1} />;
-              case "subs": return <RenewalsPanel key={id} i={i + 1} />;
-              case "weather": return <Suspense key={id} fallback={<Skeleton i={i + 1} />}><WeatherPanel i={i + 1} /></Suspense>;
-              case "music": return <SpotifyPanel key={id} i={i + 1} />;
-              case "news": return <Suspense key={id} fallback={<Skeleton h="h-64" i={i + 1} />}><NewsPanel i={i + 1} limit={5} /></Suspense>;
               default: return null;
             }
           })}

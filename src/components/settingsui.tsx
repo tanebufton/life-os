@@ -13,7 +13,7 @@ export function CopyBox({ value, mono = true }: { value: string; mono?: boolean 
     </div>
   );
 }
-const AREA_LABEL: Record<string, string> = { tasks: "Tasks, search, brief", habits: "Habits", journal: "Journal", money: "Budget & transactions", subscriptions: "Subscriptions", voice: "Voice memos" };
+const AREA_LABEL: Record<string, string> = { tasks: "Tasks, search, brief", voice: "Voice memos" };
 type TokenItem = { id: number; name: string; prefix: string; created_at: string; last_used_at: string | null; level: string; areas: string | null; expires_at: string | null };
 export function TokenManager({ tokens }: { tokens: TokenItem[] }) {
   const [name, setName] = useState(""), [level, setLevel] = useState<"read" | "write">("write"), [days, setDays] = useState(0), [areas, setAreas] = useState<string[]>([]), [fresh, setFresh] = useState<string | null>(null), [, start] = useTransition();

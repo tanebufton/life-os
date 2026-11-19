@@ -1,10 +1,10 @@
 import { record, type Entity } from "./activity";
 import { db } from "./db";
 
-export type LinkKind = "task" | "note" | "goal" | "person";
-export const LINK_KINDS: LinkKind[] = ["task", "note", "goal", "person"];
+export type LinkKind = "task" | "note" | "goal";
+export const LINK_KINDS: LinkKind[] = ["task", "note", "goal"];
 export type Linked = { kind: LinkKind; id: number; title: string; href: string; meta?: string };
-const LABEL: Record<LinkKind, string> = { task: "Task", note: "Note", goal: "Goal", person: "Person" };
+const LABEL: Record<LinkKind, string> = { task: "Task", note: "Note", goal: "Goal" };
 
 /** Title (and where it lives) of an item, or null if it doesn't exist or was deleted. */
 export function describe(kind: LinkKind, id: number): Linked | null {
@@ -12,7 +12,6 @@ export function describe(kind: LinkKind, id: number): Linked | null {
     case "task": { const r = db.prepare("SELECT title, done_at FROM tasks WHERE id=? AND deleted_at IS NULL").get(id) as { title: string; done_at: string | null } | undefined; return r ? { kind, id, title: r.title, href: `/tasks/${id}`, meta: r.done_at ? "done" : undefined } : null; }
     case "note": { const r = db.prepare("SELECT title FROM notes WHERE id=? AND deleted_at IS NULL").get(id) as { title: string } | undefined; return r ? { kind, id, title: r.title || "Untitled", href: `/notes/${id}` } : null; }
     case "goal": { const r = db.prepare("SELECT title FROM goals WHERE id=?").get(id) as { title: string } | undefined; return r ? { kind, id, title: r.title, href: "/goals" } : null; }
-    case "person": { const r = db.prepare("SELECT name FROM people WHERE id=? AND archived=0").get(id) as { name: string } | undefined; return r ? { kind, id, title: r.name, href: "/people" } : null; }
   }
 }
 // A link is stored once, with its two ends in a fixed order, and shows from both sides.

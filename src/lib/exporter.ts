@@ -14,7 +14,8 @@ export function exportAll() {
     task_comments: all("task_comments"), tags: all("tags"), item_links: all("item_links"),
     notes: (db.prepare("SELECT * FROM notes WHERE deleted_at IS NULL").all() as { id: number }[]).map((n) => ({ ...n, tags: entityTags("note", n.id) })), note_versions: all("note_versions"), favourites: all("favourites"),
     goals: (db.prepare("SELECT * FROM goals").all() as { id: number }[]).map((g) => ({ ...g, tags: entityTags("goal", g.id) })), key_results: all("key_results"),
-    people: (db.prepare("SELECT * FROM people").all() as { id: number }[]).map((p) => ({ ...p, tags: entityTags("person", p.id) })), interactions: all("interactions"),
+    // Data from features that have been removed from the app (people, habits, journal, money, subscriptions) is still exported, so nothing is lost.
+    people: all("people"), interactions: all("interactions"),
     voice_memos: db.prepare("SELECT * FROM voice_memos WHERE deleted_at IS NULL").all(), templates: all("templates"), saved_filters: all("saved_filters"),
     habits: db.prepare("SELECT * FROM habits").all(), habit_logs: db.prepare("SELECT * FROM habit_logs").all(),
     journal: db.prepare("SELECT * FROM journal").all(), focus_sessions: db.prepare("SELECT * FROM focus_sessions").all(),

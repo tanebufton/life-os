@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "LifeOS", short_name: "LifeOS", description: "Tasks, habits, focus and more, in one place.",
+    name: "LifeOS", short_name: "LifeOS", description: "Tasks, planning and focus, in one place.",
     start_url: "/", scope: "/", display: "standalone", background_color: "#ffffff", theme_color: "#1877f2",
     icons: [
       { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },

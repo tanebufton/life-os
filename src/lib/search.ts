@@ -2,10 +2,10 @@ import { db } from "./db";
 import { isOn } from "./features";
 import { searchTasks, type TaskRow } from "./tasks";
 
-export type Kind = "task" | "note" | "goal" | "person" | "memo" | "project";
+export type Kind = "task" | "note" | "goal" | "memo" | "project";
 export type Hit = { kind: Kind; id: number; title: string; snippet?: string; href: string; meta?: string };
 export type Group = { kind: Kind; label: string; items: Hit[] };
-const LABEL: Record<Kind, string> = { task: "Tasks", note: "Notes", goal: "Goals", person: "People", memo: "Voice memos", project: "Projects" };
+const LABEL: Record<Kind, string> = { task: "Tasks", note: "Notes", goal: "Goals", memo: "Voice memos", project: "Projects" };
 const esc = (s: string) => s.replace(/[\\%_]/g, (c) => "\\" + c);
 const OPERATOR = /^(#|@|!|is:|due:|has:|no:|source:|priority:|status:)/i;
 /** Plain words search everything; any task filter (#tag, @project, due:…) narrows the search to tasks. */
@@ -32,7 +32,6 @@ export function searchAll(q: string, o: { limit?: number; kinds?: Kind[] } = {})
   const add = (kind: Kind, items: Hit[]) => { if (items.length) groups.push({ kind, label: LABEL[kind], items: items.sort((a, b) => rank(a.title, terms) - rank(b.title, terms)).slice(0, limit) }); };
   if (want("note") && isOn("notes")) { const w = where(["title", "body"], terms); add("note", (db.prepare(`SELECT id, title, body, updated_at FROM notes WHERE deleted_at IS NULL AND ${w.sql} ORDER BY pinned DESC, updated_at DESC LIMIT ?`).all(...w.args, limit * 2) as { id: number; title: string; body: string; updated_at: string }[]).map((n) => ({ kind: "note", id: n.id, title: n.title || "Untitled", snippet: snippet(n.body, terms), href: `/notes/${n.id}`, meta: n.updated_at.slice(0, 10) }))); }
   if (want("goal") && isOn("goals")) { const w = where(["title", "description"], terms); add("goal", (db.prepare(`SELECT id, title, description, area FROM goals WHERE status!='archived' AND ${w.sql} LIMIT ?`).all(...w.args, limit * 2) as { id: number; title: string; description: string; area: string }[]).map((g) => ({ kind: "goal", id: g.id, title: g.title, snippet: g.description ? snippet(g.description, terms) : undefined, href: "/goals", meta: g.area }))); }
-  if (want("person") && isOn("people")) { const w = where(["name", "notes"], terms); add("person", (db.prepare(`SELECT id, name, notes FROM people WHERE archived=0 AND ${w.sql} LIMIT ?`).all(...w.args, limit * 2) as { id: number; name: string; notes: string }[]).map((p) => ({ kind: "person", id: p.id, title: p.name, snippet: p.notes ? snippet(p.notes, terms) : undefined, href: "/people" }))); }
   if (want("memo") && isOn("voice")) { const w = where(["text"], terms); add("memo", (db.prepare(`SELECT id, text, created_at FROM voice_memos WHERE deleted_at IS NULL AND ${w.sql} ORDER BY id DESC LIMIT ?`).all(...w.args, limit * 2) as { id: number; text: string; created_at: string }[]).map((m) => ({ kind: "memo", id: m.id, title: plain(m.text).slice(0, 80), href: "/voice", meta: m.created_at.slice(0, 10) }))); }
   if (want("project")) { const w = where(["name"], terms); add("project", (db.prepare(`SELECT id, name FROM projects WHERE archived=0 AND ${w.sql} LIMIT ?`).all(...w.args, limit) as { id: number; name: string }[]).map((p) => ({ kind: "project", id: p.id, title: p.name, href: `/projects/${p.id}` }))); }
   return { query, groups };

@@ -8,8 +8,7 @@ import { PageHead } from "@/components/tasks";
 import { ThemeToggle } from "@/components/theme";
 import { BrowserReminders } from "@/components/browserreminders";
 import { browserNotifyConfig } from "@/lib/browsernotify";
-import { saveVoiceProject, addFeed, removeFeed, resetFeatures, saveCapacity, saveCurrency, saveLocation, saveNotifySettings, saveTimezone, spotifyDisconnect } from "@/lib/actions";
-import { currency } from "@/lib/money";
+import { saveVoiceProject, resetFeatures, saveCapacity, saveNotifySettings, saveTimezone } from "@/lib/actions";
 import { MobileTabsEditor, SidebarEditor, TodayWidgetsEditor } from "@/components/layoutprefs";
 import { parsePrefs } from "@/lib/sidebar";
 import { MAX_TABS, NAV, resolveTabs, visiblePages } from "@/lib/nav";
@@ -17,9 +16,7 @@ import { WIDGETS, widgetOn } from "@/lib/widgets";
 import { recentEmailImports } from "@/lib/email";
 import { FEATURES, featureMap } from "@/lib/features";
 import { imapConfigured } from "@/lib/imap";
-import { listFeeds } from "@/lib/news";
 import { getSetting } from "@/lib/settings";
-import { redirectUri, spotifyConfigured, spotifyConnected } from "@/lib/spotify";
 import { tz } from "@/lib/time";
 import { TelegramButtons } from "@/components/settingsui";
 import { db } from "@/lib/db";
@@ -46,7 +43,7 @@ export default async function Settings({ searchParams }: { searchParams: Promise
   const sp = await searchParams, err = sp.err, tab = TABS.some((t) => t.k === sp.tab) ? sp.tab! : "general";
   const h = await headers();
   const origin = (process.env.LIFEOS_BASE_URL ?? `${h.get("x-forwarded-proto") ?? "http"}://${h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000"}`).replace(/\/$/, "");
-  const f = featureMap(), feeds = listFeeds(), groups = [...new Set(FEATURES.map((x) => x.group))];
+  const f = featureMap(), groups = [...new Set(FEATURES.map((x) => x.group))];
   const nv = (k: string, d = "") => getSetting(k) ?? d;
   return (
     <div className="max-w-4xl">
@@ -66,12 +63,9 @@ export default async function Settings({ searchParams }: { searchParams: Promise
         <p className="mt-2 text-xs text-dim">Always on: Today, Inbox, My tasks and Settings.</p>
       </Section>
 
-      <Section cur={tab} tab="general" i={2} title="Location & time" desc="Used for the weather forecast and to decide what “today” means for due dates, repeats and reminders.">
+      <Section cur={tab} tab="general" i={2} title="Time & capacity" desc="Decides what “today” means for due dates, repeats and reminders, and how much work fits in a day.">
         <Panel bodyClass="space-y-5 p-4">
-          <form action={saveLocation} className="space-y-1.5"><label className="text-[13px] font-medium">City</label>
-            <div className="flex gap-2"><input name="place" defaultValue={nv("place")} placeholder="e.g. Auckland" className="field" /><button className="btn-primary">Save</button></div><p className="text-xs text-dim">Saving a city also sets your timezone. Leave blank to clear.</p></form>
           <form action={saveTimezone} className="space-y-1.5"><label className="text-[13px] font-medium">Timezone</label><div className="flex gap-2"><input name="timezone" defaultValue={tz()} className="field" /><button className="btn">Update</button></div></form>
-          {(f.money || f.subscriptions) && <form action={saveCurrency} className="space-y-1.5"><label className="text-[13px] font-medium">Currency</label><div className="flex gap-2"><input name="currency" defaultValue={currency()} maxLength={3} className="field !w-28 uppercase" aria-label="Currency code" /><button className="btn">Save</button></div><p className="text-xs text-dim">Three-letter code, e.g. NZD, USD, EUR, GBP.</p></form>}
           <form action={saveCapacity} className="space-y-1.5"><label className="text-[13px] font-medium">Daily capacity (hours)</label><div className="flex gap-2"><input name="hours" type="number" step="0.5" min="1" max="16" defaultValue={Number(nv("capacity_min", "360")) / 60} className="field !w-28" /><button className="btn">Save</button></div>
             <p className="text-xs text-dim">Today shows planned time (from task estimates) against this.</p></form>
         </Panel>
@@ -94,8 +88,7 @@ export default async function Settings({ searchParams }: { searchParams: Promise
               <label className="space-y-1.5 text-[13px] font-medium">ntfy topic<input name="ntfy_topic" defaultValue={nv("ntfy_topic")} placeholder="a-long-private-topic-name" className="field font-normal" /></label></div>
             <label className="block space-y-1.5 text-[13px] font-medium">ntfy access token <span className="font-normal text-dim">(optional{nv("ntfy_token") ? ", already set" : ""})</span><input name="ntfy_token" type="password" placeholder={nv("ntfy_token") ? "••••••••" : "tk_…"} className="field font-normal" autoComplete="off" /></label>
             <label className="block space-y-1.5 text-[13px] font-medium">Webhook URL <span className="font-normal text-dim">(optional, receives JSON)</span><input name="webhook_url" defaultValue={nv("webhook_url")} placeholder="https://hooks.example.com/…" className="field font-normal" /></label>
-            <div className="grid gap-3 sm:grid-cols-2"><label className="space-y-1.5 text-[13px] font-medium">Morning brief at<input name="brief_time" type="time" defaultValue={nv("brief_time", "08:00")} className="field font-normal" /></label>
-              <label className="space-y-1.5 text-[13px] font-medium">Habit nudge at{f.habits ? "" : " (habits off)"}<input name="habit_nudge_time" type="time" defaultValue={nv("habit_nudge_time", "20:00")} className="field font-normal" /></label></div>
+            <div className="grid gap-3 sm:grid-cols-2"><label className="space-y-1.5 text-[13px] font-medium">Morning brief at<input name="brief_time" type="time" defaultValue={nv("brief_time", "08:00")} className="field font-normal" /></label></div>
             <div className="flex flex-wrap items-center gap-3"><button className="btn-primary">Save</button><TestNotify /></div>
           </form>
           <div className="border-t px-4 py-3 text-xs text-mute">Reminders are sent by a small background process. Run <code className="rounded bg-raise px-1">npm run worker</code> alongside the app (a systemd unit or pm2 keeps it running).</div></Panel>
@@ -184,22 +177,7 @@ export default async function Settings({ searchParams }: { searchParams: Promise
         </Section>
       )}
 
-      {f.news && (
-        <Section cur={tab} tab="connect" i={6} title="News feeds" desc="RSS and Atom feeds that power the headlines on Today and the News page.">
-          <Panel><ul>{feeds.map((x) => (
-            <li key={x.id} className="flex items-center justify-between gap-3 border-b px-4 py-2.5"><div className="min-w-0"><div className="truncate text-sm font-medium">{x.title || x.url}</div>{x.title && <div className="truncate text-xs text-dim">{x.url}</div>}</div>
-              <form action={removeFeed.bind(null, x.id)}><button className="rounded p-1 text-dim hover:bg-raise hover:text-danger" aria-label="Remove feed"><Icon name="x" size={16} /></button></form></li>))}</ul>
-            <form action={addFeed} className="flex flex-wrap gap-2 p-4"><input name="url" type="url" required placeholder="https://example.com/feed.xml" className="field min-w-0 flex-1 basis-60" /><input name="title" placeholder="Name (optional)" className="field w-44" /><button className="btn-primary">Add feed</button></form></Panel>
-        </Section>
-      )}
 
-      {f.music && (
-        <Section cur={tab} tab="connect" i={7} title="Spotify" desc="Show what's playing and control playback from the dashboard. Needs a Spotify Premium account.">
-          <Panel bodyClass="space-y-3 p-4">{!spotifyConfigured() ? (<><p className="text-sm text-mute">Create an app at developer.spotify.com, add this redirect URI, then set the environment variables and restart.</p><Code>{redirectUri()}</Code><Code>{`SPOTIFY_CLIENT_ID=…\nSPOTIFY_CLIENT_SECRET=…\nLIFEOS_BASE_URL=https://your.public.hostname`}</Code></>)
-            : spotifyConnected() ? (<form action={spotifyDisconnect} className="flex items-center justify-between text-sm"><span className="flex items-center gap-2 font-medium text-ok"><Icon name="circleCheck" size={17} />Connected</span><button className="btn">Disconnect</button></form>)
-            : (<div className="flex items-center justify-between text-sm"><span className="text-mute">Not connected</span><a href="/api/spotify/login" className="btn-primary">Connect Spotify</a></div>)}</Panel>
-        </Section>
-      )}
 
       <Section cur={tab} tab="data" id="backup" i={8} title="Backup to Cloudflare R2" desc="An encrypted copy of your database in your own R2 bucket, so losing this machine doesn't lose your data. Each backup is downloaded again and verified before it counts. Your local database stays the live one.">
         {(() => { const c = Backup.config(), st = Backup.status(); return (

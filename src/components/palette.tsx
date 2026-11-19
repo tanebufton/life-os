@@ -10,7 +10,7 @@ type Item = { label: string; group: string; hint?: string; icon?: string; projec
 
 type FoundHit = { kind: string; id: number; title: string; href: string; meta?: string; snippet?: string };
 type FoundGroup = { kind: string; label: string; items: FoundHit[] };
-const KIND_ICON: Record<string, string> = { task: "circleCheck", note: "notes", goal: "goals", person: "people", memo: "mic", project: "list" };
+const KIND_ICON: Record<string, string> = { task: "circleCheck", note: "notes", goal: "goals", memo: "mic", project: "list" };
 export function Palette({ projects, features }: { projects: NavProject[]; features: Features }) {
   const router = useRouter();
   const [open, setOpen] = useState(false), [q, setQ] = useState(""), [sel, setSel] = useState(0);

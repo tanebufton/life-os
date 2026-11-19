@@ -5,7 +5,7 @@ import { saveTagsAction, setNoteProjectAction } from "@/lib/actions5";
 import type { TagKind } from "@/lib/entitytags";
 import { Icon } from "./Icon";
 
-/** Tags and (optionally) a project for a note, goal or person. Saves when you leave the field. */
+/** Tags and (optionally) a project for a note or goal. Saves when you leave the field. */
 export function TagField({ kind, id, value }: { kind: TagKind; id: number; value: string[] }) {
   const [text, setText] = useState(value.join(" ")), [, start] = useTransition();
   const save = () => { if (text.trim() === value.join(" ")) return; start(async () => { const r = await saveTagsAction(kind, id, text); if (!r.ok) toast(r.error); }); };

@@ -7,14 +7,14 @@ import { addLinkAction, removeLinkAction } from "@/lib/actions5";
 import type { Linked, LinkKind } from "@/lib/links";
 import { Icon } from "./Icon";
 
-const ICON: Record<string, string> = { task: "circleCheck", note: "notes", goal: "goals", person: "people" };
+const ICON: Record<string, string> = { task: "circleCheck", note: "notes", goal: "goals" };
 type Found = { kind: LinkKind; id: number; title: string; meta?: string };
-/** Links between a task, note, goal or person and anything else. Shows both directions; add with a search box. */
+/** Links between a task, note or goal and anything else. Shows both directions; add with a search box. */
 export function LinksPanel({ kind, id, links }: { kind: LinkKind; id: number; links: Linked[] }) {
   const router = useRouter(), [adding, setAdding] = useState(false), [q, setQ] = useState(""), [found, setFound] = useState<Found[]>([]), [, start] = useTransition();
   useEffect(() => {
     if (!adding || q.trim().length < 2) { setFound([]); return; }
-    const c = new AbortController(), t = setTimeout(() => fetch(`/api/search?q=${encodeURIComponent(q)}&kinds=task,note,goal,person&limit=6`, { signal: c.signal }).then((r) => r.json()).then((j) => setFound((j.groups ?? []).flatMap((g: { items: Found[] }) => g.items).filter((h: Found) => !(h.kind === kind && h.id === id) && !links.some((l) => l.kind === h.kind && l.id === h.id)))).catch(() => {}), 150);
+    const c = new AbortController(), t = setTimeout(() => fetch(`/api/search?q=${encodeURIComponent(q)}&kinds=task,note,goal&limit=6`, { signal: c.signal }).then((r) => r.json()).then((j) => setFound((j.groups ?? []).flatMap((g: { items: Found[] }) => g.items).filter((h: Found) => !(h.kind === kind && h.id === id) && !links.some((l) => l.kind === h.kind && l.id === h.id)))).catch(() => {}), 150);
     return () => { clearTimeout(t); c.abort(); };
   }, [q, adding, kind, id, links]);
   const add = (h: Found) => start(async () => { const r = await addLinkAction(kind, id, h.kind, h.id); if (!r.ok) toast(r.error); else { setQ(""); setFound([]); setAdding(false); router.refresh(); } });

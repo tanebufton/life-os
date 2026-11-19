@@ -1,8 +1,6 @@
 import { addDays } from "./dates";
 import { queryTasks } from "./tasks";
 import { isOn } from "./features";
-import { listSubs } from "./subs";
-import { listPeople } from "./people";
 import { tz } from "./time";
 
 const esc = (s: string) => s.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
@@ -28,11 +26,6 @@ export function buildIcs(baseUrl = ""): string {
     if (baseUrl) L.push(fold(`URL:${baseUrl}/tasks/${t.id}`));
     L.push(`STATUS:${t.status_kind === "doing" ? "CONFIRMED" : "TENTATIVE"}`, "TRANSP:TRANSPARENT", "END:VEVENT");
   }
-  if (isOn("subscriptions")) for (const s of listSubs("active")) {
-    const rr = { weekly: "FREQ=WEEKLY", fortnightly: "FREQ=WEEKLY;INTERVAL=2", halfyearly: "FREQ=MONTHLY;INTERVAL=6", monthly: "FREQ=MONTHLY", quarterly: "FREQ=MONTHLY;INTERVAL=3", yearly: "FREQ=YEARLY" }[s.cycle];
-    L.push("BEGIN:VEVENT", `UID:sub-${s.id}@lifeos`, `DTSTAMP:${stamp}`, `DTSTART;VALUE=DATE:${ymd(s.next_due)}`, `DTEND;VALUE=DATE:${ymd(addDays(s.next_due, 1))}`, fold(`SUMMARY:${esc(`${s.name} renews (${(s.amount_cents / 100).toFixed(2)})`)}`), `RRULE:${rr}`, "TRANSP:TRANSPARENT", "END:VEVENT");
-  }
-  if (isOn("people")) for (const p of listPeople()) if (p.birthday) { const bd = p.birthday.length === 10 ? p.birthday : `2000-${p.birthday}`; if (Number.isNaN(Date.parse(bd))) continue; /* birthdays may have no year: anchor those to 2000 (a leap year) */ L.push("BEGIN:VEVENT", `UID:bday-${p.id}@lifeos`, `DTSTAMP:${stamp}`, `DTSTART;VALUE=DATE:${ymd(bd)}`, `DTEND;VALUE=DATE:${ymd(addDays(bd, 1))}`, fold(`SUMMARY:${esc(`${p.name}'s birthday`)}`), "RRULE:FREQ=YEARLY", "TRANSP:TRANSPARENT", "END:VEVENT"); }
   L.push("END:VCALENDAR");
   return L.join("\r\n") + "\r\n";
 }

@@ -3,7 +3,7 @@ import { NAV, type NavPage } from "./nav";
 export type SidebarPrefs = { order: string[]; hidden: string[]; shown: string[]; groups: string[] };
 export type GroupKey = NavPage["group"] | "projects";
 /** "projects" has no pages of its own: it stands for Favourites + the project list, so it can be ordered like any other section. */
-export const GROUPS: { key: GroupKey; title: string }[] = [{ key: "main", title: "" }, { key: "projects", title: "Projects" }, { key: "life", title: "Life" }, { key: "money", title: "Money" }, { key: "explore", title: "Explore" }];
+export const GROUPS: { key: GroupKey; title: string }[] = [{ key: "main", title: "" }, { key: "projects", title: "Projects" }, { key: "life", title: "Life" }, { key: "explore", title: "Explore" }];
 export const EMPTY_PREFS: SidebarPrefs = { order: [], hidden: [], shown: [], groups: [] };
 const strs = (v: unknown) => (Array.isArray(v) ? [...new Set(v.filter((x): x is string => typeof x === "string"))] : []);
 /** Read the saved preference defensively: anything unknown or malformed is ignored, so a bad value can never empty the sidebar. */

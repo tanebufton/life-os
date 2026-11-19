@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
-const L = await import("../src/lib/links.ts"); const T = await import("../src/lib/tasks.ts"); const N = await import("../src/lib/notes.ts"); const G = await import("../src/lib/goals.ts"); const P = await import("../src/lib/people.ts"); const A = await import("../src/lib/activity.ts");
+const L = await import("../src/lib/links.ts"); const T = await import("../src/lib/tasks.ts"); const N = await import("../src/lib/notes.ts"); const G = await import("../src/lib/goals.ts"); const A = await import("../src/lib/activity.ts");
 let n = 0; const ok = (m: string) => { n++; console.log("  ✓", m); };
-const t = T.createTask({ title: "Plan trip" }), note = N.createNote("Trip notes", "x"), g = G.createGoal({ title: "See the world" }), p = P.createPerson({ name: "Sam" });
+const t = T.createTask({ title: "Plan trip" }), note = N.createNote("Trip notes", "x"), g = G.createGoal({ title: "See the world" });
 assert.equal(L.addLink("task", t, "note", note), true); assert.equal(L.addLink("note", note, "task", t), false); ok("a link is created once, whichever side adds it");
 assert.deepEqual(L.listLinks("task", t).map((x: any) => x.title), ["Trip notes"]); assert.deepEqual(L.listLinks("note", note).map((x: any) => x.title), ["Plan trip"]); ok("it shows from both sides");
-L.addLink("task", t, "goal", g); L.addLink("person", p, "task", t); assert.deepEqual(L.listLinks("task", t).map((x: any) => x.kind).sort(), ["goal", "note", "person"]); ok("tasks, notes, goals and people can all be linked");
+L.addLink("task", t, "goal", g); assert.deepEqual(L.listLinks("task", t).map((x: any) => x.kind).sort(), ["goal", "note"]); ok("tasks, notes and goals can all be linked");
 assert.throws(() => L.addLink("task", t, "task", t), /itself/); assert.throws(() => L.addLink("task", t, "note", 99999), /no longer exists/); assert.throws(() => L.addLink("task", t, "memo" as any, 1), /Can't link/); ok("self-links, missing items and unsupported kinds are refused");
 const h = A.history("task", t).map((e: any) => A.describeEvent(e)); assert.ok(h.some((x: string) => x.includes("linked")) || A.history("task", t).some((e: any) => e.action === "linked")); ok("linking is recorded in the history of both items");
 T.deleteTask(t); assert.deepEqual(L.listLinks("note", note), []); T.restoreTask(t); assert.deepEqual(L.listLinks("note", note).map((x: any) => x.title), ["Plan trip"]); ok("a deleted item drops out of the list and comes back when restored");
-assert.equal(L.removeLink("note", note, "task", t), true); assert.equal(L.removeLink("note", note, "task", t), false); assert.deepEqual(L.listLinks("task", t).map((x: any) => x.kind).sort(), ["goal", "person"]); ok("removing works from either side, and twice is harmless");
+assert.equal(L.removeLink("note", note, "task", t), true); assert.equal(L.removeLink("note", note, "task", t), false); assert.deepEqual(L.listLinks("task", t).map((x: any) => x.kind).sort(), ["goal"]); ok("removing works from either side, and twice is harmless");
 console.log(`\n${n} checks passed`);

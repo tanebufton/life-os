@@ -1,15 +1,14 @@
 import { db } from "./db";
 import { cleanTag } from "./tasks";
 
-export type TagInfo = { id: number; name: string; color: string | null; tasks: number; notes: number; goals: number; people: number; total: number };
+export type TagInfo = { id: number; name: string; color: string | null; tasks: number; notes: number; goals: number; total: number };
 /** Every tag with how many of each kind of item carries it. */
 export function allTags(): TagInfo[] {
   return (db.prepare(`SELECT g.id, g.name, g.color,
     (SELECT count(*) FROM task_tags tt JOIN tasks t ON t.id=tt.task_id WHERE tt.tag_id=g.id AND t.deleted_at IS NULL) AS tasks,
     (SELECT count(*) FROM entity_tags e WHERE e.tag_id=g.id AND e.kind='note') AS notes,
-    (SELECT count(*) FROM entity_tags e WHERE e.tag_id=g.id AND e.kind='goal') AS goals,
-    (SELECT count(*) FROM entity_tags e WHERE e.tag_id=g.id AND e.kind='person') AS people
-    FROM tags g ORDER BY g.name`).all() as Omit<TagInfo, "total">[]).map((t) => ({ ...t, total: t.tasks + t.notes + t.goals + t.people }));
+    (SELECT count(*) FROM entity_tags e WHERE e.tag_id=g.id AND e.kind='goal') AS goals
+    FROM tags g ORDER BY g.name`).all() as Omit<TagInfo, "total">[]).map((t) => ({ ...t, total: t.tasks + t.notes + t.goals }));
 }
 const HEX = /^#[0-9a-f]{6}$/i;
 export function setTagColor(name: string, color: string | null) {

@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { assertPublicUrl } from "./news";
+import { assertPublicUrl } from "./netsafe";
 import { queryTasks, type TaskRow } from "./tasks";
 import { today } from "./time";
 import { diffDays } from "./dates";

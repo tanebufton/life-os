@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 const L = (p: string) => import("../src/lib/" + p);
 const { parseQuickAdd: pq } = await L("parse");
 const T = await L("tasks"); const { today, localNow } = await L("time"); const { addDays, addMonths, weekday } = await L("dates");
-const H = await L("habits"); const J = await L("journal"); const I = await L("insights"); const E = await L("email");
+const I = await L("insights"); const E = await L("email");
 const R = await L("reminders"); const K = await L("tokens"); const F = await L("features"); const C = await L("ical"); const X = await L("exporter"); const S = await L("settings");
 const t = today();
 let n = 0; const ok = (name: string) => { n++; console.log("  ✓", name); };
@@ -54,23 +54,8 @@ assert.deepEqual(ids("#bills @work due:today"), ["Invoice for Acme"]); assert.de
 assert.ok(ids("has:link").includes("Invoice for Acme")); assert.ok(ids("is:done").includes("Old invoice") && !ids("is:done").includes("Buy milk")); assert.deepEqual(ids("100%"), []);
 assert.ok(ids("no:date").includes("Temp")); ok("search operators (#tag @project due: is: has: no:) + LIKE escaping");
 
-// ---- habits
-const h = H.createHabit("Read", { days: [0, 1, 2, 3, 4, 5, 6] });
-for (let i = 1; i <= 3; i++) H.toggleHabit(h, addDays(t, -i));
-let st = H.habitStats(H.getHabit(h), t); assert.equal(st.streak, 3); ok("habit: streak holds when today not yet done");
-H.toggleHabit(h, t); st = H.habitStats(H.getHabit(h), t); assert.equal(st.streak, 4); assert.equal(st.best, 4);
-H.toggleHabit(h, addDays(t, -2)); st = H.habitStats(H.getHabit(h), t); assert.equal(st.streak, 2); ok("habit: gap breaks streak; best preserved");
-assert.equal(H.toggleHabit(h, t)!.done, false); assert.equal(H.habitsToday().find((x: any) => x.id === h).done, false); ok("habit: toggle off");
-const wk = H.createHabit("Gym", { days: [1, 3, 5] }); // Mon/Wed/Fri, skipping other days must not break the streak
-const mons: string[] = []; for (let i = 0; i < 21; i++) { const d = addDays(t, -i); if ([1, 3, 5].includes(weekday(d))) mons.push(d); }
-for (const d of mons) H.toggleHabit(wk, d); assert.equal(H.habitStats(H.getHabit(wk), t).streak, mons.length); ok("habit: unscheduled days are skipped, not breaks");
-
-// ---- journal
-J.saveEntry(t, { mood: 4, body: "Good day" }); J.saveEntry(t, { body: "Great day" }); assert.equal(J.getEntry(t).mood, 4); assert.equal(J.getEntry(t).body, "Great day");
-assert.equal(J.listEntries({ q: "great" }).length, 1); assert.equal(J.moodSeries(7).at(-1).mood, 4); assert.ok(J.journalStreak() >= 1); ok("journal: upsert keeps mood, search, series, streak");
-
 // ---- insights
-const ins = I.insights(t); assert.ok(ins.thisWeek >= 3); assert.equal(ins.heat.length, 182); assert.ok(ins.streak >= 1); assert.ok(ins.habits.length >= 2); ok("insights: heatmap, week totals, streak, habits");
+const ins = I.insights(t); assert.ok(ins.thisWeek >= 3); assert.equal(ins.heat.length, 182); assert.ok(ins.streak >= 1); ok("insights: heatmap, week totals, streak, habits");
 
 // ---- email import
 const e1 = E.importEmail({ from: "Ann <ann@x.test>", to: "tasks+work@me.test", subject: "Fwd: Re: Pay invoice tomorrow #bills !high", messageId: "<m1@x>", text: "Please pay by Friday.\n\nOn Mon, Bob wrote:\n> old stuff\n-- \nsig" });
@@ -84,7 +69,7 @@ const tok = K.createToken("bot"); assert.ok(tok.startsWith("lifeos_")); assert.o
 assert.equal(K.listTokens()[0].prefix, tok.slice(0, 12)); assert.ok(K.revokeToken(K.listTokens()[0].id)); assert.ok(!K.verifyBearer(`Bearer ${tok}`)); ok("tokens: hashed, verify, revoke");
 
 // ---- features
-assert.equal(F.isOn("habits"), true); F.setFeature("habits", false); assert.equal(F.isOn("habits"), false); assert.equal(F.featureMap().habits, false); assert.equal(F.featureMap().journal, true); F.setFeature("habits", true); ok("features: toggle on/off");
+assert.equal(F.isOn("board"), true); F.setFeature("board", false); assert.equal(F.isOn("board"), false); assert.equal(F.featureMap().board, false); assert.equal(F.featureMap().notes, true); F.setFeature("board", true); ok("features: toggle on/off");
 
 // ---- reminders (fake channel)
 const { hm, date } = localNow(); const cur = +hm.slice(0, 2) * 60 + +hm.slice(3);

@@ -7,9 +7,7 @@ import { addLink, removeLink, type LinkKind } from "./links";
 import { setEntityTags, type TagKind } from "./entitytags";
 import { createNote, moveNote, restoreNoteVersion, updateNote } from "./notes";
 import { toggleFavourite, type FavKind } from "./favourites";
-import { markRangePaid, setCharge } from "./subs";
 import { PROJECT_VIEWS } from "./projectviews";
-import { savePayday, setSetAside } from "./payday";
 import { redirect } from "next/navigation";
 import { setSetting } from "./settings";
 import { parsePrefs } from "./sidebar";
@@ -43,7 +41,7 @@ export async function saveBoardDoneDays(days: number): Promise<R> { return run((
 export async function saveSidebarAction(prefs: unknown): Promise<R> { return run(() => { setSetting("sidebar", JSON.stringify(parsePrefs(JSON.stringify(prefs)))); }); }
 export async function resetSidebarAction(): Promise<R> { return run(() => { setSetting("sidebar", null); return "Sidebar back to the default order"; }); }
 
-export async function saveTagsAction(kind: TagKind, id: number, text: string): Promise<R> { return run(() => { if (!["note", "goal", "person"].includes(kind)) throw new Error("Can't tag that"); setEntityTags(kind, id, parseTags(text)); }); }
+export async function saveTagsAction(kind: TagKind, id: number, text: string): Promise<R> { return run(() => { if (!["note", "goal"].includes(kind)) throw new Error("Can't tag that"); setEntityTags(kind, id, parseTags(text)); }); }
 export async function setNoteProjectAction(id: number, projectId: number | null): Promise<R> { return run(() => { updateNote(id, { project_id: projectId }); }); }
 export async function restoreNoteVersionAction(noteId: number, versionId: number): Promise<R> { return run(() => { if (!restoreNoteVersion(noteId, versionId)) throw new Error("That version is gone"); return "Restored. The text it replaced is kept as a version."; }); }
 export async function renameProjectAction(id: number, name: string, color: string, icon?: string, area?: string, view?: string): Promise<R> {
@@ -121,11 +119,6 @@ export async function moveProjectAction(id: number, dir: -1 | 1): Promise<R> {
     const peers = (db.prepare("SELECT id FROM projects WHERE archived=0 AND area=? ORDER BY position, name COLLATE NOCASE").all(p.area) as { id: number }[]).map((r) => r.id), i = peers.indexOf(id), j = i + dir;
     if (i < 0 || j < 0 || j >= peers.length) return; [peers[i], peers[j]] = [peers[j], peers[i]]; const st = db.prepare("UPDATE projects SET position=? WHERE id=?"); db.transaction(() => peers.forEach((pid, k) => st.run(k + 1, pid)))(); });
 }
-export async function savePaydayAction(fd: FormData) { try { savePayday(String(fd.get("freq") ?? ""), String(fd.get("anchor") ?? "")); } catch { /* the form's required fields stop this in practice */ } revalidatePath("/subscriptions"); redirect("/subscriptions"); }
-export async function clearPaydayAction() { setSetting("payday_freq", null); setSetting("payday_anchor", null); revalidatePath("/subscriptions"); redirect("/subscriptions"); }
-export async function setSetAsideAction(from: string, done: boolean): Promise<R> { return run(() => { if (/^\d{4}-\d{2}-\d{2}$/.test(from)) setSetAside(from, done); }); }
-export async function setChargeAction(subId: number, due: string, paid: boolean): Promise<R> { return run(() => { setCharge(subId, due, paid); }); }
-export async function markRangePaidAction(from: string, to: string): Promise<R> { return run(() => { const n = markRangePaid(from, to); return n ? `Marked ${n} paid` : "Nothing left to mark"; }); }
 export async function toggleFavouriteAction(kind: FavKind, id: number): Promise<R> { return run(() => (toggleFavourite(kind, id) ? "Added to favourites" : "Removed from favourites")); }
 export async function moveNoteAction(id: number, parentId: number | null): Promise<R> { return run(() => { const e = moveNote(id, parentId); if (e) throw new Error(e); return "Moved"; }); }
 export async function newSubpageAction(parentId: number) { const id = createNote("", "", null, parentId); revalidatePath("/", "layout"); redirect(`/notes/${id}`); }

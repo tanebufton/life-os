@@ -20,9 +20,9 @@ db.prepare("UPDATE api_tokens SET areas=? WHERE name='t'").run('["tasks"]');
 
 // ---- guard
 RL.resetLimits();
-assert.equal(status(guard(req("GET", full))), 200); assert.equal(status(guard(req("POST", full), "money")), 200); ok("a normal token can read and write");
+assert.equal(status(guard(req("GET", full))), 200); assert.equal(status(guard(req("POST", full), "voice")), 200); ok("a normal token can read and write");
 assert.equal(status(guard(req("GET", ro))), 200); assert.equal(status(guard(req("POST", ro))), 403); assert.equal(status(guard(req("PATCH", ro))), 403); assert.equal(status(guard(req("DELETE", ro))), 403); ok("read-only token can GET but not POST, PATCH or DELETE");
-assert.equal(status(guard(req("GET", tasksOnly), "money")), 403); assert.equal(status(guard(req("GET", tasksOnly))), 200); ok("a tasks-only token is refused on money");
+assert.equal(status(guard(req("GET", tasksOnly), "voice")), 403); assert.equal(status(guard(req("GET", tasksOnly))), 200); ok("a tasks-only token is refused on money");
 assert.equal(status(guard(req("GET", exp))), 401); ok("expired token gets 401");
 F.setFeature("voice", false); assert.equal(status(guard(req("GET"), "voice")), 401); assert.equal(status(guard(req("GET", full), "voice")), 404); F.setFeature("voice", true); ok("a disabled feature isn't revealed to unauthenticated callers");
 assert.equal(status(guard(new Request("http://x", { method: "POST", headers: { authorization: `Bearer ${full}`, "content-length": "5000000" } }))), 413); ok("oversized request body is refused");

@@ -18,7 +18,6 @@ import { db } from "@/lib/db";
 import { featureMap } from "@/lib/features";
 import { resolveTabs } from "@/lib/nav";
 import { getSetting } from "@/lib/settings";
-import { currency, listCategories } from "@/lib/money";
 import { today } from "@/lib/time";
 
 export const metadata = { title: "LifeOS", applicationName: "LifeOS", appleWebApp: { capable: true, title: "LifeOS", statusBarStyle: "default" as const }, icons: { icon: "/icons/icon.svg", apple: "/icons/apple-touch-icon.png" } };
@@ -28,7 +27,6 @@ export const viewport = { width: "device-width", initialScale: 1, themeColor: "#
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const t = today();
   const features = featureMap();
-  const money = features.money ? { cats: listCategories("expense").map((c) => c.name), currency: currency() } : null;
   const projects = db.prepare(`SELECT p.id, p.name, p.color, p.icon, p.area, (SELECT count(*) FROM tasks k WHERE k.project_id=p.id AND k.done_at IS NULL AND k.deleted_at IS NULL AND k.parent_id IS NULL) AS open
     FROM projects p WHERE p.archived=0 ORDER BY p.area='', p.area COLLATE NOCASE, p.position, p.name COLLATE NOCASE`).all() as NavProject[];
   const counts = db.prepare(`SELECT
@@ -44,7 +42,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Sidebar counts={counts} projects={projects} features={features} filters={listFilters()} favourites={listFavourites()} prefs={parsePrefs(getSetting("sidebar"))} />
           <div className="flex min-w-0 flex-1 flex-col">
             <main className="min-h-0 flex-1 overflow-y-auto">
-              <Topbar today={t} projects={projects} money={money} />
+              <Topbar today={t} projects={projects} />
               <Content>{children}</Content>
             </main>
           </div>
@@ -52,7 +50,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <MobileNav counts={counts} tabs={resolveTabs(getSetting("mobile_tabs"), features)} />
         <PwaRegister />
         <ReminderWatcher enabled={features.reminders && browserNotifyConfig().on} />
-        <CaptureFab today={t} money={money} />
+        <CaptureFab today={t} />
         </SessionProvider>
         <Toaster position="bottom-center" offset={{ bottom: 88 }} mobileOffset={{ bottom: 140 }} toastOptions={{ style: { background: "rgb(var(--panel))", color: "rgb(var(--fg))", border: "1px solid rgb(var(--line) / .12)", borderRadius: 12, fontFamily: "inherit" } }} />
         <Palette projects={projects} features={features} />

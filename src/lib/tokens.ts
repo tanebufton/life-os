@@ -3,7 +3,7 @@ import { db } from "./db";
 import { getSetting, setSetting } from "./settings";
 
 const hash = (s: string) => crypto.createHash("sha256").update(s).digest("hex");
-export const AREAS = ["tasks", "habits", "journal", "money", "subscriptions", "voice"] as const;
+export const AREAS = ["tasks", "voice"] as const;
 export type Area = (typeof AREAS)[number];
 export type Level = "read" | "write";
 export type TokenInfo = { name: string; id: number; level: Level; areas: Area[] | null };

@@ -8,7 +8,7 @@ import type { Fav } from "@/lib/favourites";
 import { arrange, withVisibility, EMPTY_PREFS, type SidebarPrefs } from "@/lib/sidebar";
 import { toast } from "sonner";
 import { NAV, SETTINGS_PAGE, visiblePages, type Features, type NavPage } from "@/lib/nav";
-import { CaptureForm, type MoneyCtx } from "./capture";
+import { CaptureForm } from "./capture";
 import { Icon } from "./Icon";
 import { ProjectAvatar } from "./Pill";
 import { ThemeToggle } from "./theme";
@@ -61,7 +61,7 @@ export function Sidebar({ counts, projects, features, filters = [], favourites =
     const ids = projects.filter((x) => (x.area ?? "") === (from.area ?? "")).map((x) => x.id).filter((i) => i !== from.id); ids.splice(ids.indexOf(target.id), 0, from.id);
     void reorderProjectsAction(ids).then((r) => { if (!r.ok) toast(r.error); router.refresh(); });
   };
-  const [collapsed, setCollapsed] = useState<string[]>(["life", "money", "explore", "filters"]);
+  const [collapsed, setCollapsed] = useState<string[]>(["life", "explore", "filters"]);
   useEffect(() => { try { const v = localStorage.getItem("lifeos.sb.collapsed"); if (v) setCollapsed(JSON.parse(v)); } catch { /* keep defaults */ } }, []);
   const toggle = (k: string) => setCollapsed((c) => { const n = c.includes(k) ? c.filter((x) => x !== k) : [...c, k]; try { localStorage.setItem("lifeos.sb.collapsed", JSON.stringify(n)); } catch { /* ignore */ } return n; });
   const [adding, setAdding] = useState(false), [editing, setEditing] = useState(false), [prefs, setPrefs] = useState<SidebarPrefs>(savedPrefs), [drag, setDrag] = useState<string | null>(null);
@@ -188,7 +188,7 @@ function crumbs(path: string, projects: NavProject[]): string[] {
   if (path.startsWith("/notes/")) return ["Notes", "Page"];
   return [[...NAV, SETTINGS_PAGE].find((p) => isActive(path, p.href))?.label ?? "LifeOS"];
 }
-export function Topbar({ today, projects, money }: { today: string; projects: NavProject[]; money?: MoneyCtx }) {
+export function Topbar({ today, projects }: { today: string; projects: NavProject[] }) {
   const path = usePathname();
   const c = crumbs(path, projects);
   return (
@@ -197,7 +197,7 @@ export function Topbar({ today, projects, money }: { today: string; projects: Na
       <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-1.5 text-[14px] md:w-40">
         {c.map((x, i) => (<span key={i} className="flex min-w-0 items-center gap-1.5">{i > 0 && <span className="text-dim">/</span>}<span className={`truncate ${i === c.length - 1 ? "font-semibold" : "text-mute"}`}>{x}</span></span>))}
       </nav>
-      <div className="mx-auto hidden w-full max-w-xl md:block"><CaptureForm today={today} variant="pill" money={money} /></div>
+      <div className="mx-auto hidden w-full max-w-xl md:block"><CaptureForm today={today} variant="pill" /></div>
       <div className="ml-auto flex items-center gap-1.5 md:justify-end"><button onClick={openPalette} aria-label="Search" title="Search (⌘K)" className="rounded-md p-1.5 text-mute hover:bg-raise hover:text-fg"><Icon name="search" size={18} /></button><button onClick={focusCapture} className="btn-primary hidden !h-8 md:inline-flex"><Icon name="plus" size={14} />New task</button></div>
     </div></header>
   );
@@ -214,7 +214,7 @@ export function MobileNav({ counts, tabs }: { counts: Counts; tabs: NavPage[] })
         return (
           <Link key={p.href} href={p.href} className={`flex min-w-0 flex-1 flex-col items-center gap-0.5 pb-1.5 pt-2 text-[10.5px] font-medium ${on ? "text-accent" : "text-mute"}`}>
             <span className="relative"><Icon name={p.icon} size={22} />{badge[p.href] ? <span className="absolute -right-2.5 -top-1.5 min-w-4 rounded-full bg-danger px-1 text-center text-[10px] font-bold leading-4 text-white">{badge[p.href]}</span> : null}</span>
-            <span className="max-w-full truncate px-0.5">{p.label === "My tasks" ? "Tasks" : p.label === "Subscriptions" ? "Subs" : p.label === "Plan & review" ? "Review" : p.label}</span>
+            <span className="max-w-full truncate px-0.5">{p.label === "My tasks" ? "Tasks" : p.label === "Plan & review" ? "Review" : p.label}</span>
           </Link>
         );
       })}

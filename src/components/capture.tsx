@@ -1,8 +1,7 @@
 "use client";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { quickAdd, quickSpend } from "@/lib/actions";
-import { fmtMoney, parseMoneyQuick } from "@/lib/moneyfmt";
+import { quickAdd } from "@/lib/actions";
 import { fmtMinutes, fmtTime, nice } from "@/lib/dates";
 import { describeRepeat, parseQuickAdd } from "@/lib/parse";
 import { Icon } from "./Icon";
@@ -12,8 +11,7 @@ import { Pill } from "./Pill";
 
 const SYNTAX: [string, string][] = [["#tag", "label it"], ["@project", "file it in a project"], ["!high  !low  !doing", "priority or status"], ["tomorrow · friday · in 3 days", "due date"], ["daily · weekdays · every 2 weeks", "repeat"]];
 
-function Preview({ v, parsed, today, empty, mq, cur }: { v: string; parsed: ReturnType<typeof parseQuickAdd> | null; today: string; empty: boolean; mq?: ReturnType<typeof parseMoneyQuick>; cur?: string }) {
-  if (mq) return (<div className="space-y-2"><div className="text-[15px] font-medium">{mq.payee || (mq.amount_cents < 0 ? "Expense" : "Income")}</div><div className="flex flex-wrap items-center gap-1.5 text-xs"><span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-medium ${mq.amount_cents < 0 ? "bg-danger/10 text-danger" : "bg-ok/10 text-ok"}`}><Icon name="wallet" size={12} />{mq.amount_cents < 0 ? "Expense" : "Income"} {fmtMoney(Math.abs(mq.amount_cents), cur ?? "USD")}</span>{mq.category && <span className="rounded bg-raise px-1.5 py-0.5 font-medium">{mq.category}</span>}{mq.date && <span className="rounded bg-raise px-1.5 py-0.5">{mq.date}</span>}<span className="text-dim">↵ logs it to your budget</span></div></div>);
+function Preview({ parsed, today, empty }: { parsed: ReturnType<typeof parseQuickAdd> | null; today: string; empty: boolean }) {
   const effDue = parsed?.due ?? (parsed?.due_time || parsed?.repeat ? today : null);
   const due = effDue ? (effDue === today ? "Today" : nice(effDue)) : null;
   if (parsed?.title) return (
@@ -39,8 +37,7 @@ function Preview({ v, parsed, today, empty, mq, cur }: { v: string; parsed: Retu
   return null;
 }
 
-export type MoneyCtx = { cats: string[]; currency: string } | null;
-export function CaptureForm({ today, variant, onDone, money }: { today: string; variant: "pill" | "sheet"; onDone?: () => void; money?: MoneyCtx }) {
+export function CaptureForm({ today, variant, onDone }: { today: string; variant: "pill" | "sheet"; onDone?: () => void }) {
   const [v, setV] = useState(""), [focus, setFocus] = useState(false), [ok, setOk] = useState(false);
   const { guarded } = useSession(), dk = `capture:${variant}`;
   useEffect(() => { const d = getDraft<string>(dk); if (d?.value?.trim()) setV(d.value); }, [dk]);
@@ -48,10 +45,9 @@ export function CaptureForm({ today, variant, onDone, money }: { today: string; 
   const pid = usePathname().match(/^\/projects\/(\d+)/)?.[1];
   const parsed = useMemo(() => { if (!v.trim()) return null; try { return parseQuickAdd(v, today); } catch { return null; } }, [v, today]);
   const sheet = variant === "sheet";
-  const mq = money ? parseMoneyQuick(v, today, money.cats) : null;
   const action = async (fd: FormData) => {
-    if (!mq && !parsed?.title) return;
-    const g = await guarded(`capture-save:${dk}`, v, async () => { if (mq) await quickSpend(v); else await quickAdd(fd); });
+    if (!parsed?.title) return;
+    const g = await guarded(`capture-save:${dk}`, v, async () => { await quickAdd(fd); });
     if (!g.saved) return; // text stays in the box (and in local storage) until it really saved
     setV(""); setOk(true); setTimeout(() => setOk(false), 1800); onDone?.();
   };
@@ -67,16 +63,16 @@ export function CaptureForm({ today, variant, onDone, money }: { today: string; 
         {!sheet && !v && <kbd className="hidden rounded border bg-panel px-1.5 text-[11px] text-dim lg:block">C</kbd>}
       </div>
       {sheet ? (
-        <div className="mt-3 min-h-14"><Preview v={v} parsed={parsed} today={today} empty={!v} mq={mq} cur={money?.currency} /></div>
+        <div className="mt-3 min-h-14"><Preview parsed={parsed} today={today} empty={!v} /></div>
       ) : (
-        focus && (parsed?.title || mq || !v) && <div className="absolute inset-x-0 top-full z-30 mt-2 rounded-xl border bg-panel p-3.5 shadow-[0_8px_30px_rgb(0_0_0/0.12)]"><Preview v={v} parsed={parsed} today={today} empty={!v} mq={mq} cur={money?.currency} /></div>
+        focus && (parsed?.title || !v) && <div className="absolute inset-x-0 top-full z-30 mt-2 rounded-xl border bg-panel p-3.5 shadow-[0_8px_30px_rgb(0_0_0/0.12)]"><Preview parsed={parsed} today={today} empty={!v} /></div>
       )}
-      {sheet && <button className="btn-primary mt-3 !h-11 w-full !text-[15px]" disabled={!parsed?.title && !mq}>Add task</button>}
+      {sheet && <button className="btn-primary mt-3 !h-11 w-full !text-[15px]" disabled={!parsed?.title}>Add task</button>}
     </form>
   );
 }
 
-export function CaptureFab({ today, money }: { today: string; money?: MoneyCtx }) {
+export function CaptureFab({ today }: { today: string }) {
   const [open, setOpen] = useState(false);
   useEffect(() => { const f = () => setOpen(true); window.addEventListener("lifeos:capture", f); return () => window.removeEventListener("lifeos:capture", f); }, []);
   return (
@@ -87,7 +83,7 @@ export function CaptureFab({ today, money }: { today: string; money?: MoneyCtx }
           <div className="w-full rounded-t-2xl bg-bg p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl">
             <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-fg/15" />
             <div className="mb-3 flex items-center justify-between"><h2 className="text-base font-semibold">New task</h2><button onClick={() => setOpen(false)} aria-label="Close" className="rounded-full p-1.5 text-mute hover:bg-raise"><Icon name="x" size={18} /></button></div>
-            <CaptureForm today={today} variant="sheet" onDone={() => setOpen(false)} money={money} />
+            <CaptureForm today={today} variant="sheet" onDone={() => setOpen(false)} />
           </div>
         </div>
       )}

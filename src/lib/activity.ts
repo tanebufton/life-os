@@ -13,7 +13,7 @@ export const runAs = <T>(actor: string, fn: () => T): T => als.run({ actor }, fn
 export const setActor = (actor: string) => { als.enterWith({ actor }); };
 export const currentActor = () => als.getStore()?.actor ?? processActor;
 
-export type Entity = "task" | "note" | "goal" | "person";
+export type Entity = "task" | "note" | "goal";
 export type Event = { id: number; entity: Entity; entity_id: number; action: string; field: string | null; old: string | null; new: string | null; actor: string; at: string };
 const cut = (v: unknown) => (v === null || v === undefined || v === "" ? null : String(v).replace(/\s+/g, " ").trim().slice(0, 160) || null);
 export function record(entity: Entity, id: number, action: string, o: { field?: string; old?: unknown; new?: unknown } = {}) {

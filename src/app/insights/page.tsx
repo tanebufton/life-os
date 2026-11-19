@@ -39,13 +39,6 @@ export default function Insights() {
               <div key={p.name}><div className="mb-1 flex justify-between text-[13px]"><span className="flex items-center gap-2"><span className="h-2 w-2 rounded-[3px]" style={{ background: p.color }} />{p.name}</span><span className="text-mute">{p.count}</span></div>
                 <div className="h-1.5 overflow-hidden rounded-full bg-raise"><div className="h-full rounded-full" style={{ width: `${(p.count / maxP) * 100}%`, background: p.color }} /></div></div>)) : <p className="text-sm text-mute">Complete a few tasks to see the split.</p>}</div>
           </Panel>
-          {isOn("habits") && (
-            <Panel title="Habit consistency (30 days)" i={3} right={<Link href="/habits" className="font-medium text-accent hover:underline">Habits</Link>}>
-              <div className="space-y-2.5 px-4 pb-4">{i.habits.length ? i.habits.map((h) => (
-                <div key={h.name}><div className="mb-1 flex justify-between text-[13px]"><span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full" style={{ background: h.color }} />{h.name}</span><span className="text-mute">{h.rate30}% · <Icon name="flame" size={11} className="inline text-warn" /> {h.streak}</span></div>
-                  <div className="h-1.5 overflow-hidden rounded-full bg-raise"><div className="h-full rounded-full" style={{ width: `${h.rate30}%`, background: h.color }} /></div></div>)) : <p className="text-sm text-mute">No habits yet.</p>}</div>
-            </Panel>
-          )}
         </div>
       </div>
     </FeatureGate>

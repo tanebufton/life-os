@@ -2,7 +2,7 @@ import { db } from "./db";
 import { record, type Entity } from "./activity";
 import { cleanTag, ensureTag, parseTags, uniqueTags } from "./tasks";
 
-export type TagKind = "note" | "goal" | "person";
+export type TagKind = "note" | "goal";
 export { parseTags };
 export const entityTags = (kind: TagKind, id: number): string[] => (db.prepare("SELECT g.name FROM entity_tags e JOIN tags g ON g.id=e.tag_id WHERE e.kind=? AND e.entity_id=? ORDER BY g.name").all(kind, id) as { name: string }[]).map((r) => r.name);
 export function setEntityTags(kind: TagKind, id: number, names: string[]) {

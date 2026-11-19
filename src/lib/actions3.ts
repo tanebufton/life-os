@@ -7,7 +7,6 @@ import { isOn } from "./features";
 import { addKeyResult, createGoal, deleteGoal, deleteKeyResult, setGoalStatus, setKeyResult, type Goal } from "./goals";
 import { addComment, deleteComment, emptyTrash, deleteFilter, purgeTask, saveFilter, enrichLinkTask } from "./misc";
 import { createNote, deleteNote, getNote, noteByTitle, noteRev, saveNote, updateNote } from "./notes";
-import { archivePerson, createPerson, followUpTask, logContact, updatePerson } from "./people";
 import { autoSchedule, findSlot, toHm, workHours } from "./planner";
 import { getSetting, setSetting } from "./settings";
 import { tgConfigured, tgHookToken, tgLinkCode, tgSecret, tgSend, tgUseMode } from "./telegram";
@@ -57,12 +56,6 @@ export async function addKrAction(goalId: number, fd: FormData) { try { addKeyRe
 export async function setKrAction(id: number, v: number) { if (Number.isFinite(v)) setKeyResult(id, v); refresh(); }
 export async function deleteKrAction(id: number) { deleteKeyResult(id); refresh(); }
 
-// people
-export async function addPersonAction(fd: FormData) { const n = s(fd, "name"); if (!n) return; createPerson({ name: n, birthday: s(fd, "birthday") || null, cadence_days: Number(s(fd, "cadence")) || null, notes: s(fd, "notes") }); refresh(); }
-export async function logContactAction(id: number, note = "") { logContact(id, note); refresh(); }
-export async function updatePersonAction(id: number, p: { name?: string; notes?: string; birthday?: string | null; cadence_days?: number | null }) { updatePerson(id, p); refresh(); }
-export async function archivePersonAction(id: number) { archivePerson(id); refresh(); }
-export async function followUpAction(id: number) { followUpTask(id); refresh(); }
 
 // templates
 export async function useTemplateAction(id: number) { const t = useTemplate(id, { due: today() }); refresh(); if (t) redirect(`/tasks/${t}`); }

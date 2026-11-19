@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { searchAll, type Kind } from "@/lib/search";
 export const dynamic = "force-dynamic";
-const KINDS = ["task", "note", "goal", "person", "memo", "project"];
+const KINDS = ["task", "note", "goal", "memo", "project"];
 /** Same-origin search for the command palette and link picker (protected like the rest of the UI). `tasks` is kept for older callers. */
 export function GET(req: Request) {
   const u = new URL(req.url), q = u.searchParams.get("q")?.trim() ?? "", kinds = (u.searchParams.get("kinds") ?? "").split(",").filter((k) => KINDS.includes(k)) as Kind[];

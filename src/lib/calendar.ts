@@ -1,7 +1,7 @@
 import ical from "node-ical";
 import { db } from "./db";
 import { addDays } from "./dates";
-import { assertPublicUrl } from "./news";
+import { assertPublicUrl } from "./netsafe";
 import { localNow, today } from "./time";
 
 export type Feed = { id: number; name: string; url: string; color: string; enabled: number; last_synced: string | null; last_error: string | null };
