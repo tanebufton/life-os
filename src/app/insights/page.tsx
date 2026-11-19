@@ -34,7 +34,7 @@ export default function Insights() {
           </Panel>
         </div>
         <div className="grid gap-4 md:grid-cols-2">
-          <Panel title="Where the effort went (30 days)" i={2}>
+          <Panel title="Where the effort went (30 days)" i={2} className="md:col-span-2">
             <div className="space-y-2.5 px-4 pb-4">{i.byProject.length ? i.byProject.map((p) => (
               <div key={p.name}><div className="mb-1 flex justify-between text-[13px]"><span className="flex items-center gap-2"><span className="h-2 w-2 rounded-[3px]" style={{ background: p.color }} />{p.name}</span><span className="text-mute">{p.count}</span></div>
                 <div className="h-1.5 overflow-hidden rounded-full bg-raise"><div className="h-full rounded-full" style={{ width: `${(p.count / maxP) * 100}%`, background: p.color }} /></div></div>)) : <p className="text-sm text-mute">Complete a few tasks to see the split.</p>}</div>

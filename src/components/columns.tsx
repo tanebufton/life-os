@@ -52,7 +52,7 @@ export function ColumnsEditor({ projectId, projectName, columns, custom, counts 
 export function DoneWindow({ days, showingAll, base }: { days: number; showingAll: boolean; base: string }) {
   const [, start] = useTransition();
   return (
-    <label className="inline-flex items-center gap-2 text-[13px] text-mute">Hide finished cards after
+    <label className="inline-flex items-center gap-2 text-[13px] text-mute">Hide finished after
       <select value={days} aria-label="Hide finished cards after" className="field !w-auto !py-1" onChange={(e) => start(async () => { const r = await saveBoardDoneDays(Number(e.target.value)); if (!r.ok) toast(r.error); })}>
         <option value={0}>Never</option><option value={1}>1 day</option><option value={3}>3 days</option><option value={7}>7 days</option><option value={14}>14 days</option><option value={30}>30 days</option><option value={90}>90 days</option></select>
       {days > 0 && <a href={showingAll ? base : `${base}${base.includes("?") ? "&" : "?"}done=all`} className="text-accent hover:underline">{showingAll ? "Back to recent" : "Show all"}</a>}

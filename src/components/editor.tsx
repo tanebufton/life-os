@@ -70,11 +70,11 @@ export function TaskEditor({ task, projects, focus, columns, head, children, tod
           <Prop icon="repeat" label="Repeat"><input value={v.repeat} onChange={(e) => set("repeat", e.target.value)} onBlur={() => { save({ repeat: v.repeat.trim() || null }); void flush(); }} placeholder="Doesn't repeat" title="Try: weekly, every 2 weeks, 15th of the month" onKeyDown={enterBlur} className="ghost max-w-full" /></Prop>
           <Prop icon="tag" label="Tags"><input value={v.tags} onChange={(e) => set("tags", e.target.value)} onBlur={() => { save({ tags: v.tags }); void flush(); }} placeholder="Add tags" title="Separate tags with spaces. Press Enter to save." onKeyDown={enterBlur} className="ghost max-w-full" /></Prop>
         </div>
-        <div className="mt-3 flex flex-wrap items-center gap-2 border-t pt-3">
+        <div className="mt-3 grid grid-cols-2 gap-2 border-t pt-3 [&>button]:justify-center">
           {focus && <button className="btn !h-8" onClick={async () => { await startFocus(task.id); router.push(`/focus?task=${task.id}`); }}><Icon name="focus" size={15} className="text-accent" />Focus</button>}
           <button className="btn !h-8" onClick={async () => { try { await navigator.clipboard.writeText(`${location.origin}/tasks/${task.id}`); toast("Link copied"); } catch { toast("Couldn't copy the link"); } }}><Icon name="link" size={15} />Copy link</button>
           <button className="btn !h-8" onClick={async () => { const n = await duplicateTaskAction(task.id); if (n) { toast("Task duplicated"); router.push(`/tasks/${n}`); } }}><Icon name="copy" size={15} />Duplicate</button>
-          <button className="btn !h-8 ml-auto text-danger" onClick={async () => { const r = await deleteTaskInline(task.id); if (r) { router.push("/tasks"); toast(`Deleted “${r.title}”`, { action: { label: "Undo", onClick: () => void restoreTaskAction(task.id).then(() => router.push(`/tasks/${task.id}`)) } }); } }}><Icon name="trash" size={15} />Delete</button>
+          <button className="btn !h-8 text-danger" onClick={async () => { const r = await deleteTaskInline(task.id); if (r) { router.push("/tasks"); toast(`Deleted “${r.title}”`, { action: { label: "Undo", onClick: () => void restoreTaskAction(task.id).then(() => router.push(`/tasks/${task.id}`)) } }); } }}><Icon name="trash" size={15} />Delete</button>
         </div>
       </aside>
       <div className="min-w-0 lg:col-start-1 lg:row-start-3">

@@ -96,7 +96,7 @@ export default async function Settings({ searchParams }: { searchParams: Promise
         </Section>
       </>)}
 
-      <Section cur={tab} tab="connect" id="install" i={0} title="Install the app" desc="Put LifeOS on your phone or desktop like any other app."><div className="p-4"><InstallApp /></div></Section>
+      <Section cur={tab} tab="connect" id="install" i={0} title="Install the app" desc="Put LifeOS on your phone or desktop like any other app."><InstallApp /></Section>
 
       {f.voice && (
         <Section cur={tab} tab="connect" id="extension" i={0} title="Chrome extension" desc="Record a voice memo from any tab without opening LifeOS. It speaks to your LifeOS with an API token, so it works from anywhere you can reach it.">

@@ -139,7 +139,7 @@ export function CaptureFab({ today, projects = [] }: { today: string; projects?:
   const path = usePathname();
   return (
     <>
-      {!path.startsWith("/settings") && <button onClick={() => setOpen(true)} aria-label="New task" className="fab fixed bottom-[76px] right-4 z-40 grid h-14 w-14 place-items-center rounded-full bg-accent text-ink shadow-[0_6px_18px_rgb(24_119_242/0.45)] transition active:scale-95 md:hidden"><Icon name="plus" size={26} /></button>}
+      {!/^\/(settings|tasks\/\d+|notes\/\d+)/.test(path) && <button onClick={() => setOpen(true)} aria-label="New task" className="fab fixed bottom-[76px] right-4 z-40 grid h-14 w-14 place-items-center rounded-full bg-accent text-ink shadow-[0_6px_18px_rgb(24_119_242/0.45)] transition active:scale-95 md:hidden"><Icon name="plus" size={26} /></button>}
       {open && (
         <div className="fixed inset-0 z-50 bg-black/40 md:hidden" onMouseDown={(e) => e.target === e.currentTarget && setOpen(false)} onTouchStart={(e) => e.target === e.currentTarget && setOpen(false)}>
           <div role="dialog" aria-label="New task" style={{ bottom: lift }} className="absolute inset-x-0 rounded-t-2xl bg-bg px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-4 shadow-2xl">

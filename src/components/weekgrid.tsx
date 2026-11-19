@@ -14,10 +14,10 @@ export function WeekGrid({ days, capacity = 360 }: { days: Day[]; capacity?: num
   const [view, move] = useOptimistic(days, (ds, a: { id: number; to: string }) => { const t = ds.flatMap((d) => d.tasks).find((x) => x.id === a.id); return t ? ds.map((d) => ({ ...d, tasks: d.date === a.to ? [...d.tasks.filter((x) => x.id !== a.id), t] : d.tasks.filter((x) => x.id !== a.id) })) : ds; });
   const drop = (id: number, to: string) => start(async () => { move({ id, to }); try { await rescheduleAction(id, to); router.refresh(); } catch (e) { toast((e as Error).message); } });
   return (
-    <div className="-mx-4 grid snap-x snap-mandatory grid-flow-col auto-cols-[78%] gap-2 overflow-x-auto px-4 pb-2 sm:auto-cols-[44%] md:mx-0 md:auto-cols-fr md:px-0 xl:gap-3">
+    <div className="grid grid-cols-1 gap-2 pb-2 md:grid-flow-col md:auto-cols-fr md:grid-cols-none xl:gap-3">
       {view.map((d) => (
         <section key={d.date} aria-label={`${d.label} ${d.num}`} onDragOver={(e) => { e.preventDefault(); setOver(d.date); }} onDragLeave={() => setOver((o) => (o === d.date ? null : o))} onDrop={(e) => { e.preventDefault(); setOver(null); const id = Number(e.dataTransfer.getData("text/plain")); if (id) drop(id, d.date); }}
-          className={`min-h-[50vh] min-w-0 snap-start rounded-xl border p-2 transition ${d.isToday ? "border-accent/40 bg-accent/5" : "bg-panel"} ${over === d.date ? "ring-2 ring-accent/50" : ""}`}>
+          className={`min-w-0 rounded-xl md:min-h-[50vh] border p-2 transition ${d.isToday ? "border-accent/40 bg-accent/5" : "bg-panel"} ${over === d.date ? "ring-2 ring-accent/50" : ""}`}>
           <h2 className="mb-2 flex items-baseline gap-1.5 px-1"><span className="text-[11px] font-medium text-mute">{d.label}</span><span className={`text-lg font-semibold ${d.isToday ? "text-accent" : ""}`}>{d.num}</span><span className="ml-auto text-[11px] text-dim">{d.tasks.length ? `${d.tasks.length}${d.tasks.reduce((n, t) => n + (t.minutes ?? 0), 0) ? ` · ${fmtMinutes(d.tasks.reduce((n, t) => n + (t.minutes ?? 0), 0))}` : ""}` : ""}</span></h2>
           <Load minutes={d.tasks.reduce((n, t) => n + (t.minutes ?? 0), 0)} capacity={capacity} />
           <ul className="space-y-1.5">
