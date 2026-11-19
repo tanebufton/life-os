@@ -14,7 +14,6 @@ export default async function Journal({ searchParams }: { searchParams: Promise<
   const date = d && /^\d{4}-\d{2}-\d{2}$/.test(d) && d <= t ? d : t;
   const e = getEntry(date), entries = listEntries({ q, limit: 40 }), series = moodSeries(30, t), streak = journalStreak(t);
   const pretty = (s: string) => new Intl.DateTimeFormat("en-NZ", { timeZone: "UTC", weekday: "long", day: "numeric", month: "long" }).format(new Date(s + "T00:00:00Z"));
-  const pts = series.map((s, i) => (s.mood ? `${(i / 29) * 100},${100 - ((s.mood - 1) / 4) * 100}` : null)).filter(Boolean);
   return (
     <FeatureGate feature="journal">
       <PageHead title="Journal" sub={`${streak ? `${streak}-day writing streak · ` : ""}One honest paragraph a day beats a perfect entry never written.`} />
@@ -27,11 +26,13 @@ export default async function Journal({ searchParams }: { searchParams: Promise<
           <JournalEditor date={date} initial={e?.body ?? ""} />
         </div>
         <aside className="space-y-4">
-          <Panel title="Mood, last 30 days" i={1}>
-            <div className="px-4 pb-4">{pts.length > 1 ? (
-              <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-20 w-full overflow-visible"><polyline points={pts.join(" ")} fill="none" stroke="rgb(var(--accent))" strokeWidth="2.5" vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
-                {series.map((s, i) => s.mood ? <circle key={i} cx={(i / 29) * 100} cy={100 - ((s.mood - 1) / 4) * 100} r="1.6" fill="rgb(var(--accent))" vectorEffect="non-scaling-stroke" /> : null)}</svg>
-            ) : <p className="text-sm text-mute">Log your mood for a few days to see a trend.</p>}</div>
+          <Panel title="Mood, last 14 days" i={1}>
+            <div className="px-4 pb-4">
+              <div className="flex h-24 items-end gap-1.5">{series.slice(-14).map((x) => (
+                <div key={x.date} className="flex h-full flex-1 flex-col justify-end" title={`${x.date}${x.mood ? `: ${MOODS[x.mood - 1]}` : ": no entry"}`}>
+                  <div className={`w-full rounded-t ${x.mood ? "bg-accent" : "bg-fg/10"}`} style={{ height: x.mood ? `${(x.mood / 5) * 100}%` : "6%", opacity: x.mood ? 0.35 + x.mood * 0.13 : 1 }} /></div>))}</div>
+              <div className="mt-1.5 flex justify-between text-[10px] text-dim"><span>14 days ago</span><span>today</span></div>
+            </div>
           </Panel>
           <Panel title="Past entries" count={entries.length} i={2}>
             <form className="px-3 pb-2"><input name="q" defaultValue={q} placeholder="Search entries" className="field" /></form>

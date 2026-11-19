@@ -1,7 +1,9 @@
 import { getSetting } from "./settings";
+import { tgChat, tgConfigured, tgSend, tgToken } from "./telegram";
+import { isOn } from "./features";
 
 export type Note = { title: string; body?: string; click?: string; priority?: 1 | 2 | 3 | 4 | 5; tags?: string[] };
-export const notifyConfigured = () => ({ ntfy: !!getSetting("ntfy_topic"), webhook: !!getSetting("webhook_url") });
+export const notifyConfigured = () => ({ ntfy: !!getSetting("ntfy_topic"), webhook: !!getSetting("webhook_url"), telegram: isOn("telegram") && tgConfigured() });
 const base = () => (process.env.LIFEOS_BASE_URL ?? "").replace(/\/$/, "");
 
 async function post(url: string, body: unknown, headers: Record<string, string> = {}) {
@@ -10,8 +12,9 @@ async function post(url: string, body: unknown, headers: Record<string, string> 
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
 }
 /** Sends to every configured channel. Returns "ok" or an error string per channel. */
-export async function notify(n: Note): Promise<{ ntfy?: string; webhook?: string }> {
-  const out: { ntfy?: string; webhook?: string } = {};
+export async function notify(n: Note): Promise<{ ntfy?: string; webhook?: string; telegram?: string }> {
+  const out: { ntfy?: string; webhook?: string; telegram?: string } = {};
+  if (isOn("telegram") && tgToken() && tgChat()) { try { await tgSend(tgChat(), `${n.title}${n.body ? "\n" + n.body : ""}`); out.telegram = "ok"; } catch (e) { out.telegram = (e as Error).message; } }
   // A relative link is useless on a phone, so only send one when we know the public base URL (set LIFEOS_BASE_URL).
   const click = n.click ? (n.click.startsWith("http") ? n.click : base() ? base() + n.click : undefined) : undefined;
   const topic = getSetting("ntfy_topic");

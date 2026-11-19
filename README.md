@@ -16,7 +16,7 @@ Data lives in `data/lifeos.db` (override with `LIFEOS_DB`). Back it up from **Se
 
 ## Switch features on and off
 **Settings → Features.** Everything except Today, Inbox, My tasks and Settings can be turned off: Upcoming, Board, Plan & review,
-Insights, Habits, Journal, Focus, News, Weather, Music, Email import, Reminders, REST API. A switched-off feature disappears from the
+Insights, Habits, Journal, Focus, Planner, Notes, Goals, People, Templates, Budgets, Subscriptions, Calendar sync, Telegram, the AI assistant (off by default), News, Weather, Music, Email import, Reminders, REST API. A switched-off feature disappears from the
 sidebar, mobile nav, command palette, shortcuts, Today, the MCP tools, the REST API and the worker. Data is kept if you turn it back on.
 
 ## What's in it
@@ -28,6 +28,10 @@ quick-add syntax (`Pay rent every month #bills @home !high 31 march at 9am ~30m`
 **Speed:** `⌘K` palette (searches tasks too), `C` capture, `J/K/X/E/T/W/#` in lists, `?` for help, hover quick-reschedule.
 **Phone:** installable PWA, share-sheet "Share to LifeOS", bottom tab bar, floating `+`.
 
+**Money:** monthly **budgets** per category (default + per-month overrides), transactions, `$12.50 coffee` quick-add from anywhere, rules that auto-categorise by payee, **bank CSV import** (delimiter/date/debit-credit detection, de-duplicated), month projection and threshold alerts, savings goals. **Subscriptions:** cycle maths, auto-logged renewals, free-trial and renewal reminders, price-rise detection, monthly/yearly totals.
+**Planning & life:** **Planner** (time-blocking timeline, auto-schedule into free slots, synced calendar events), **Notes** (Markdown, `[[links]]`, backlinks), **Goals** with key results, **People** (catch-up cadence, birthdays), **Templates** (one click makes a task with its checklist), **Do this now**, **Priority matrix**, **Trash**, saved filters, bulk select, task comments, link-title enrichment, voice capture (where the browser supports it), quiet hours.
+**Customise:** Settings → Layout picks the (up to 4) tabs in the phone's bottom bar and the order of Today's side panels.
+
 ## Integrations
 | What | How |
 |---|---|
@@ -36,6 +40,9 @@ quick-add syntax (`Pay rent every month #bills @home !high 31 march at 9am ~30m`
 | **Email to tasks** | Webhook: POST any email (Postmark, Mailgun, SendGrid, JSON, or raw RFC 822 from a Cloudflare Email Worker) to the URL in Settings. Or IMAP: set `LIFEOS_IMAP_HOST/USER/PASS` (+ `_MAILBOX`, `_FLAGGED_ONLY=1`) and run the worker. Subject accepts quick-add syntax; `tasks+work@` adds the tag `work`; duplicates are skipped. |
 | **Calendar** | Subscribe to the iCal URL in Settings from Google/Apple/Outlook. Repeats come through as RRULEs. |
 | **Push** | ntfy topic and/or any webhook in Settings; due-time reminders, morning brief, evening habit nudge. Needs `npm run worker` and `LIFEOS_BASE_URL` for tap-through links. |
+| **Calendar sync** | Settings → Calendar sync: paste a private `.ics` link (Google: "Secret address in iCal format"). Read-only, refreshed by the worker every ~15 min. |
+| **Telegram** | Create a bot with @BotFather, paste the token in Settings → Telegram, press Connect webhook (needs a public HTTPS URL), send the shown `/start <code>` to link your chat. Only that chat is answered. Free text adds a task; `/today /inbox /done 12 /search /brief /habits /spent 12 coffee /subs`. |
+| **AI assistant** | Off by default. Set `ANTHROPIC_API_KEY`, switch it on in Settings; smart paste, plan-my-day and ask. Model `claude-opus-5-5` (override `LIFEOS_AI_MODEL`). Text is sent to Anthropic only when you press a button. |
 | **Spotify** | `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `LIFEOS_BASE_URL`; Premium needed for control. |
 
 ## Auth

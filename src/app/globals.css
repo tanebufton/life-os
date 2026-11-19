@@ -5,7 +5,7 @@
 :root {
   color-scheme: light;
   --bg: 255 255 255; --side: 247 247 245; --panel: 255 255 255; --raise: 241 241 239; --line: 55 53 47;
-  --fg: 55 53 47; --mute: 120 119 116; --dim: 155 154 151;
+  --fg: 55 53 47; --mute: 112 111 107; --dim: 136 135 131;
   --accent: 24 119 242; --ink: 255 255 255; --ok: 31 132 90; --warn: 203 117 20; --danger: 201 55 44;
 }
 :root[data-theme="dark"] {
@@ -33,6 +33,7 @@
   .field { @apply w-full rounded-md border bg-panel px-3 py-1.5 text-sm outline-none transition placeholder:text-dim hover:border-fg/25 focus:border-accent focus:ring-2 focus:ring-accent/25; }
   .ghost { @apply w-full rounded-md border border-transparent bg-transparent px-2 py-1 text-sm outline-none transition placeholder:text-dim hover:bg-raise focus:bg-raise focus:ring-2 focus:ring-accent/25; }
   .pill { display: inline-flex; align-items: center; border-radius: 4px; padding: 0 6px; font-size: 12px; line-height: 20px; white-space: nowrap; background: rgb(var(--c) / 0.15); color: rgb(var(--c)); }
+  .pill { color: color-mix(in srgb, rgb(var(--c)) 74%, black); }
   :root[data-theme="dark"] .pill { color: color-mix(in srgb, rgb(var(--c)) 65%, white); }
   .lozenge { @apply inline-flex items-center rounded-[3px] px-1.5 text-[11px] font-bold uppercase leading-4 tracking-wide; }
   .rise { animation: rise 0.35s cubic-bezier(0.2, 0.7, 0.2, 1) backwards; animation-delay: calc(var(--i, 0) * 30ms); }
@@ -44,3 +45,25 @@
 
 /* keyboard-selected task row (j / k) */
 [data-task-id][data-active="true"] { background: rgb(var(--accent) / 0.07); box-shadow: inset 3px 0 0 rgb(var(--accent)); }
+
+/* ---- form controls: one consistent look ---- */
+select.field, select.ghost { appearance: none; -webkit-appearance: none; padding-right: 2rem; background-repeat: no-repeat; background-position: right 0.6rem center; background-size: 14px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23787774' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); }
+:root[data-theme="dark"] select.field, :root[data-theme="dark"] select.ghost {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%239d9d9a' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); }
+select option { color: rgb(var(--fg)); background: rgb(var(--panel)); }
+input[type="color"] { -webkit-appearance: none; appearance: none; padding: 0; border-radius: 8px; overflow: hidden; }
+input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 0; }
+input[type="color"]::-moz-color-swatch { border: 0; }
+input[type="date"], input[type="time"] { font-variant-numeric: tabular-nums; }
+input[type="date"]::-webkit-calendar-picker-indicator, input[type="time"]::-webkit-calendar-picker-indicator { opacity: 0.55; cursor: pointer; }
+:root[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator, :root[data-theme="dark"] input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(1); }
+
+/* rendered markdown (notes) */
+.prose-note { @apply text-[15px] leading-relaxed; max-width: 70ch; }
+.prose-note h2 { @apply mb-2 mt-6 text-xl font-semibold tracking-tight; } .prose-note h3 { @apply mb-1.5 mt-5 text-[17px] font-semibold; } .prose-note h4, .prose-note h5 { @apply mb-1 mt-4 text-[15px] font-semibold; }
+.prose-note p { @apply my-2.5; } .prose-note ul, .prose-note ol { @apply my-2.5 space-y-1 pl-5; } .prose-note ul { list-style: disc; } .prose-note ol { list-style: decimal; }
+.prose-note li.md-task { list-style: none; margin-left: -1.1rem; } .prose-note li.md-task input { margin-right: 0.5rem; vertical-align: -1px; } .prose-note blockquote { @apply my-3 border-l-2 pl-3 text-mute; }
+.prose-note code { @apply rounded bg-raise px-1 py-0.5 font-mono text-[13px]; } .prose-note pre { @apply my-3 overflow-x-auto rounded-lg border bg-raise/60 p-3; } .prose-note pre code { @apply bg-transparent p-0; }
+.prose-note hr { @apply my-5; } .md-link { @apply text-accent underline decoration-accent/30 underline-offset-2 hover:decoration-accent; } .md-link.missing { @apply text-mute decoration-dotted; }

@@ -7,6 +7,9 @@ import { db, Project } from "@/lib/db";
 import { isOn } from "@/lib/features";
 import { describeRepeat, getTask, subtasks } from "@/lib/tasks";
 import { issueKey } from "@/lib/ui";
+import { addCommentAction, deleteCommentAction, saveTemplateFromTask } from "@/lib/actions3";
+import { listComments } from "@/lib/misc";
+import { nice } from "@/lib/dates";
 
 export const dynamic = "force-dynamic";
 export default async function TaskPage({ params }: { params: Promise<{ id: string }> }) {
@@ -16,8 +19,9 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
   const kids = t.parent_id ? [] : subtasks(t.id).map((s) => ({ id: s.id, title: s.title, done: !!s.done_at }));
   const parent = t.parent_id ? getTask(t.parent_id) : null;
   const meta = t.meta ? (JSON.parse(t.meta) as { from?: string; subject?: string }) : null;
+  const comments = listComments(t.id);
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="max-w-3xl">
       <Link href={parent ? `/tasks/${parent.id}` : "/tasks"} className="mb-5 inline-flex items-center gap-1 text-[13px] text-mute hover:text-fg"><Icon name="chevRight" size={14} className="rotate-180" />{parent ? parent.title : "My tasks"}</Link>
       <div className="rise">
         <div className="mb-1 flex items-center gap-2 text-xs text-mute">
@@ -31,6 +35,12 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
           {!t.parent_id && <SubtaskList parentId={t.id} items={kids} />}
         </TaskEditor>
       </div>
+      <section className="rise mt-8" style={{ ["--i" as string]: 2 }}>
+        <h2 className="mb-2 text-[13px] font-semibold">Activity <span className="font-normal text-dim">{comments.length || ""}</span></h2>
+        <ul className="space-y-2">{comments.map((c) => <li key={c.id} className="group rounded-lg border bg-panel px-3 py-2 text-[14px]"><p className="whitespace-pre-wrap">{c.body}</p><div className="mt-1 flex items-center justify-between text-xs text-dim"><span>{nice(c.created_at.slice(0, 10))} {c.created_at.slice(11, 16)}</span><form action={deleteCommentAction.bind(null, t.id, c.id)}><button className="opacity-0 hover:text-danger focus:opacity-100 group-hover:opacity-100">Delete</button></form></div></li>)}</ul>
+        <form action={addCommentAction.bind(null, t.id)} className="mt-2 flex gap-2"><input name="body" required placeholder="Add a comment or progress note…" aria-label="Comment" className="field" /><button className="btn">Post</button></form>
+        {isOn("templates") && !t.parent_id && <form action={saveTemplateFromTask.bind(null, t.id)} className="mt-4"><button className="text-xs text-mute hover:text-fg">Save as template</button></form>}
+      </section>
     </div>
   );
 }

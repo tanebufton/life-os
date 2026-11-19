@@ -5,7 +5,11 @@ import { CopyBox, RegenButton, TestNotify, TokenManager } from "@/components/set
 import { FeatureSwitch } from "@/components/switch";
 import { PageHead } from "@/components/tasks";
 import { ThemeToggle } from "@/components/theme";
-import { addFeed, removeFeed, resetFeatures, saveCapacity, saveLocation, saveNotifySettings, saveTimezone, spotifyDisconnect } from "@/lib/actions";
+import { addFeed, removeFeed, resetFeatures, saveCapacity, saveCurrency, saveLocation, saveNotifySettings, saveTimezone, spotifyDisconnect } from "@/lib/actions";
+import { currency } from "@/lib/money";
+import { MobileTabsEditor, TodayWidgetsEditor } from "@/components/layoutprefs";
+import { MAX_TABS, NAV, resolveTabs, visiblePages } from "@/lib/nav";
+import { WIDGETS } from "@/lib/widgets";
 import { recentEmailImports } from "@/lib/email";
 import { FEATURES, featureMap } from "@/lib/features";
 import { imapConfigured } from "@/lib/imap";
@@ -13,6 +17,11 @@ import { listFeeds } from "@/lib/news";
 import { getSetting } from "@/lib/settings";
 import { redirectUri, spotifyConfigured, spotifyConnected } from "@/lib/spotify";
 import { tz } from "@/lib/time";
+import { TelegramButtons } from "@/components/settingsui";
+import { addCalFeedAction, removeCalFeedAction, saveQuietHours, saveTelegramToken, saveWorkHours, syncCalendarsAction, telegramRegen, telegramUnlink } from "@/lib/actions3";
+import { listFeeds as listCalFeeds } from "@/lib/calendar";
+import { aiConfigured, aiModel } from "@/lib/ai";
+import { tgChat, tgLinkCode, tgSecret, tgToken } from "@/lib/telegram";
 import { icalSecret, inboundSecret, listTokens } from "@/lib/tokens";
 
 export const dynamic = "force-dynamic";
@@ -30,7 +39,7 @@ export default async function Settings({ searchParams }: { searchParams: Promise
   const f = featureMap(), feeds = listFeeds(), groups = [...new Set(FEATURES.map((x) => x.group))];
   const nv = (k: string, d = "") => getSetting(k) ?? d;
   return (
-    <div className="mx-auto max-w-4xl">
+    <div className="max-w-4xl">
       <PageHead title="Settings" sub="Make LifeOS yours: switch features on or off, connect things, own your data" />
       {err && <p className="mb-6 rounded-lg border border-danger/30 bg-danger/10 px-4 py-2.5 text-sm text-danger">{err}</p>}
 
@@ -44,16 +53,23 @@ export default async function Settings({ searchParams }: { searchParams: Promise
         <p className="mt-2 text-xs text-dim">Always on: Today, Inbox, My tasks and Settings.</p>
       </Section>
 
-      <Section i={1} title="Location & time" desc="Used for the weather forecast and to decide what “today” means for due dates, repeats and reminders.">
+      <Section i={2} title="Location & time" desc="Used for the weather forecast and to decide what “today” means for due dates, repeats and reminders.">
         <Panel bodyClass="space-y-5 p-4">
           <form action={saveLocation} className="space-y-1.5"><label className="text-[13px] font-medium">City</label>
             <div className="flex gap-2"><input name="place" defaultValue={nv("place")} placeholder="e.g. Auckland" className="field" /><button className="btn-primary">Save</button></div><p className="text-xs text-dim">Saving a city also sets your timezone. Leave blank to clear.</p></form>
           <form action={saveTimezone} className="space-y-1.5"><label className="text-[13px] font-medium">Timezone</label><div className="flex gap-2"><input name="timezone" defaultValue={tz()} className="field" /><button className="btn">Update</button></div></form>
+          {(f.money || f.subscriptions) && <form action={saveCurrency} className="space-y-1.5"><label className="text-[13px] font-medium">Currency</label><div className="flex gap-2"><input name="currency" defaultValue={currency()} maxLength={3} className="field !w-28 uppercase" aria-label="Currency code" /><button className="btn">Save</button></div><p className="text-xs text-dim">Three-letter code, e.g. NZD, USD, EUR, GBP.</p></form>}
           <form action={saveCapacity} className="space-y-1.5"><label className="text-[13px] font-medium">Daily capacity (hours)</label><div className="flex gap-2"><input name="hours" type="number" step="0.5" min="1" max="16" defaultValue={Number(nv("capacity_min", "360")) / 60} className="field !w-28" /><button className="btn">Save</button></div>
             <p className="text-xs text-dim">Today shows planned time (from task estimates) against this.</p></form>
         </Panel>
       </Section>
 
+      <Section id="layout" i={1} title="Layout" desc="Choose the tabs in your phone's bottom bar, and what shows on Today. Changes apply straight away.">
+        <div className="space-y-5">
+          <Panel title="Phone bottom bar" bodyClass="p-4">{(() => { const vis = visiblePages(f), chosen = resolveTabs(nv("mobile_tabs") || undefined, f), ids = chosen.map((c) => c.href), rest = vis.filter((p) => !ids.includes(p.href)); return <MobileTabsEditor items={[...chosen, ...rest].map((p) => ({ id: p.href, label: p.label, icon: p.icon, on: ids.includes(p.href) }))} />; })()}</Panel>
+          <Panel title="Today widgets" bodyClass="p-4">{(() => { let order: string[] = [], hidden: string[] = []; try { const p = nv("today_widgets") ? JSON.parse(nv("today_widgets")) : null; if (p) { order = p.order ?? []; hidden = p.hidden ?? []; } } catch {} const ids = WIDGETS.map((w) => w.id), full = [...order.filter((i: string) => ids.includes(i)), ...ids.filter((i) => !order.includes(i))]; return <TodayWidgetsEditor items={full.map((id) => { const w = WIDGETS.find((x) => x.id === id)!; return { id, label: w.label + (w.feature && !f[w.feature] ? " (feature off)" : ""), on: !hidden.includes(id) }; })} />; })()}</Panel>
+        </div>
+      </Section>
       <Section i={2} title="Appearance" desc="Light or dark. LifeOS follows your system until you pick one."><Panel bodyClass="flex items-center justify-between p-4"><span className="text-sm">Theme</span><ThemeToggle label className="border" /></Panel></Section>
 
       {f.reminders && (
@@ -96,6 +112,43 @@ export default async function Settings({ searchParams }: { searchParams: Promise
             <p className="text-[13px] text-mute">Subscribe in Google Calendar, Apple Calendar or Outlook (“add calendar from URL”). Tasks with a date appear as events; repeats come through too.</p>
             <CopyBox value={`${origin}/api/ical/${icalSecret()}.ics`} /><div className="flex items-center gap-2"><RegenButton which="ical" /><span className="text-xs text-dim">Anyone with this link can read your task titles. Regenerate if it leaks.</span></div>
           </Panel>
+        </Section>
+      )}
+
+      {f.planner && (
+        <Section id="planner" i={3} title="Planner & quiet hours" desc="Working hours bound the day planner. Quiet hours hold back push notifications; they go out when quiet hours end.">
+          <Panel><div className="grid gap-4 p-4 sm:grid-cols-2">
+            <form action={saveWorkHours} className="space-y-2"><div className="text-[13px] font-medium">Working hours</div><div className="flex items-center gap-2"><input type="time" name="work_start" defaultValue={nv("work_start", "09:00")} aria-label="Start" className="field" /><span className="text-mute">to</span><input type="time" name="work_end" defaultValue={nv("work_end", "17:30")} aria-label="End" className="field" /></div><button className="btn">Save</button></form>
+            <form action={saveQuietHours} className="space-y-2"><div className="text-[13px] font-medium">Quiet hours <span className="font-normal text-dim">(blank to disable)</span></div><div className="flex items-center gap-2"><input type="time" name="quiet_start" defaultValue={nv("quiet_start")} aria-label="From" className="field" /><span className="text-mute">to</span><input type="time" name="quiet_end" defaultValue={nv("quiet_end")} aria-label="Until" className="field" /></div><button className="btn">Save</button></form>
+          </div></Panel>
+        </Section>
+      )}
+
+      {f.calendar && (
+        <Section id="calendar" i={4} title="Calendar sync" desc="Show events from Google, Apple, Outlook or any calendar that gives you a private .ics link. Read-only, refreshed about every 15 minutes by the worker.">
+          <Panel>
+            <ul>{listCalFeeds().map((c) => <li key={c.id} className="flex items-center gap-3 border-b px-4 py-2.5 text-[13px]"><span className="h-3 w-3 shrink-0 rounded-full" style={{ background: c.color }} /><div className="min-w-0 flex-1"><div className="truncate font-medium">{c.name}</div><div className={`truncate text-xs ${c.last_error ? "text-danger" : "text-mute"}`}>{c.last_error ? c.last_error : c.last_synced ? `Synced ${c.last_synced}` : "Not synced yet"}</div></div><form action={removeCalFeedAction.bind(null, c.id)}><button className="text-xs text-dim hover:text-danger">Remove</button></form></li>)}</ul>
+            <form action={addCalFeedAction} className="space-y-2.5 p-4"><div className="flex gap-2"><input name="name" placeholder="Name" className="field !w-40" /><input type="color" name="color" defaultValue="#8b5cf6" aria-label="Colour" className="h-9 w-10 shrink-0 cursor-pointer rounded-md border bg-transparent p-0.5" /><input name="url" required placeholder="https://…/basic.ics (or webcal://)" className="field" /></div><div className="flex gap-2"><button className="btn-primary">Add calendar</button></div></form>
+            <div className="flex items-center gap-3 border-t px-4 py-3 text-xs text-mute"><form action={syncCalendarsAction}><button className="btn !py-1">Sync now</button></form>In Google Calendar: Settings → your calendar → “Secret address in iCal format”.</div>
+          </Panel>
+        </Section>
+      )}
+
+      {f.telegram && (
+        <Section id="telegram" i={5} title="Telegram bot" desc="Message your own bot to add tasks, check today, tick habits or log spending. It only ever answers the one chat you link. Needs a public HTTPS address (your Cloudflare tunnel works).">
+          <Panel bodyClass="space-y-4 p-4">
+            <ol className="list-decimal space-y-1 pl-5 text-[13px] text-mute"><li>In Telegram, message <b className="text-fg">@BotFather</b>, send /newbot, and copy the token.</li><li>Paste it below{process.env.TELEGRAM_BOT_TOKEN ? " (already set by environment)" : ""} and press Connect webhook.</li><li>Send this to your bot to link your chat:</li></ol>
+            <CopyBox value={`/start ${tgLinkCode()}`} />
+            <form action={saveTelegramToken} className="flex gap-2"><input name="token" type="password" autoComplete="off" placeholder={tgToken() ? "•••••••• (saved)" : "123456:ABC…"} className="field" aria-label="Bot token" /><button className="btn">Save token</button></form>
+            <TelegramButtons origin={origin} />
+            <div className="flex flex-wrap items-center gap-3 text-xs text-mute"><span>{tgChat() ? "Linked to a chat." : "Not linked yet."}</span>{tgChat() && <form action={telegramUnlink}><button className="underline">Unlink</button></form>}<form action={telegramRegen}><button className="underline">Regenerate link code &amp; webhook secret</button></form><span className="text-dim">Secret: …{tgSecret().slice(-4)}</span></div>
+          </Panel>
+        </Section>
+      )}
+
+      {f.ai && (
+        <Section id="ai" i={6} title="AI assistant" desc="Smart paste, day planning and questions, powered by Claude. Task text is sent to Anthropic only when you press a button on the Assistant page.">
+          <Panel bodyClass="space-y-1.5 p-4 text-[13px]"><div>{aiConfigured() ? <span className="text-ok">API key found.</span> : <span className="text-warn">No API key. Set <code className="rounded bg-raise px-1">ANTHROPIC_API_KEY</code> in the server environment and restart.</span>}</div><div className="text-mute">Model: <code className="rounded bg-raise px-1">{aiModel()}</code> (override with <code className="rounded bg-raise px-1">LIFEOS_AI_MODEL</code>)</div></Panel>
         </Section>
       )}
 

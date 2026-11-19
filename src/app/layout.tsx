@@ -5,9 +5,13 @@ import { CaptureFab } from "@/components/capture";
 import { ListKeys, ShortcutsHelp } from "@/components/keys";
 import { Palette } from "@/components/palette";
 import { PwaRegister } from "@/components/pwa";
+import { listFilters } from "@/lib/misc";
 import { Hotkeys, MobileNav, Sidebar, Topbar, type NavProject } from "@/components/shell";
 import { db } from "@/lib/db";
 import { featureMap } from "@/lib/features";
+import { resolveTabs } from "@/lib/nav";
+import { getSetting } from "@/lib/settings";
+import { currency, listCategories } from "@/lib/money";
 import { today } from "@/lib/time";
 
 export const metadata = { title: "LifeOS", applicationName: "LifeOS", appleWebApp: { capable: true, title: "LifeOS", statusBarStyle: "default" as const }, icons: { icon: "/icons/icon.svg", apple: "/icons/apple-touch-icon.png" } };
@@ -17,6 +21,7 @@ export const viewport = { width: "device-width", initialScale: 1, themeColor: "#
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const t = today();
   const features = featureMap();
+  const money = features.money ? { cats: listCategories("expense").map((c) => c.name), currency: currency() } : null;
   const projects = db.prepare(`SELECT p.id, p.name, p.color, (SELECT count(*) FROM tasks k WHERE k.project_id=p.id AND k.done_at IS NULL AND k.deleted_at IS NULL AND k.parent_id IS NULL) AS open
     FROM projects p WHERE p.archived=0 ORDER BY p.name`).all() as NavProject[];
   const counts = db.prepare(`SELECT
@@ -28,17 +33,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head><script dangerouslySetInnerHTML={{ __html: "try{var t=localStorage.getItem('lifeos.theme');if(!t)t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.dataset.theme=t}catch(e){}" }} /></head>
       <body>
         <div className="flex h-dvh">
-          <Sidebar counts={counts} projects={projects} features={features} />
+          <Sidebar counts={counts} projects={projects} features={features} filters={listFilters()} />
           <div className="flex min-w-0 flex-1 flex-col">
             <main className="min-h-0 flex-1 overflow-y-auto">
-              <Topbar today={t} projects={projects} />
+              <Topbar today={t} projects={projects} money={money} />
               <div className="mx-auto max-w-[1180px] px-4 pb-28 pt-6 md:px-10 md:pb-12 md:pt-8">{children}</div>
             </main>
           </div>
         </div>
-        <MobileNav counts={counts} features={features} />
+        <MobileNav counts={counts} tabs={resolveTabs(getSetting("mobile_tabs"), features)} />
         <PwaRegister />
-        <CaptureFab today={t} />
+        <CaptureFab today={t} money={money} />
         <Toaster position="bottom-center" offset={{ bottom: 88 }} mobileOffset={{ bottom: 140 }} toastOptions={{ style: { background: "rgb(var(--panel))", color: "rgb(var(--fg))", border: "1px solid rgb(var(--line) / .12)", borderRadius: 12, fontFamily: "inherit" } }} />
         <Palette projects={projects} features={features} />
         <Hotkeys features={features} />

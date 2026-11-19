@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { isOn } from "./features";
+import { isOn, type FeatureKey } from "./features";
 import { verifyBearer } from "./tokens";
 import { describeRepeat, parseTags, type TaskRow } from "./tasks";
 
 export const json = (data: unknown, status = 200) => NextResponse.json(data, { status, headers: { "cache-control": "no-store" } });
 export const err = (message: string, status = 400) => json({ error: message }, status);
 /** Returns an error response if the API is off or the bearer token is missing/invalid. */
-export function guard(req: Request, feature: "api" | "habits" | "journal" = "api"): NextResponse | null {
+export function guard(req: Request, feature: FeatureKey = "api"): NextResponse | null {
   if (!isOn("api")) return err("The REST API is turned off in LifeOS settings.", 404);
   if (feature !== "api" && !isOn(feature)) return err(`The ${feature} feature is turned off in LifeOS settings.`, 404);
   if (!verifyBearer(req.headers.get("authorization"))) return err("Missing or invalid API token. Send `Authorization: Bearer <token>`.", 401);

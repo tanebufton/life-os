@@ -8,6 +8,13 @@ import { createHabit, toggleHabit } from "../src/lib/habits";
 import { saveEntry } from "../src/lib/journal";
 import { importEmail } from "../src/lib/email";
 import { today } from "../src/lib/time";
+import { addRule, addStarterCategories, addTransaction, categoryByName, contributeSaving, createSaving, setBudget, shiftMonth, monthOf } from "../src/lib/money";
+import { createSub, updateSub } from "../src/lib/subs";
+import { createNote } from "../src/lib/notes";
+import { addKeyResult, createGoal, setKeyResult } from "../src/lib/goals";
+import { createPerson } from "../src/lib/people";
+import { installStarterTemplates } from "../src/lib/templates";
+import { saveFilter } from "../src/lib/misc";
 const _db = db;
 
 if ((db.prepare("SELECT count(*) n FROM tasks").get() as { n: number }).n) { console.log("DB already has tasks; not seeding."); process.exit(0); }
@@ -66,3 +73,48 @@ importEmail({ from: "Hospital Billing <billing@clinic.test>", to: "tasks+bills@m
 importEmail({ from: "Jordan Lee <jordan@broker.test>", to: "tasks@me.test", subject: "Fwd: Home insurance renewal quotes", messageId: "<demo-3@broker.test>", text: "Three quotes attached, please compare before the end of the month." });
 db.prepare("INSERT INTO tasks (title, notes, source, meta) VALUES (?,?,?,?)").run("Interesting article: why spreadsheets still win", "https://example.com/spreadsheets-win", "share", null);
 console.log("seeded demo data");
+
+// ---- money: budgets, three months of spending, subscriptions, savings ----
+{
+  setSetting("currency", "NZD"); addStarterCategories();
+  const t0 = today(), cur = monthOf(t0);
+  const budgets: Record<string, number> = { Groceries: 650, "Eating out": 250, Transport: 180, Housing: 1900, Utilities: 220, Health: 120, Fun: 160, Shopping: 220, Subscriptions: 120, Savings: 300 };
+  for (const [n, b] of Object.entries(budgets)) setBudget(categoryByName(n)!, cur, b * 100, true);
+  for (const [p, c] of [["countdown", "Groceries"], ["new world", "Groceries"], ["z energy", "Transport"], ["uber", "Transport"], ["cafe", "Eating out"], ["mercury", "Utilities"]] as const) addRule(p, categoryByName(c)!);
+  const pool: Record<string, [string, number, number][]> = { Groceries: [["Countdown Metro", 38, 120], ["New World", 25, 95], ["Farmers market", 12, 40]], "Eating out": [["Cafe Kōkako", 5, 19], ["Burger Wisconsin", 14, 38], ["Uber Eats", 22, 55]], Transport: [["Z Energy", 55, 95], ["Uber", 9, 28], ["AT HOP top-up", 20, 40]], Utilities: [["Mercury Energy", 120, 190]], Health: [["Life Pharmacy", 8, 45]], Fun: [["Event Cinemas", 15, 38], ["Steam", 10, 30]], Shopping: [["Kmart", 12, 80], ["Bunnings", 18, 120]] };
+  let sd = 5; const rnd = () => (sd = (sd * 9301 + 49297) % 233280) / 233280;
+  for (let back = 2; back >= 0; back--) {
+    const m = shiftMonth(cur, -back), last = back === 0 ? Number(t0.slice(8)) : 28;
+    addTransaction({ date: `${m}-01`, amount_cents: 480000, payee: "ACME Ltd payroll", category_id: categoryByName("Salary")! }); addTransaction({ date: `${m}-02`, amount_cents: -190000, payee: "Rent", category_id: categoryByName("Housing")! });
+    for (const [cat, list] of Object.entries(pool)) { const n = cat === "Utilities" ? 1 : cat === "Groceries" ? 6 : cat === "Eating out" ? 7 : 3; for (let i = 0; i < n; i++) { const [payee, lo, hi] = list[Math.floor(rnd() * list.length)], day = 1 + Math.floor(rnd() * last); addTransaction({ date: `${m}-${String(day).padStart(2, "0")}`, amount_cents: -Math.round((lo + rnd() * (hi - lo)) * 100), payee, category_id: categoryByName(cat)! }); } }
+  }
+  addTransaction({ date: t0, amount_cents: -2340, payee: "Mystery charge" });
+  const nf = createSub({ name: "Netflix", amount_cents: 1599, next_due: addDays(t0, 6), color: "#d44c47" });
+  const sp = createSub({ name: "Spotify", amount_cents: 1299, next_due: addDays(t0, 11), color: "#1f845a" }); updateSub(sp, { amount_cents: 1499 });
+  createSub({ name: "iCloud+", amount_cents: 499, next_due: addDays(t0, 3), color: "#337ea9" });
+  createSub({ name: "ChatGPT", amount_cents: 3200, next_due: addDays(t0, 2), color: "#10b981" });
+  createSub({ name: "Adobe Creative Cloud", amount_cents: 28999, cycle: "yearly", next_due: addDays(t0, 41), color: "#c14c8a" });
+  createSub({ name: "Gym", amount_cents: 1400, cycle: "weekly", next_due: addDays(t0, 4), color: "#c46f00" });
+  createSub({ name: "Disney+", amount_cents: 1199, trial_ends: addDays(t0, 2), next_due: addDays(t0, 2), color: "#6366f1" });
+  createSub({ name: "Old magazine", amount_cents: 899, next_due: addDays(t0, 20), color: "#64748b" }); void nf;
+  const hol = createSaving("Holiday fund", 300000, addDays(t0, 180)); contributeSaving(hol, 120000); const em = createSaving("Emergency fund", 1000000, null, "#6366f1"); contributeSaving(em, 430000);
+}
+
+// ---- planner, calendar, notes, goals, people, templates (demo data for the newer features)
+{
+  const t0 = today(), at = (title: string, time: string, est: number, pr = 0) => createTask({ title, due: t0, due_time: time, estimate: est, priority: pr });
+  at("Weekly planning", "09:00", 45, 1); at("Review pull requests", "13:30", 60);
+  createTask({ title: "Write project update", due: t0, estimate: 40, priority: 1 }); createTask({ title: "Book dentist", due: t0, estimate: 10 }); createTask({ title: "Reply to Sam about the venue", due: t0, estimate: 15 });
+  db.prepare("INSERT INTO cal_feeds (name, url, color, last_synced) VALUES ('Work','https://example.invalid/work.ics','#8b5cf6', datetime('now'))").run();
+  const ev = (uid: string, title: string, st: string, en: string, d = t0) => db.prepare("INSERT INTO cal_events (feed_id, uid, title, date, start_time, end_date, end_time, all_day) VALUES (1,?,?,?,?,?,?,0)").run(uid, title, d, st, d, en);
+  ev("e1", "Team standup", "10:00", "10:30"); ev("e2", "Design review", "11:00", "12:00"); ev("e3", "1:1 with Priya", "15:00", "15:30"); ev("e4", "Standup", "10:00", "10:30", addDays(t0, 1));
+  const n1 = createNote("Meeting notes: Q4 kickoff", "## Agenda\n- Roadmap and priorities\n- Hiring\n\n## Decisions\n- Ship the **planner** first\n- Revisit pricing in [[Pricing ideas]]\n\n> Remember to send the summary by Friday.\n\n- [ ] Send summary\n- [x] Book room");
+  createNote("Pricing ideas", "Three tiers: free, pro, team. See [[Meeting notes: Q4 kickoff]] for context.\n\n1. Keep free generous\n2. Charge for sync\n3. Annual discount"); void n1;
+  const g = createGoal({ title: "Run a half marathon", area: "Health", target_date: addDays(t0, 120) }); addKeyResult(g, "Total km run", 300, "km"); addKeyResult(g, "Long runs over 15 km", 6, ""); setKeyResult(1, 124); setKeyResult(2, 2);
+  const g2 = createGoal({ title: "Save a house deposit", area: "Money", target_date: addDays(t0, 400) }); addKeyResult(g2, "Saved", 60000, "$"); setKeyResult(3, 18500);
+  createGoal({ title: "Learn conversational Spanish", area: "Learning" });
+  createPerson({ name: "Mum", birthday: addDays(t0, 6).replace(/^\d{4}/, "1960"), cadence_days: 7, last_contact: addDays(t0, -9), notes: "Loves the garden. Call Sundays." });
+  createPerson({ name: "Alex Chen", cadence_days: 30, last_contact: addDays(t0, -12), birthday: "1990-03-14" }); createPerson({ name: "Priya Nair", cadence_days: 14, last_contact: addDays(t0, -20) });
+  installStarterTemplates();
+  saveFilter("Overdue & high", "is:overdue !high"); saveFilter("This week #work", "#work due:week");
+}

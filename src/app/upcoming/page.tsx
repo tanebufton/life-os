@@ -21,19 +21,19 @@ export default async function Upcoming({ searchParams }: { searchParams: Promise
     const days = Array.from({ length: 14 }, (_, i) => addDays(t, i));
     const overdue = all.filter((x) => x.due! < t), by = (d: string) => all.filter((x) => x.due === d);
     return (
-      <FeatureGate feature="upcoming">{head}
+      <FeatureGate feature="upcoming"><div className="max-w-4xl">{head}
         <div className="mb-6 grid grid-cols-7 gap-1.5">{days.slice(0, 7).map((d) => { const n = by(d).length; return (
           <a key={d} href={`#d-${d}`} className={`rounded-xl border px-1 py-2 text-center transition hover:bg-raise ${d === t ? "border-accent/40 bg-accent/5" : ""}`}>
             <div className="text-[11px] font-medium text-mute">{new Intl.DateTimeFormat("en-NZ", { timeZone: "UTC", weekday: "short" }).format(new Date(d + "T00:00:00Z"))}</div>
             <div className="text-lg font-semibold leading-tight">{Number(d.slice(8))}</div>
             <div className={`mt-0.5 text-[11px] ${n ? "font-medium text-accent" : "text-dim"}`}>{n ? `${n} ${n === 1 ? "task" : "tasks"}` : "·"}</div></a>); })}</div>
-        <div className="mx-auto max-w-3xl space-y-5">
+        <div className="space-y-5">
           {overdue.length > 0 && <Panel title="Overdue" count={overdue.length} i={1}><ul>{overdue.map((x) => <TaskRow key={x.id} t={x} />)}</ul></Panel>}
           {days.map((d, i) => { const list = by(d), mins = list.reduce((n, x) => n + (x.estimate ?? 0), 0); return (
             <section key={d} id={`d-${d}`} className="rise scroll-mt-16" style={{ ["--i" as string]: i }}>
               <h2 className="flex items-baseline gap-2 border-b px-2 pb-1.5 text-[13px] font-semibold"><span className={d === t ? "text-ok" : ""}>{dayLabel(d, t)}</span><span className="font-normal text-dim">{list.length || ""}</span>{mins > 0 && <span className="ml-auto font-normal text-dim">{fmtMinutes(mins)} planned</span>}</h2>
               <ul>{list.map((x) => <TaskRow key={x.id} t={x} />)}</ul><DayAdd date={d} /></section>); })}
-        </div>
+        </div></div>
       </FeatureGate>
     );
   }

@@ -18,14 +18,21 @@ export default function Insights() {
   return (
     <FeatureGate feature="insights">
       <PageHead title="Insights" sub="How you're really doing, measured quietly" right={isOn("review") ? <Link href="/review?mode=week" className="btn"><Icon name="review" size={15} className="text-accent" />Weekly review</Link> : undefined} />
-      <div className="mx-auto max-w-4xl space-y-4">
+      <div className="space-y-4">
         <Panel i={0} bodyClass="grid grid-cols-2 divide-x sm:grid-cols-4">
           <Stat v={i.thisWeek} l="Completed, last 7 days" sub={<Delta now={i.thisWeek} prev={i.lastWeek} />} />
           <Stat v={<span className="inline-flex items-center gap-1.5"><Icon name="flame" size={22} className={i.streak ? "text-warn" : "text-dim"} />{i.streak}</span>} l="Day streak" sub={<span className="text-xs text-dim">best {i.bestStreak}</span>} />
           {isOn("focus") ? <Stat v={<>{i.focusWeek}<span className="text-base font-medium text-mute"> min</span></>} l="Focused, last 7 days" sub={<Delta now={i.focusWeek} prev={i.focusPrev} />} /> : <Stat v={i.total} l="Completed, last 6 months" />}
           <Stat v={i.bestDay.count || "–"} l="Best single day" sub={i.bestDay.date ? <span className="text-xs text-dim">{nice(i.bestDay.date)}</span> : undefined} />
         </Panel>
-        <Panel title="Completed tasks, last 26 weeks" right={<span>{i.total} total</span>} i={1}><div className="px-4 pb-4"><Heatmap cells={i.heat} color="var(--accent)" label={(c) => `${nice(c.date)}: ${c.count} completed`} /></div></Panel>
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+          <Panel title="Completed tasks, last 26 weeks" right={<span>{i.total} total</span>} i={1}><div className="px-4 pb-4"><Heatmap cells={i.heat} color="var(--accent)" label={(c) => `${nice(c.date)}: ${c.count} completed`} /></div></Panel>
+          <Panel title="Your weekly rhythm" i={2} right={<span>26 weeks</span>}>
+            <div className="space-y-2 px-4 pb-4">{["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d, k) => { const n = i.byWeekday[k], top = Math.max(1, ...i.byWeekday); return (
+              <div key={d} className="flex items-center gap-3 text-[13px]"><span className="w-8 text-mute">{d}</span><div className="h-2 flex-1 overflow-hidden rounded-full bg-raise"><div className={`h-full rounded-full ${n === top ? "bg-accent" : "bg-accent/40"}`} style={{ width: `${(n / top) * 100}%` }} /></div><span className="w-8 text-right tabular-nums text-mute">{n}</span></div>); })}
+              <p className="pt-1 text-xs text-dim">{(() => { const t = Math.max(...i.byWeekday); const d = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"][i.byWeekday.indexOf(t)]; return t ? `You finish the most on ${d}s.` : "Complete a few tasks to see your rhythm."; })()}</p></div>
+          </Panel>
+        </div>
         <div className="grid gap-4 md:grid-cols-2">
           <Panel title="Where the effort went (30 days)" i={2}>
             <div className="space-y-2.5 px-4 pb-4">{i.byProject.length ? i.byProject.map((p) => (

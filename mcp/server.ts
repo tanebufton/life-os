@@ -19,9 +19,19 @@ import { getEntry, listEntries, saveEntry } from "../src/lib/journal";
 import { getNews } from "../src/lib/news";
 import { notify, notifyConfigured } from "../src/lib/notify";
 import { weeklyReview } from "../src/lib/review";
+import { addTransaction, budgetAlerts, categoryByName, currency, listCategories, listTransactions, monthOf, monthSummary } from "../src/lib/money";
+import { parseMoneyQuick, toCents } from "../src/lib/moneyfmt";
+import { advanceSubscriptions, createSub, listSubs, monthlyCents, subsSummary } from "../src/lib/subs";
 import { control, nowPlaying } from "../src/lib/spotify";
 import { completeTask, createTask, deleteTask, listTags, parseQuickAdd, queryTasks, reschedule, restoreTask, searchTasks, setStatus, updateTask } from "../src/lib/tasks";
 import { addDays } from "../src/lib/dates";
+import { eventsBetween } from "../src/lib/calendar";
+import { dayBlocks, freeSlots, toHm, workHours, autoSchedule } from "../src/lib/planner";
+import { createNote, getNote, listNotes, updateNote } from "../src/lib/notes";
+import { createGoal, goalProgress, listGoals, setKeyResult, keyResults } from "../src/lib/goals";
+import { createPerson, listPeople, logContact, catchUpIn, upcomingBirthdays } from "../src/lib/people";
+import { listTemplates, useTemplate } from "../src/lib/templates";
+import { nextBest } from "../src/lib/misc";
 import { today } from "../src/lib/time";
 import { getWeather } from "../src/lib/weather";
 
@@ -105,6 +115,48 @@ function buildServer() {
     safe(({ subject, body, from, message_id }: any) => importEmail({ subject, text: body, from, messageId: message_id })));
   if (isOn("reminders")) tool("notify_me", { description: "Send the owner a push notification (via their configured ntfy/webhook).", inputSchema: { title: z.string().min(1), message: z.string().optional(), url: z.string().optional() } },
     safe(async ({ title, message, url }: any) => { const c = notifyConfigured(); if (!c.ntfy && !c.webhook) throw new Error("No push channel configured in LifeOS settings."); return notify({ title, body: message, click: url }); }));
+  if (isOn("money")) {
+    tool("add_transaction", { description: "Log spending or income. Either `text` (\"$12.50 flat white @eating-out\", \"spent 80 power yesterday\", \"+$2000 salary\") or `amount` (negative = expense) with `payee`, `category`, `date`. Categories are matched by name and created if missing.", inputSchema: { text: z.string().optional(), amount: z.number().optional(), payee: z.string().optional(), category: z.string().optional(), date: date.optional() } },
+      safe(({ text, amount, payee, category, date: d }: any) => { let a = amount, p = payee, c = category, dt = d; if (text) { const q = parseMoneyQuick(text, today(), listCategories().map((x) => x.name)); if (!q) throw new Error("Couldn't read an amount from that text"); a = q.amount_cents / 100; p = q.payee; c = q.category; dt = q.date ?? d; } if (!a) throw new Error("amount or text is required"); const cid = c ? categoryByName(c, true) : undefined; return { id: addTransaction({ date: dt, amount_cents: toCents(a), payee: p, category_id: cid === null ? undefined : cid, source: "mcp" }), amount: a, payee: p, category: c ?? null }; }));
+    tool("budget_status", { description: "Budget for a month (default this month): income, spent, remaining, month-end projection, and each category's spent/budget/percent.", inputSchema: { month: z.string().regex(/^\d{4}-\d{2}$/).optional() } },
+      safe(({ month }: any) => { const m = month ?? monthOf(today()), s = monthSummary(m); return { month: m, currency: currency(), income: s.income_cents / 100, spent: s.spent_cents / 100, budgeted: s.budgeted_cents / 100, remaining: s.remaining_cents / 100, projected_spend: s.projected_cents / 100, over_threshold: budgetAlerts(m).map((a) => `${a.category.name} ${a.pct}%`), categories: s.rows.map((r) => ({ name: r.category.name, spent: r.spent / 100, budget: r.budget / 100, percent: r.pct })) }; }));
+    tool("list_transactions", { description: "Recent transactions, optionally filtered by month (YYYY-MM), category name or text.", inputSchema: { month: z.string().optional(), category: z.string().optional(), q: z.string().optional(), limit: z.number().int().min(1).max(200).optional() } },
+      safe(({ month, category, q, limit }: any) => listTransactions({ month: month ?? monthOf(today()), category: category ? categoryByName(category) ?? undefined : undefined, q, limit: limit ?? 25 }).map((t) => ({ id: t.id, date: t.date, amount: t.amount_cents / 100, payee: t.payee, category: t.category_name }))));
+  }
+  if (isOn("subscriptions")) {
+    tool("list_subscriptions", { description: "All subscriptions with price, cycle, monthly cost, next renewal date and status, plus monthly/yearly totals.", inputSchema: {} },
+      safe(() => { advanceSubscriptions(); const s = subsSummary(); return { currency: currency(), monthly_total: s.monthly_cents / 100, yearly_total: s.yearly_cents / 100, subscriptions: listSubs().map((x) => ({ id: x.id, name: x.name, amount: x.amount_cents / 100, cycle: x.cycle, monthly_cost: monthlyCents(x) / 100, next_due: x.next_due, status: x.status, trial_ends: x.trial_ends })) }; }));
+    tool("add_subscription", { description: "Track a new subscription. next_due defaults to one cycle from today; set trial_ends for a free trial (you'll be reminded before it ends).", inputSchema: { name: z.string().min(1), amount: z.number().min(0), cycle: z.enum(["weekly", "monthly", "quarterly", "yearly"]).optional(), next_due: date.optional(), trial_ends: date.optional() } },
+      safe(({ name, amount, cycle, next_due, trial_ends }: any) => ({ id: createSub({ name, amount_cents: toCents(amount), cycle, next_due, trial_ends }) })));
+    tool("upcoming_renewals", { description: "Subscriptions renewing in the next N days (default 30) with the total due.", inputSchema: { days: z.number().int().min(1).max(365).optional() } },
+      safe(({ days }: any) => { const t = today(), lim = new Date(t + "T00:00:00Z"); lim.setUTCDate(lim.getUTCDate() + (days ?? 30)); const end = lim.toISOString().slice(0, 10); const due = listSubs("active").filter((s) => s.next_due >= t && s.next_due <= end); return { total: due.reduce((n, s) => n + s.amount_cents, 0) / 100, renewals: due.map((s) => ({ name: s.name, date: s.next_due, amount: s.amount_cents / 100 })) }; }));
+  }
+  if (isOn("calendar")) tool("calendar_events", { description: "Events from the synced calendars between two dates (inclusive).", inputSchema: { from: date.optional(), to: date.optional() } }, safe(({ from, to }: any) => { const f = from ?? today(); return eventsBetween(f, to ?? addDays(f, 7)).map((e) => ({ date: e.date, start: e.start_time, end: e.end_time, title: e.title, all_day: !!e.all_day })); }));
+  if (isOn("planner")) {
+    tool("day_plan", { description: "The day's timeline: scheduled tasks and calendar events, plus free slots within working hours.", inputSchema: { date: date.optional() } }, safe(({ date: d }: any) => { const day = d ?? today(), w = workHours(); return { date: day, blocks: dayBlocks(day).blocks.map((b) => ({ kind: b.kind, title: b.title, start: toHm(b.start), end: toHm(b.end), conflict: !!b.conflict })), free: freeSlots(day, w.start, w.end).map(([a, b]) => `${toHm(a)}-${toHm(b)}`) }; }));
+    tool("auto_schedule", { description: "Give today's unscheduled tasks start times in the free slots, highest priority first. Changes task times.", inputSchema: { date: date.optional() } }, safe(({ date: d }: any) => autoSchedule(d ?? today())));
+  }
+  if (isOn("notes")) {
+    tool("add_note", { description: "Create a Markdown note. Link other notes with [[Title]].", inputSchema: { title: z.string().min(1), body: z.string().optional() } }, safe(({ title, body }: any) => ({ id: createNote(title, body ?? "") })));
+    tool("search_notes", { description: "Search notes by title/body text, or list recent ones.", inputSchema: { query: z.string().optional(), limit: z.number().int().min(1).max(50).optional() } }, safe(({ query, limit }: any) => listNotes({ q: query, limit: limit ?? 20 }).map((n) => ({ id: n.id, title: n.title, updated: n.updated_at, preview: n.body.slice(0, 200) }))));
+    tool("get_note", { description: "Read one note in full.", inputSchema: { id: z.number().int() } }, safe(({ id }: any) => getNote(id) ?? (() => { throw new Error("No such note"); })()));
+    tool("append_to_note", { description: "Append text to the end of a note.", inputSchema: { id: z.number().int(), text: z.string().min(1) } }, safe(({ id, text }: any) => { const n = getNote(id); if (!n) throw new Error("No such note"); updateNote(id, { body: (n.body ? n.body + "\n\n" : "") + text }); return "ok"; }));
+  }
+  if (isOn("goals")) {
+    tool("list_goals", { description: "Active goals with progress and key results.", inputSchema: {} }, safe(() => listGoals().map((g) => ({ id: g.id, title: g.title, area: g.area, target_date: g.target_date, progress_pct: goalProgress(g).pct, key_results: keyResults(g.id) }))));
+    tool("add_goal", { description: "Create a goal.", inputSchema: { title: z.string().min(1), area: z.string().optional(), target_date: date.optional() } }, safe(({ title, area, target_date }: any) => ({ id: createGoal({ title, area, target_date }) })));
+    tool("update_key_result", { description: "Set the current value of a key result.", inputSchema: { id: z.number().int(), current: z.number() } }, safe(({ id, current }: any) => ({ ok: setKeyResult(id, current) })));
+  }
+  if (isOn("people")) {
+    tool("list_people", { description: "People you're keeping in touch with: days until the next catch-up is due, upcoming birthdays.", inputSchema: {} }, safe(() => ({ people: listPeople().map((p) => ({ id: p.id, name: p.name, last_contact: p.last_contact, catch_up_in_days: catchUpIn(p) })), birthdays: upcomingBirthdays(30).map((x) => ({ name: x.p.name, in_days: x.b!.in })) })));
+    tool("add_person", { description: "Add a person to keep in touch with.", inputSchema: { name: z.string().min(1), birthday: date.optional(), cadence_days: z.number().int().min(1).optional() } }, safe(({ name, birthday, cadence_days }: any) => ({ id: createPerson({ name, birthday, cadence_days }) })));
+    tool("log_contact", { description: "Record that you caught up with someone today.", inputSchema: { id: z.number().int(), note: z.string().optional() } }, safe(({ id, note }: any) => { logContact(id, note ?? ""); return "ok"; }));
+  }
+  if (isOn("templates")) {
+    tool("list_templates", { description: "Task templates (checklists/routines).", inputSchema: {} }, safe(() => listTemplates().map((t) => ({ id: t.id, name: t.name, steps: t.data.subtasks.length }))));
+    tool("use_template", { description: "Create a task (with its subtasks) from a template. Optional due date.", inputSchema: { id: z.number().int(), due: date.optional() } }, safe(({ id, due }: any) => ({ task_id: useTemplate(id, due ? { due } : {}) })));
+  }
+  tool("next_task", { description: "The single best thing to do right now (overdue and high priority first, short tasks break ties). Pass skip ids to get the next one.", inputSchema: { skip: z.array(z.number().int()).optional() } }, safe(({ skip }: any) => { const t = nextBest(skip ?? []); return t ? briefTask(t) : "Nothing to do."; }));
   return s;
 }
 

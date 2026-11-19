@@ -62,6 +62,28 @@ function migrate(d: Database.Database) {
       message_id TEXT PRIMARY KEY, sender TEXT, subject TEXT, task_id INTEGER, received_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
     CREATE TABLE IF NOT EXISTS notifications_sent (key TEXT PRIMARY KEY, sent_at TEXT NOT NULL DEFAULT (datetime('now')));
+    CREATE TABLE IF NOT EXISTS money_categories (id INTEGER PRIMARY KEY, name TEXT NOT NULL, color TEXT NOT NULL DEFAULT '#1877f2', kind TEXT NOT NULL DEFAULT 'expense', budget_cents INTEGER NOT NULL DEFAULT 0, archived INTEGER NOT NULL DEFAULT 0);
+    CREATE TABLE IF NOT EXISTS budget_overrides (category_id INTEGER NOT NULL REFERENCES money_categories(id) ON DELETE CASCADE, month TEXT NOT NULL, amount_cents INTEGER NOT NULL, PRIMARY KEY (category_id, month));
+    CREATE TABLE IF NOT EXISTS transactions (id INTEGER PRIMARY KEY, date TEXT NOT NULL, amount_cents INTEGER NOT NULL, payee TEXT NOT NULL DEFAULT '', category_id INTEGER REFERENCES money_categories(id) ON DELETE SET NULL,
+      note TEXT NOT NULL DEFAULT '', source TEXT NOT NULL DEFAULT 'manual', sub_id INTEGER, hash TEXT UNIQUE, created_at TEXT NOT NULL DEFAULT (datetime('now')));
+    CREATE INDEX IF NOT EXISTS tx_date ON transactions(date);
+    CREATE TABLE IF NOT EXISTS money_rules (id INTEGER PRIMARY KEY, pattern TEXT NOT NULL, category_id INTEGER NOT NULL REFERENCES money_categories(id) ON DELETE CASCADE);
+    CREATE TABLE IF NOT EXISTS savings_goals (id INTEGER PRIMARY KEY, name TEXT NOT NULL, target_cents INTEGER NOT NULL, saved_cents INTEGER NOT NULL DEFAULT 0, due TEXT, color TEXT NOT NULL DEFAULT '#1f845a', archived INTEGER NOT NULL DEFAULT 0);
+    CREATE TABLE IF NOT EXISTS subscriptions (id INTEGER PRIMARY KEY, name TEXT NOT NULL, amount_cents INTEGER NOT NULL, cycle TEXT NOT NULL DEFAULT 'monthly', next_due TEXT NOT NULL, category_id INTEGER REFERENCES money_categories(id) ON DELETE SET NULL,
+      url TEXT NOT NULL DEFAULT '', notes TEXT NOT NULL DEFAULT '', trial_ends TEXT, status TEXT NOT NULL DEFAULT 'active', remind_days INTEGER NOT NULL DEFAULT 3, auto_log INTEGER NOT NULL DEFAULT 1,
+      color TEXT NOT NULL DEFAULT '#1877f2', started TEXT, cancelled_at TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')));
+    CREATE TABLE IF NOT EXISTS sub_price_history (id INTEGER PRIMARY KEY, sub_id INTEGER NOT NULL REFERENCES subscriptions(id) ON DELETE CASCADE, amount_cents INTEGER NOT NULL, from_date TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS notes (id INTEGER PRIMARY KEY, title TEXT NOT NULL DEFAULT '', body TEXT NOT NULL DEFAULT '', pinned INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')), deleted_at TEXT);
+    CREATE TABLE IF NOT EXISTS goals (id INTEGER PRIMARY KEY, title TEXT NOT NULL, area TEXT NOT NULL DEFAULT 'General', target_date TEXT, project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL, description TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'active', created_at TEXT NOT NULL DEFAULT (datetime('now')));
+    CREATE TABLE IF NOT EXISTS key_results (id INTEGER PRIMARY KEY, goal_id INTEGER NOT NULL REFERENCES goals(id) ON DELETE CASCADE, title TEXT NOT NULL, target REAL NOT NULL DEFAULT 100, current REAL NOT NULL DEFAULT 0, unit TEXT NOT NULL DEFAULT '');
+    CREATE TABLE IF NOT EXISTS people (id INTEGER PRIMARY KEY, name TEXT NOT NULL, notes TEXT NOT NULL DEFAULT '', birthday TEXT, cadence_days INTEGER, last_contact TEXT, archived INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now')));
+    CREATE TABLE IF NOT EXISTS interactions (id INTEGER PRIMARY KEY, person_id INTEGER NOT NULL REFERENCES people(id) ON DELETE CASCADE, date TEXT NOT NULL, note TEXT NOT NULL DEFAULT '');
+    CREATE TABLE IF NOT EXISTS templates (id INTEGER PRIMARY KEY, name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', data TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')));
+    CREATE TABLE IF NOT EXISTS cal_feeds (id INTEGER PRIMARY KEY, name TEXT NOT NULL, url TEXT NOT NULL UNIQUE, color TEXT NOT NULL DEFAULT '#8b5cf6', enabled INTEGER NOT NULL DEFAULT 1, last_synced TEXT, last_error TEXT);
+    CREATE TABLE IF NOT EXISTS cal_events (id INTEGER PRIMARY KEY, feed_id INTEGER NOT NULL REFERENCES cal_feeds(id) ON DELETE CASCADE, uid TEXT NOT NULL, title TEXT NOT NULL, date TEXT NOT NULL, start_time TEXT, end_date TEXT, end_time TEXT, all_day INTEGER NOT NULL DEFAULT 0, location TEXT NOT NULL DEFAULT '');
+    CREATE INDEX IF NOT EXISTS cal_events_date ON cal_events(date);
+    CREATE TABLE IF NOT EXISTS task_comments (id INTEGER PRIMARY KEY, task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE, body TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')));
+    CREATE TABLE IF NOT EXISTS saved_filters (id INTEGER PRIMARY KEY, name TEXT NOT NULL, query TEXT NOT NULL);
   `);
   d.exec("UPDATE tasks SET status='done' WHERE done_at IS NOT NULL AND status!='done'");
   d.exec("DELETE FROM tasks WHERE deleted_at IS NOT NULL AND deleted_at < datetime('now','-30 days')");

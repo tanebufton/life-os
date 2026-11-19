@@ -27,7 +27,7 @@ export function RowActions({ id, due, focus }: { id: number; due: string | null;
   const del = async () => { setOpen(null); const r = await deleteTaskInline(id); if (r) toast(`Deleted “${r.title}”`, { action: { label: "Undo", onClick: () => void restoreTaskAction(id) } }); };
   const btn = "grid h-7 w-7 place-items-center rounded-md text-mute hover:bg-raise hover:text-fg";
   return (
-    <span ref={box} className="relative flex shrink-0 items-center [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:transition-opacity [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-within:opacity-100">
+    <span ref={box} className="flex shrink-0 items-center [@media(hover:hover)]:absolute [@media(hover:hover)]:right-1.5 [@media(hover:hover)]:top-1.5 [@media(hover:hover)]:rounded-md [@media(hover:hover)]:bg-raise [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:shadow-sm [@media(hover:hover)]:transition-opacity [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-within:opacity-100">
       <button onClick={() => setOpen(open === "date" ? null : "date")} aria-label="Reschedule" className={`${btn} hidden sm:grid`}><Icon name="calendar" size={15} /></button>
       <button onClick={() => setOpen(open === "more" ? null : "more")} aria-label="More actions" className={btn}><Icon name="more" size={16} /></button>
       {open && pos && createPortal(

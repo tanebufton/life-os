@@ -4,10 +4,11 @@ import { AddTaskRow } from "@/components/addrow";
 import { Panel } from "@/components/Panel";
 import { SpotifyPanel } from "@/components/spotify";
 import { PageHead, TaskGroups, bucket } from "@/components/tasks";
-import { HabitsPanel, JournalPanel } from "@/components/todaywidgets";
+import { EventsPanel, GoalsPanel, HabitsPanel, JournalPanel, MoneyPanel, PeoplePanel, RenewalsPanel } from "@/components/todaywidgets";
 import { Icon } from "@/components/Icon";
 import { NewsPanel, OverviewCard, WeatherPanel } from "@/components/widgets";
-import { featureMap } from "@/lib/features";
+import { featureMap, isOn } from "@/lib/features";
+import { resolveWidgets } from "@/lib/widgets";
 import { focusToday } from "@/lib/focus";
 import { getSetting } from "@/lib/settings";
 import { doneToday, queryTasks } from "@/lib/tasks";
@@ -22,6 +23,7 @@ export default function Today() {
   const overdue = open.filter((x) => x.due && x.due < t).length;
   const toDo = open.filter((x) => x.due && x.due <= t).length;
   const planned = open.filter((x) => x.due && x.due <= t).reduce((n, x) => n + (x.estimate ?? 0), 0);
+  const widgets = resolveWidgets(getSetting("today_widgets"), isOn);
   const emailNew = open.filter((x) => x.source === "email" && !x.due && !x.project_id).length;
   const groups = bucket(open).filter((g) => g.label !== "Later").map((g) => (g.label === "No date" ? { ...g, label: "Inbox", tasks: g.tasks.slice(0, 6) } : g));
   const date = new Intl.DateTimeFormat("en-NZ", { timeZone: tz(), weekday: "long", day: "numeric", month: "long" }).format(new Date());
@@ -35,12 +37,22 @@ export default function Today() {
       <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-x-12 gap-y-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div><TaskGroups groups={groups} empty={<>You&apos;re all caught up. Enjoy the day.</>} /><AddTaskRow /></div>
         <aside className="space-y-4">
-          <OverviewCard i={1} done={doneToday()} focus={f.focus ? focusToday().minutes : undefined} overdue={overdue} planned={planned} capacity={Number(getSetting("capacity_min") ?? 360)} />
-          {f.habits && <HabitsPanel i={2} />}
-          {f.journal && <JournalPanel i={3} />}
-          {f.weather && <Suspense fallback={<Skeleton i={4} />}><WeatherPanel i={4} /></Suspense>}
-          {f.music && <SpotifyPanel i={5} />}
-          {f.news && <Suspense fallback={<Skeleton h="h-64" i={6} />}><NewsPanel i={6} limit={5} /></Suspense>}
+          {widgets.map((id, i) => {
+            switch (id) {
+              case "glance": return <OverviewCard key={id} i={i + 1} done={doneToday()} focus={f.focus ? focusToday().minutes : undefined} overdue={overdue} planned={planned} capacity={Number(getSetting("capacity_min") ?? 360)} />;
+              case "habits": return <HabitsPanel key={id} i={i + 1} />;
+              case "journal": return <JournalPanel key={id} i={i + 1} />;
+              case "money": return <MoneyPanel key={id} i={i + 1} />;
+              case "events": return <EventsPanel key={id} i={i + 1} />;
+              case "people": return <PeoplePanel key={id} i={i + 1} />;
+              case "goals": return <GoalsPanel key={id} i={i + 1} />;
+              case "subs": return <RenewalsPanel key={id} i={i + 1} />;
+              case "weather": return <Suspense key={id} fallback={<Skeleton i={i + 1} />}><WeatherPanel i={i + 1} /></Suspense>;
+              case "music": return <SpotifyPanel key={id} i={i + 1} />;
+              case "news": return <Suspense key={id} fallback={<Skeleton h="h-64" i={i + 1} />}><NewsPanel i={i + 1} limit={5} /></Suspense>;
+              default: return null;
+            }
+          })}
         </aside>
       </div>
     </>

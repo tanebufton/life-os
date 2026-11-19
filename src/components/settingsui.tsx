@@ -36,3 +36,10 @@ export function RegenButton({ which }: { which: "ical" | "inbound" }) {
   const [, start] = useTransition();
   return <button className="btn !h-7 text-xs" onClick={() => { if (confirm("The old link will stop working. Continue?")) start(async () => { await (which === "ical" ? regenerateIcal() : regenerateInbound()); toast("New link generated"); }); }}>Regenerate</button>;
 }
+
+import { telegramConnect, telegramTest } from "@/lib/actions3";
+export function TelegramButtons({ origin }: { origin: string }) {
+  const [msg, setMsg] = useState(""), [busy, start] = useTransition();
+  const run = (f: () => Promise<{ ok: boolean; message?: string; error?: string }>) => start(async () => { const r = await f(); setMsg(r.ok ? (r.message ?? "Done") : (r.error ?? "Failed")); });
+  return (<div className="flex flex-wrap items-center gap-3"><button type="button" className="btn" disabled={busy} onClick={() => run(() => telegramConnect(origin) as never)}>Connect webhook</button><button type="button" className="btn" disabled={busy} onClick={() => run(() => telegramTest() as never)}>Send test</button>{msg && <span className="text-[13px] text-mute">{msg}</span>}</div>);
+}

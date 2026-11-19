@@ -36,7 +36,7 @@ export function TaskRow({ t }: { t: TaskRow }) {
   const from = t.source === "email" && t.meta ? (JSON.parse(t.meta).from as string | undefined)?.replace(/<.*>/, "").trim() : null;
   const ring = t.priority > 0 ? "border-danger bg-danger/10 hover:bg-danger/20" : t.priority < 0 ? "border-accent/70 hover:bg-accent/10" : "border-fg/35 hover:bg-fg/5";
   return (
-    <li data-task-id={t.id} className="group flex items-start gap-3 border-b px-2 py-2.5 transition-colors last:border-b-0 hover:bg-raise/60">
+    <li data-task-id={t.id} className="group relative flex items-start gap-3 border-b px-2 py-2.5 transition-colors last:border-b-0 hover:bg-raise/60">
       <div className="flex pt-px"><CheckButton id={t.id} done={done} ring={ring} /></div>
       <div className="min-w-0 flex-1">
         <Link href={`/tasks/${t.id}`} className={`block truncate text-[14.5px] leading-[18px] ${done ? "text-dim line-through" : ""}`}>{t.title}</Link>

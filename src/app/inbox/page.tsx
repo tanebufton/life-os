@@ -13,7 +13,7 @@ export default async function Inbox({ searchParams }: { searchParams: Promise<{ 
   const fromEmail = unsorted.filter((t) => t.source === "email"), fromShare = unsorted.filter((t) => t.source === "share");
   const rest = unsorted.filter((t) => t.source !== "email" && t.source !== "share");
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="max-w-4xl">
       <FlashToast shared={!!shared} base="/inbox" />
       <PageHead title="Inbox" sub={unsorted.length ? `${unsorted.length} to sort. Give each a date or project and it leaves the inbox.` : "Everything captured lands here until you sort it."} />
       <TaskGroups groups={[{ label: "From email", tone: "accent", tasks: fromEmail }, { label: "Shared to LifeOS", tasks: fromShare }, { label: "Unsorted", tasks: rest }]}
