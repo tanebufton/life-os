@@ -17,7 +17,7 @@ export type Column = { id: number; key: string; name: string; kind: Kind };
 export type Card = { id: number; title: string; status: string; priority: number; due: string | null; project_name: string | null; project_color: string | null; tags: string[]; repeat: string | null; sub_total?: number; sub_done?: number };
 const lift = "shadow-[0_1px_1px_rgb(9_30_66/0.25),0_0_1px_rgb(9_30_66/0.31)] dark:shadow-none dark:border";
 
-export function Board({ columns, cards, today, projectId = null, hiddenNote }: { columns: Column[]; cards: Card[]; today: string; projectId?: number | null; hiddenNote?: React.ReactNode }) {
+export function Board({ columns, cards, today, projectId = null, hiddenNote, toolbar }: { columns: Column[]; cards: Card[]; today: string; projectId?: number | null; hiddenNote?: React.ReactNode; toolbar?: React.ReactNode }) {
   const router = useRouter();
   const [items, setItems] = useOptimistic(cards, (s, a: { id: number; status: string; before?: number | null }) => { const c = s.find((x) => x.id === a.id); if (!c) return s; const rest = s.filter((x) => x.id !== a.id), at = a.before ? rest.findIndex((x) => x.id === a.before) : -1; const moved = { ...c, status: a.status }; return at < 0 ? [...rest, moved] : [...rest.slice(0, at), moved, ...rest.slice(at)]; });
   const [, start] = useTransition();
@@ -43,44 +43,45 @@ export function Board({ columns, cards, today, projectId = null, hiddenNote }: {
   return (
     <>
     {lightbox !== null && <TaskLightbox id={lightbox} onClose={closeLightbox} />}
-    <div className="mb-3 flex flex-wrap items-center gap-2">
-      <button className={selecting ? "btn-primary !h-8 text-xs" : "btn !h-8 text-xs"} onClick={() => { setSelecting((v) => !v); setSel(new Set()); }}>{selecting ? "Done selecting" : "Select cards"}</button>
-      {selecting && <span className="text-xs text-mute">{sel.size} selected. Click cards to pick them.</span>}
+    <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+      {toolbar}
+      <div className="ml-auto flex items-center gap-2">
+        {selecting && <span className="text-xs text-mute">{sel.size} selected</span>}
+        <button className={selecting ? "btn-primary !h-8 text-xs" : "btn !h-8 text-xs"} onClick={() => { setSelecting((v) => !v); setSel(new Set()); }}>{selecting ? "Done" : "Select"}</button>
+      </div>
     </div>
     <div role="tablist" aria-label="Columns" className="-mx-4 mb-3 flex gap-1.5 overflow-x-auto px-4 md:hidden">{columns.map((c) => <button key={c.key} role="tab" aria-selected={mobileCol === c.key} onClick={() => setMobileCol(c.key)} className={`shrink-0 rounded-full border px-3 py-1.5 text-[13px] ${mobileCol === c.key ? "border-accent/50 bg-accent/10 font-medium text-accent" : "text-mute"}`}>{c.name} <span className="text-dim">{items.filter((x) => x.status === c.key).length}</span></button>)}</div>
-    <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-3 md:-mx-10 md:grid md:snap-none md:px-10 md:[grid-template-columns:repeat(var(--cols),minmax(220px,1fr))]" style={{ ["--cols" as string]: columns.length }}>
+    <div className="-mx-4 flex snap-x snap-mandatory items-start gap-2.5 overflow-x-auto px-4 pb-3 md:-mx-8 md:snap-none md:px-8">
       {columns.map((col, ci) => {
         const list = items.filter((c) => c.status === col.key);
         return (
           <section key={col.key} onDragOver={(e) => { e.preventDefault(); setOver(col.key); }} onDragLeave={() => setOver(null)}
             onDrop={(e) => { e.preventDefault(); setOver(null); const id = Number(e.dataTransfer.getData("text/plain")); if (id) place(id, col.key, null); }}
-            className={`rise min-h-[60vh] w-full shrink-0 rounded-xl bg-raise/70 p-2 transition md:block md:w-auto ${mobileCol === col.key ? "" : "hidden"} ${over === col.key ? "ring-2 ring-accent/50" : ""}`} style={{ ["--i" as string]: ci }}>
-            <h2 className="flex items-center gap-2 px-2 pb-2.5 pt-1.5 text-xs font-semibold uppercase tracking-wide text-mute"><StatusIcon status={col.kind} size={13} /><span className="truncate">{col.name}</span><span className="font-medium text-dim">{list.length}</span></h2>
-            <ul className="space-y-2">
+            className={`rise w-full shrink-0 rounded-xl bg-raise/60 p-1.5 transition md:block md:w-[272px] ${mobileCol === col.key ? "" : "hidden"} ${over === col.key ? "ring-2 ring-accent/50" : ""}`} style={{ ["--i" as string]: ci }}>
+            <h2 className="flex items-center gap-1.5 px-1.5 pb-1.5 pt-1 text-[12px] font-semibold text-mute"><StatusIcon status={col.kind} size={12} /><span className="truncate">{col.name}</span><span className="font-medium text-dim">{list.length}</span></h2>
+            <ul className="space-y-1.5">
               {list.map((c) => {
                 const done = col.kind === "done";
                 const d = c.due && !done ? (c.due < today ? "text-danger" : c.due === today ? "text-ok" : "text-mute") : "text-mute";
                 return (
                   <li key={c.id} draggable onDragStart={(e) => { e.dataTransfer.setData("text/plain", String(c.id)); e.dataTransfer.setData("application/x-lifeos-task", String(c.id)); }} onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); e.stopPropagation(); setOver(null); const id = Number(e.dataTransfer.getData("text/plain")); if (!id || id === c.id) return; const r = e.currentTarget.getBoundingClientRect(), after = e.clientY > r.top + r.height / 2, i = list.findIndex((x) => x.id === c.id), next = after ? list[i + 1]?.id ?? null : c.id; place(id, col.key, next); }} onClick={(e) => open(e, c.id)} onKeyDown={(e) => { if (e.key === "Enter") open(e, c.id); }} tabIndex={0} role="link" aria-label={`Open ${c.title}`}
-                    className={`group relative cursor-pointer rounded-lg bg-panel p-3 outline-none transition hover:bg-raise/40 focus-visible:ring-2 focus-visible:ring-accent/50 active:cursor-grabbing ${lift}`}>
-                    {selecting && <input type="checkbox" checked={sel.has(c.id)} onChange={() => toggle(c.id)} aria-label={`Select ${c.title}`} className="absolute left-2.5 top-3.5 h-4 w-4" />}
-                    <div className={`flex items-start gap-2 ${selecting ? "pl-6" : ""} pr-14`}>
-                      {!selecting && <button type="button" aria-label={done ? `Reopen ${c.title}` : `Complete ${c.title}`} title={done ? "Reopen" : "Mark done"} onClick={() => complete(c)} className={`mt-[1px] grid h-[17px] w-[17px] shrink-0 place-items-center rounded-full border-[1.5px] transition ${done ? "border-ok bg-ok text-white" : "border-fg/35 text-transparent hover:border-ok hover:text-ok"}`}><Icon name="check" size={11} /></button>}
-                      <Link href={`/tasks/${c.id}`} draggable={false} onClick={(e) => { if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return; e.preventDefault(); if (selecting) toggle(c.id); else setLightbox(c.id); }} className={`block text-[14px] leading-snug ${done ? "text-dim line-through" : ""}`}>{c.title}</Link></div>
-                    {c.tags.length > 0 && <div className="mt-2 flex flex-wrap gap-1">{c.tags.map((g) => <Pill key={g} name={g} />)}</div>}
-                    <div className="mt-3 flex items-center gap-2 text-xs text-mute">
-                      <StatusIcon status={kindOf(c.status)} size={15} />
-                      <span className={`font-medium ${done ? "line-through" : ""}`}>{issueKey(c.project_name, c.id)}</span>
-                      <span className="ml-auto flex items-center gap-2">
-                        {!!c.sub_total && <span className="inline-flex items-center gap-1" title={`${c.sub_done ?? 0} of ${c.sub_total} subtasks done`}><span className="h-1 w-8 overflow-hidden rounded-full bg-fg/10"><span className="block h-full bg-ok" style={{ width: `${((c.sub_done ?? 0) / c.sub_total) * 100}%` }} /></span>{c.sub_done ?? 0}/{c.sub_total}</span>}
-                        {c.repeat && <Icon name="repeat" size={13} />}
-                        {c.due && <span className={`inline-flex items-center gap-1 ${d}`}><Icon name="calendar" size={12} />{c.due === today ? "Today" : nice(c.due).split(", ")[1]}</span>}
-                        {c.priority > 0 && <Icon name="chevUp2" size={15} className="text-danger" />}{c.priority < 0 && <Icon name="chevDown1" size={15} className="text-accent" />}
-                      </span>
-                    </div>
-                    <div className="absolute right-1.5 top-1.5 flex text-mute [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:transition-opacity [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-within:opacity-100">
-                      <button onClick={() => setLightbox(c.id)} aria-label={`Open ${c.title}`} title="Open" className="grid h-6 w-6 place-items-center rounded hover:bg-raise hover:text-fg"><Icon name="ext" size={13} /></button>
-                      <button onClick={() => remove(c)} aria-label={`Delete ${c.title}`} title="Delete" className="grid h-6 w-6 place-items-center rounded hover:bg-raise hover:text-danger"><Icon name="trash" size={13} /></button>
+                    title={issueKey(c.project_name, c.id)}
+                    className={`group relative cursor-pointer rounded-lg bg-panel px-2.5 py-2 outline-none transition hover:bg-raise/40 focus-visible:ring-2 focus-visible:ring-accent/50 active:cursor-grabbing ${lift}`}>
+                    {selecting && <input type="checkbox" checked={sel.has(c.id)} onChange={() => toggle(c.id)} aria-label={`Select ${c.title}`} className="absolute left-2.5 top-2.5 h-4 w-4" />}
+                    <div className={`flex items-start gap-2 ${selecting ? "pl-6" : ""} pr-12`}>
+                      {!selecting && <button type="button" aria-label={done ? `Reopen ${c.title}` : `Complete ${c.title}`} title={done ? "Reopen" : "Mark done"} onClick={() => complete(c)} className={`mt-[2px] grid h-[16px] w-[16px] shrink-0 place-items-center rounded-full border-[1.5px] transition ${done ? "border-ok bg-ok text-white" : "border-fg/35 text-transparent hover:border-ok hover:text-ok"}`}><Icon name="check" size={10} /></button>}
+                      <Link href={`/tasks/${c.id}`} draggable={false} onClick={(e) => { if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return; e.preventDefault(); if (selecting) toggle(c.id); else setLightbox(c.id); }} className={`block text-[13.5px] leading-snug ${done ? "text-dim line-through" : ""}`}>{c.title}</Link></div>
+                    {(c.tags.length > 0 || !!c.sub_total || c.repeat || c.due || c.priority !== 0) && (
+                      <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 pl-[24px] text-[11px] text-mute">
+                        {c.tags.map((g) => <Pill key={g} name={g} />)}
+                        {!!c.sub_total && <span className="inline-flex items-center gap-1" title={`${c.sub_done ?? 0} of ${c.sub_total} subtasks done`}><Icon name="list" size={11} />{c.sub_done ?? 0}/{c.sub_total}</span>}
+                        {c.repeat && <Icon name="repeat" size={12} />}
+                        {c.due && <span className={`inline-flex items-center gap-1 ${d}`}><Icon name="calendar" size={11} />{c.due === today ? "Today" : nice(c.due).split(", ")[1]}</span>}
+                        {c.priority > 0 && <Icon name="chevUp2" size={13} className="text-danger" />}{c.priority < 0 && <Icon name="chevDown1" size={13} className="text-accent" />}
+                      </div>)}
+                    <div className="absolute right-1 top-1 flex text-mute [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:transition-opacity [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-within:opacity-100">
+                      <button onClick={() => setLightbox(c.id)} aria-label={`Open ${c.title}`} title="Open" className="grid h-5 w-5 place-items-center rounded hover:bg-raise hover:text-fg"><Icon name="ext" size={12} /></button>
+                      <button onClick={() => remove(c)} aria-label={`Delete ${c.title}`} title="Delete" className="grid h-5 w-5 place-items-center rounded hover:bg-raise hover:text-danger"><Icon name="trash" size={12} /></button>
                     </div>
                   </li>
                 );
