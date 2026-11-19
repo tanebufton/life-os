@@ -35,12 +35,12 @@ export function BoardView({ sp, lockProject, base }: { sp: BoardParams; lockProj
   const cards = sorted([...open, ...done].filter(pass)), counts = Object.fromEntries(columns.map((c) => [c.key, queryTasks({ project: pid ?? undefined, state: "all", status: c.key, limit: 5000 }).length]));
   return (
     <>
-      {lockProject === undefined && <div className="mb-4 flex flex-wrap gap-1.5">
+      {lockProject === undefined && <div className="mb-3 flex gap-1.5 overflow-x-auto md:mb-4 md:flex-wrap md:overflow-visible">
         <FilterChip href="/board" active={!project}>All projects</FilterChip>
         {projects.map((p) => <FilterChip key={p.id} href={`/board?project=${p.id}`} active={project === p.id} dot={p.color}>{p.name}{hasCustomColumns(p.id) ? <span className="text-dim">· own columns</span> : null}</FilterChip>)}
       </div>}
       {sp.columns && <Panel title={current ? `Columns for ${current.name}` : "Default columns"} i={0} className="mb-4 max-w-3xl"><ColumnsEditor projectId={pid} projectName={current?.name} columns={columns} custom={custom} counts={counts} /></Panel>}
-      {lockProject === undefined && pid === null && own.length > 0 && <p className="mb-3 text-xs text-mute">These projects have their own columns, so they aren&apos;t shown here: {own.map((p, i) => <span key={p.id}>{i ? ", " : ""}<Link href={`/board?project=${p.id}`} className="text-accent hover:underline">{p.name}</Link></span>)}.</p>}
+      {lockProject === undefined && pid === null && own.length > 0 && <p className="mb-3 hidden text-xs text-mute md:block">These projects have their own columns, so they aren&apos;t shown here: {own.map((p, i) => <span key={p.id}>{i ? ", " : ""}<Link href={`/board?project=${p.id}`} className="text-accent hover:underline">{p.name}</Link></span>)}.</p>}
             <Board toolbar={<><BoardFilters tags={allTags} /><div className="flex items-center gap-4"><DoneWindow days={days} showingAll={showAll} base={lockProject === undefined ? `/board${pid ? `?project=${pid}` : ""}` : base} /><Link href={columnsHref} aria-pressed={!!sp.columns} className={`btn ${sp.columns ? "!border-accent/40 !bg-accent/10 !text-accent" : ""}`}><Icon name="settings" size={14} />Columns</Link></div></>} columns={columns} cards={cards} today={today()} projectId={pid} hiddenNote={hidden > 0 ? <p className="mt-2 px-2 text-xs text-dim">{hidden} older finished card{hidden === 1 ? "" : "s"} hidden. <Link className="text-accent hover:underline" href={lockProject === undefined ? `/board?${pid ? `project=${pid}&` : ""}done=all` : `${base}${base.includes("?") ? "&" : "?"}done=all`}>Show all</Link></p> : null} />
     </>
   );

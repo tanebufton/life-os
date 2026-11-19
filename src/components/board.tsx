@@ -33,7 +33,7 @@ export function Board({ columns, cards, today, projectId = null, hiddenNote, too
     const r = await moveCardAction(id, status, col); if (!r.ok) toast(r.error);
   });
   // The whole card opens the task (not just the title). Buttons and links inside keep their own behaviour; a drag never counts as a click.
-  const [lightbox, setLightbox] = useState<number | null>(null);
+  const [lightbox, setLightbox] = useState<number | null>(null), [tools, setTools] = useState(false);
   const open = (e: React.MouseEvent | React.KeyboardEvent, id: number) => { if ((e.target as HTMLElement).closest("button, a, input")) return; if (selecting) { toggle(id); return; } setLightbox(id); };
   const closeLightbox = () => { setLightbox(null); router.refresh(); };
   /** Tick a card: it moves to the first Done column; ticking a finished one puts it back in the first To do column. */
@@ -43,14 +43,15 @@ export function Board({ columns, cards, today, projectId = null, hiddenNote, too
   return (
     <>
     {lightbox !== null && <TaskLightbox id={lightbox} onClose={closeLightbox} />}
+    <div role="tablist" aria-label="Columns" className="sticky top-12 z-10 -mx-4 mb-2 flex gap-1.5 overflow-x-auto bg-bg/95 px-4 py-1.5 backdrop-blur md:hidden">{columns.map((c) => <button key={c.key} role="tab" aria-selected={mobileCol === c.key} onClick={() => setMobileCol(c.key)} className={`shrink-0 rounded-full border px-3 py-1.5 text-[13px] ${mobileCol === c.key ? "border-accent/50 bg-accent/10 font-medium text-accent" : "text-mute"}`}>{c.name} <span className="text-dim">{items.filter((x) => x.status === c.key).length}</span></button>)}</div>
     <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
-      {toolbar}
+      <button type="button" aria-expanded={tools} onClick={() => setTools((v) => !v)} className={`btn !h-8 text-xs md:hidden ${tools ? "!border-accent/40 !bg-accent/10 !text-accent" : ""}`}><Icon name="search" size={13} />Filters</button>
+      <div className={`${tools ? "flex" : "hidden"} w-full flex-wrap items-center gap-x-3 gap-y-2 md:order-none md:flex md:w-auto`}>{toolbar}</div>
       <div className="ml-auto flex items-center gap-2">
         {selecting && <span className="text-xs text-mute">{sel.size} selected</span>}
         <button className={selecting ? "btn-primary !h-8 text-xs" : "btn !h-8 text-xs"} onClick={() => { setSelecting((v) => !v); setSel(new Set()); }}>{selecting ? "Done" : "Select"}</button>
       </div>
     </div>
-    <div role="tablist" aria-label="Columns" className="-mx-4 mb-3 flex gap-1.5 overflow-x-auto px-4 md:hidden">{columns.map((c) => <button key={c.key} role="tab" aria-selected={mobileCol === c.key} onClick={() => setMobileCol(c.key)} className={`shrink-0 rounded-full border px-3 py-1.5 text-[13px] ${mobileCol === c.key ? "border-accent/50 bg-accent/10 font-medium text-accent" : "text-mute"}`}>{c.name} <span className="text-dim">{items.filter((x) => x.status === c.key).length}</span></button>)}</div>
     <div className="-mx-4 flex snap-x snap-mandatory items-start gap-2.5 overflow-x-auto px-4 pb-3 md:-mx-8 md:snap-none md:px-8">
       {columns.map((col, ci) => {
         const list = items.filter((c) => c.status === col.key);

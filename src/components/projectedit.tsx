@@ -12,7 +12,7 @@ export function ProjectEditor({ id, name, color, icon = "", area = "", areas = [
   const label = "mb-1 block text-xs font-medium text-mute";
   return (
     <div className="relative" data-pedit>
-      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="btn"><Icon name="edit" size={14} className="text-mute" />Edit</button>
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="btn"><Icon name="edit" size={14} className="text-mute" /><span className="max-sm:sr-only">Edit</span></button>
       {open && (
         <form className="absolute right-0 top-full z-30 mt-2 w-[22rem] max-w-[calc(100vw-2rem)] space-y-3 rounded-xl border bg-panel p-4 shadow-[0_8px_30px_rgb(0_0_0/0.15)]"
           onSubmit={(e) => { e.preventDefault(); start(async () => { const r = await renameProjectAction(id, n, c, ic, ar, vw); if (r.ok) { toast("Project updated"); setOpen(false); } else toast(r.error); }); }}>

@@ -17,7 +17,7 @@ export function PageHead({ title, sub, icon, right }: { title: string; sub?: Rea
   return (
     <div className="rise mb-6 flex flex-wrap items-end justify-between gap-3">
       <div className="flex min-w-0 items-center gap-3">{icon}<div className="min-w-0"><h1 className="truncate text-[28px] font-bold leading-tight tracking-tight md:text-[32px]">{title}</h1>{sub && <p className="mt-0.5 text-[14px] text-mute">{sub}</p>}</div></div>
-      {right && <div className="flex flex-wrap items-center gap-2">{right}</div>}
+      {right && <div className="flex max-w-full items-center gap-2 max-md:w-full max-md:overflow-x-auto md:flex-wrap">{right}</div>}
     </div>
   );
 }

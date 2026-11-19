@@ -46,14 +46,14 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   const ordered = [...open].sort((a, b) => (a.due && b.due ? a.due.localeCompare(b.due) : a.due ? -1 : b.due ? 1 : b.id - a.id)), dueSoon = ordered.slice(0, 10), moreOpen = ordered.length - dueSoon.length;
   return (
     <div className="proj">
-      <div className="rise flex flex-wrap items-center justify-between gap-3">
+      <div className="rise flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3"><ProjectAvatar name={p.name} color={p.color} size={36} icon={p.icon} />
-          <div className="min-w-0"><h1 className="truncate text-[26px] font-bold leading-tight tracking-tight">{p.name}</h1>
+          <div className="min-w-0"><h1 className="truncate text-[20px] font-bold leading-tight tracking-tight md:text-[26px]">{p.name}</h1>
             <p className="text-[13px] text-mute">{p.area ? `${p.area} · ` : ""}{projectKey(p.name)} · {open.length} open{hasCustomColumns(id) ? " · own board columns" : ""}</p></div></div>
         <div className="flex items-center gap-2"><FavouriteButton kind="project" id={id} on={isFavourite("project", id)} /><ProjectEditor id={id} name={p.name} color={p.color} icon={p.icon} area={p.area} view={p.default_view} views={tabs.map((t) => ({ k: t.k, label: t.label }))} areas={(db.prepare("SELECT DISTINCT area FROM projects WHERE area!='' ORDER BY area").all() as { area: string }[]).map((r) => r.area)} /></div>
       </div>
       <div className="mb-6 hidden md:block" />
-      <nav aria-label="Project views" className="ptabs mb-6 flex gap-0.5 overflow-x-auto border-b md:hidden">
+      <nav aria-label="Project views" className="ptabs mb-3 flex gap-0.5 overflow-x-auto border-b md:mb-6 md:hidden">
         {tabs.map((t) => { const on = t.k === tab; return (
           <Link key={t.k} href={href(t.k)} aria-current={on ? "page" : undefined} className={`-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-[14px] ${on ? "border-accent font-medium text-fg" : "border-transparent text-mute hover:text-fg"}`}>
             <Icon name={t.icon} size={15} className={on ? "text-accent" : ""} />{t.label}{t.n ? <span className="text-xs text-dim">{t.n}</span> : null}</Link>); })}

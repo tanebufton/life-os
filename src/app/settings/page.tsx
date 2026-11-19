@@ -31,7 +31,7 @@ import { tgChat, tgLinkCode, tgMode, tgSecret, tgToken } from "@/lib/telegram";
 import { icalSecret, inboundSecret, listTokens } from "@/lib/tokens";
 
 export const dynamic = "force-dynamic";
-const TABS = [{ k: "general", label: "General" }, { k: "reminders", label: "Reminders" }, { k: "connect", label: "Connections" }, { k: "data", label: "Data & backup" }];
+const TABS = [{ k: "general", label: "General" }, { k: "reminders", label: "Reminders" }, { k: "connect", label: "Connections" }, { k: "data", label: "Data" }];
 const Code = ({ children }: { children: string }) => <pre className="overflow-x-auto rounded-md border bg-raise/60 p-2.5 text-xs leading-relaxed">{children}</pre>;
 const Section = ({ id, title, desc, children, i = 0, tab, cur }: { id?: string; title: string; desc: string; children: React.ReactNode; i?: number; tab: string; cur: string }) => (tab !== cur ? null :
   <section id={id} className="rise grid scroll-mt-16 gap-4 border-b py-7 first:pt-0 last:border-b-0 md:grid-cols-[240px_minmax(0,1fr)] md:gap-10" style={{ ["--i" as string]: i }}>

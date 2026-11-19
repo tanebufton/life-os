@@ -24,8 +24,8 @@ export function MarkdownField({ value, onChange, onBlur, links, placeholder, lab
   const B = ({ icon, title, onClick }: { icon: string; title: string; onClick: () => void }) => <button type="button" title={title} aria-label={title} onMouseDown={(e) => e.preventDefault()} onClick={onClick} className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-mute hover:bg-raise hover:text-fg"><Icon name={icon} size={16} /></button>;
   return (
     <div className={`overflow-hidden rounded-lg border bg-panel focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/25 ${className}`}>
-      <div className="flex items-center gap-0.5 border-b bg-raise/40 px-1.5 py-1">
-        <div role="toolbar" aria-label="Formatting" className={`flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto ${mode === "view" ? "pointer-events-none opacity-40" : ""}`}>
+      <div className="flex flex-wrap items-center gap-x-0.5 border-b bg-raise/40 px-1.5 py-1 sm:flex-nowrap">
+        <div role="toolbar" aria-label="Formatting" className={`order-2 flex w-full min-w-0 items-center gap-0.5 overflow-x-auto sm:order-1 sm:w-auto sm:flex-1 ${mode === "view" ? "pointer-events-none opacity-40" : ""}`}>
           <B icon="bold" title="Bold (Ctrl+B)" onClick={() => run((s, e) => wrap(value, s, e, "**", "**", "bold"))} />
           <B icon="italic" title="Italic (Ctrl+I)" onClick={() => run((s, e) => wrap(value, s, e, "*", "*", "italic"))} />
           <B icon="heading" title="Heading" onClick={() => run((s) => heading(value, s))} />
@@ -38,7 +38,7 @@ export function MarkdownField({ value, onChange, onBlur, links, placeholder, lab
           <B icon="code" title="Code" onClick={() => run((s, e) => wrap(value, s, e, "`", "`", "code"))} />
           <B icon="link" title="Link (Ctrl+K)" onClick={() => run((s, e) => link(value, s, e))} />
         </div>
-        <div className="inline-flex shrink-0 rounded-md border bg-panel p-0.5 text-xs">{(["edit", "view"] as const).map((m) => <button key={m} type="button" onClick={() => setMode(m)} className={`rounded px-2 py-0.5 ${mode === m ? "bg-raise font-medium text-fg" : "text-mute"}`}>{m === "edit" ? "Write" : "Preview"}</button>)}</div>
+        <div className="order-1 ml-auto inline-flex shrink-0 rounded-md border bg-panel p-0.5 text-xs sm:order-2">{(["edit", "view"] as const).map((m) => <button key={m} type="button" onClick={() => setMode(m)} className={`rounded px-2 py-0.5 ${mode === m ? "bg-raise font-medium text-fg" : "text-mute"}`}>{m === "edit" ? "Write" : "Preview"}</button>)}</div>
       </div>
       {mode === "edit"
         ? <textarea ref={ta} value={value} rows={rows} onChange={(e) => onChange(e.target.value)} onBlur={onBlur} onKeyDown={keys} placeholder={placeholder} aria-label={label} className={`block w-full resize-y bg-transparent p-3 text-[15px] leading-relaxed outline-none placeholder:text-dim ${mono ? "font-mono text-[13.5px]" : ""}`} />

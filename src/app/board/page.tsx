@@ -9,7 +9,7 @@ export default async function BoardPage({ searchParams }: { searchParams: Promis
   const name = project ? (db.prepare("SELECT name FROM projects WHERE id=?").get(project) as { name: string } | undefined)?.name : undefined;
   return (
     <FeatureGate feature="board">
-      <PageHead title={name ? `${name} board` : "Board"} sub="Drag cards between columns, or click one to open it" />
+      <div className="hidden md:block"><PageHead title={name ? `${name} board` : "Board"} sub="Drag cards between columns, or click one to open it" /></div>
       <BoardView sp={sp} base="/board" />
     </FeatureGate>
   );
