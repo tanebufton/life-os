@@ -1,0 +1,17 @@
+import assert from "node:assert/strict";
+const P = await import("../src/lib/payday.ts"); const S = await import("../src/lib/subs.ts"); const { db } = await import("../src/lib/db.ts");
+let n = 0; const ok = (m: string) => { n++; console.log("  ✓", m); };
+const fn = { freq: "fortnightly" as const, anchor: "2026-11-06" };
+assert.deepEqual(P.payPeriod(fn, "2026-11-06"), { from: "2026-11-06", to: "2026-11-19" }); assert.deepEqual(P.payPeriod(fn, "2026-11-19"), { from: "2026-11-06", to: "2026-11-19" }); assert.deepEqual(P.payPeriod(fn, "2026-11-20"), { from: "2026-11-20", to: "2026-12-03" }); ok("a fortnightly pay period runs from a payday to the day before the next");
+assert.deepEqual(P.payPeriod(fn, "2026-10-30"), { from: "2026-10-23", to: "2026-11-05" }); ok("it also works for dates before the saved payday");
+assert.equal(P.shiftPay(fn, "2026-11-20", 1), "2026-12-04"); assert.equal(P.shiftPay(fn, "2026-11-20", -1), "2026-11-06"); ok("previous and next pay period");
+const mo = { freq: "monthly" as const, anchor: "2026-01-28" };
+assert.deepEqual(P.payPeriod(mo, "2026-11-30"), { from: "2026-11-28", to: "2026-12-27" }); assert.deepEqual(P.payPeriod(mo, "2026-11-10"), { from: "2026-10-28", to: "2026-11-27" }); assert.equal(P.shiftPay(mo, "2026-11-28", 1), "2026-12-28"); ok("monthly pay periods follow the day of the month");
+const wk = { freq: "weekly" as const, anchor: "2026-11-02" }; assert.deepEqual(P.payPeriod(wk, "2026-11-12"), { from: "2026-11-09", to: "2026-11-15" }); ok("weekly pay periods");
+S.createSub({ name: "Netflix", amount_cents: 2000, cycle: "monthly", next_due: "2026-12-01" }); S.createSub({ name: "Cloud", amount_cents: 6000, cycle: "halfyearly", next_due: "2027-01-10" }); S.createSub({ name: "Paper", amount_cents: 500, cycle: "weekly", next_due: "2026-11-25" }); S.createSub({ name: "Domain", amount_cents: 3900, cycle: "yearly", next_due: "2027-03-01" });
+const a = P.setAside("fortnightly"); const by = Object.fromEntries(a.items.map((i) => [i.name, i.per_pay_cents]));
+assert.equal(by.Netflix, Math.round(2000 * 12 / 26)); assert.equal(by.Cloud, Math.round(6000 * 2 / 26)); assert.equal(by.Paper, 1000); assert.equal(by.Domain, Math.round(3900 / 26)); ok("per-pay amount = yearly cost shared across the pays in a year, whatever the billing cycle");
+assert.equal(a.total_cents, a.items.reduce((s, i) => s + i.per_pay_cents, 0)); assert.equal(P.setAside("monthly").items.find((i) => i.name === "Netflix")!.per_pay_cents, 2000); ok("the total adds up, and monthly pay = monthly cost for a monthly bill");
+assert.equal(P.paydayConfig(), null); P.savePayday("fortnightly", "2026-11-06"); assert.deepEqual(P.paydayConfig(), fn); assert.throws(() => P.savePayday("daily", "2026-11-06")); assert.throws(() => P.savePayday("weekly", "soon")); ok("payday settings are saved and validated");
+assert.equal(P.isSetAside("2026-11-06"), false); P.setSetAside("2026-11-06", true); assert.equal(P.isSetAside("2026-11-06"), true); P.setSetAside("2026-11-06", false); assert.equal(P.isSetAside("2026-11-06"), false); ok("you can tick off a pay period as set aside");
+console.log(`  ${n} checks`);

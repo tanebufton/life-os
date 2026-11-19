@@ -8,7 +8,9 @@ import { addSubAction } from "@/lib/actions";
 import { diffDays, nice } from "@/lib/dates";
 import { currency, listCategories } from "@/lib/money";
 import { fmtMoney } from "@/lib/moneyfmt";
-import { MarkAllPaid, PayTick } from "@/components/payrun";
+import { MarkAllPaid, PayTick, SetAsideTick } from "@/components/payrun";
+import { PAY_FREQS, isSetAside, paydayConfig, payPeriod, setAside, shiftPay } from "@/lib/payday";
+import { clearPaydayAction, savePaydayAction } from "@/lib/actions5";
 import Link from "next/link";
 import { CYCLES, CYCLE_LABEL, CYCLE_SHORT, PERIODS, chargesBetween, periodRange, shiftPeriod, type Period, advanceSubscriptions, listSubs, monthlyCents, priceChange, subsSummary, yearlyCents } from "@/lib/subs";
 import { today } from "@/lib/time";
@@ -18,9 +20,11 @@ const PRESETS = ["Netflix", "Spotify", "YouTube Premium", "iCloud+", "Google One
 const when = (d: string, t: string) => { const n = diffDays(d, t); return n === 0 ? "today" : n === 1 ? "tomorrow" : n > 0 && n < 14 ? `in ${n} days` : n < 0 ? `${-n} days ago` : nice(d).replace(",", ""); };
 
 export default async function Subscriptions({ searchParams }: { searchParams: Promise<{ period?: string; d?: string }> }) {
-  const sp = await searchParams, t = today(), period = (PERIODS.some((x) => x.k === sp.period) ? sp.period : "month") as Period, anchor = /^\d{4}-\d{2}-\d{2}$/.test(sp.d ?? "") ? sp.d! : t, range = periodRange(period, anchor), charges = chargesBetween(range.from, range.to);
-  const href = (o: { period?: Period; d?: string }) => `/subscriptions?period=${o.period ?? period}&d=${o.d ?? anchor}`, left = charges.filter((c) => !c.paid), leftSum = left.reduce((n, c) => n + c.amount_cents, 0), totalSum = charges.reduce((n, c) => n + c.amount_cents, 0);
-  const dm = (d: string) => new Intl.DateTimeFormat("en-NZ", { timeZone: "UTC", day: "numeric", month: "short" }).format(new Date(d + "T00:00:00Z")), rangeLabel = period === "year" ? range.from.slice(0, 4) : `${dm(range.from)} – ${dm(range.to)}`;
+  const sp = await searchParams, t = today(), cfg = paydayConfig(), asked = sp.period ?? (cfg ? "pay" : "month"), isPay = asked === "pay" && !!cfg, period = (isPay ? "month" : PERIODS.some((x) => x.k === asked) ? asked : "month") as Period;
+  const anchor = /^\d{4}-\d{2}-\d{2}$/.test(sp.d ?? "") ? sp.d! : t, range = isPay ? payPeriod(cfg!, anchor) : periodRange(period, anchor), charges = chargesBetween(range.from, range.to), cur0 = currency();
+  const key = isPay ? "pay" : period, href = (o: { period?: string; d?: string }) => `/subscriptions?period=${o.period ?? key}&d=${o.d ?? anchor}`, left = charges.filter((c) => !c.paid), leftSum = left.reduce((n, c) => n + c.amount_cents, 0), totalSum = charges.reduce((n, c) => n + c.amount_cents, 0);
+  const prevD = isPay ? shiftPay(cfg!, range.from, -1) : shiftPeriod(period, anchor, -1), nextD = isPay ? shiftPay(cfg!, range.from, 1) : shiftPeriod(period, anchor, 1), thisPay = cfg ? payPeriod(cfg, t) : null, sa = cfg ? setAside(cfg.freq) : null;
+  const dm = (d: string) => new Intl.DateTimeFormat("en-NZ", { timeZone: "UTC", day: "numeric", month: "short" }).format(new Date(d + "T00:00:00Z")), rangeLabel = !isPay && period === "year" ? range.from.slice(0, 4) : `${dm(range.from)} – ${dm(range.to)}`;
   const cur = currency(), f = (c: number, o?: { compact?: boolean }) => fmtMoney(c, cur, o);
   advanceSubscriptions(t);
   const all = listSubs(), active = all.filter((s) => s.status === "active"), inactive = all.filter((s) => s.status !== "active"), sum = subsSummary(t), cats = listCategories("expense");
@@ -49,10 +53,32 @@ export default async function Subscriptions({ searchParams }: { searchParams: Pr
         {[["Per month", f(sum.monthly_cents), ""], ["Per year", f(sum.yearly_cents, { compact: true }), ""], ["Active", String(sum.active), ""], ["Still to pay this month", f(sum.remaining_this_month_cents), ""]].map(([l, v], i) => <div key={l} className={`px-4 py-4 ${i > 1 ? "border-t sm:border-t-0" : ""}`}><div className="text-xs text-mute">{l}</div><div className="mt-1 text-[20px] font-semibold leading-none sm:text-[26px] tracking-tight tabular-nums">{v}</div></div>)}
         {top && <div className="col-span-2 border-t px-4 py-2.5 text-[13px] text-mute sm:col-span-4">Your biggest is <b className="text-fg">{top.name}</b> at {f(monthlyCents(top))}/month ({Math.round((monthlyCents(top) / Math.max(1, sum.monthly_cents)) * 100)}% of the total).</div>}
       </Panel>
+      {!cfg ? (
+        <Panel title="Payday" i={1} className="mb-4"><form action={savePaydayAction} className="flex flex-wrap items-end gap-3 px-4 pb-4 text-[13px]">
+          <p className="basis-full text-mute">Tell LifeOS when you&apos;re paid and it works out how much of each subscription to set aside every pay, whether the bill is weekly, monthly or yearly.</p>
+          <label className="space-y-1 font-medium">How often<select name="freq" defaultValue="fortnightly" className="field !w-44">{PAY_FREQS.map((x) => <option key={x.k} value={x.k}>{x.label}</option>)}</select></label>
+          <label className="space-y-1 font-medium">A recent payday<input type="date" name="anchor" required defaultValue={t} className="field !w-44" /></label>
+          <button className="btn-primary">Set up payday</button></form></Panel>
+      ) : (
+        <Panel title="Payday" i={1} className="mb-4" right={<form action={clearPaydayAction}><button className="text-xs text-mute hover:text-fg">Change</button></form>}>
+          <div className="grid gap-x-8 gap-y-4 px-4 pb-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+            <div>
+              <div className="text-xs text-mute">Set aside every {cfg.freq === "weekly" ? "week" : cfg.freq === "fortnightly" ? "fortnight" : "month"}</div>
+              <div className="mt-0.5 text-3xl font-semibold tabular-nums">{f(sa!.total_cents)}</div>
+              <p className="mt-1 text-[13px] text-mute">This pay: {thisPay!.from === thisPay!.to ? nice(thisPay!.from) : `${new Intl.DateTimeFormat("en-NZ", { timeZone: "UTC", day: "numeric", month: "short" }).format(new Date(thisPay!.from + "T00:00:00Z"))} – ${new Intl.DateTimeFormat("en-NZ", { timeZone: "UTC", day: "numeric", month: "short" }).format(new Date(thisPay!.to + "T00:00:00Z"))}`}</p>
+              <div className="mt-3"><SetAsideTick from={thisPay!.from} done={isSetAside(thisPay!.from)} /></div>
+            </div>
+            <details open className="min-w-0 text-[13px]"><summary className="cursor-pointer select-none text-xs font-medium text-mute">Where it goes ({sa!.items.length})</summary>
+              <ul className="mt-2 divide-y rounded-lg border">{sa!.items.map((i) => <li key={i.id} className="flex items-center gap-3 px-3 py-1.5"><ProjectAvatar name={i.name} color={i.color} size={20} /><span className="min-w-0 flex-1 truncate">{i.name}</span><span className="text-xs text-dim">{f(i.amount_cents)} / {CYCLE_SHORT[i.cycle]}</span><span className="w-20 text-right font-medium tabular-nums">{f(i.per_pay_cents)}</span></li>)}
+                {!sa!.items.length && <li className="px-3 py-3 text-mute">No active subscriptions.</li>}</ul>
+              <p className="mt-2 text-xs text-dim">Each bill&apos;s yearly cost shared across your {cfg.freq === "weekly" ? "52" : cfg.freq === "fortnightly" ? "26" : "12"} pays. Charges due before your next payday are in the Pay run below.</p></details>
+          </div>
+        </Panel>
+      )}
       <Panel title="Pay run" i={1} className="mb-4" right={<MarkAllPaid from={range.from} to={range.to} left={left.length} />}>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b px-4 pb-3">
-          <div role="group" aria-label="Period" className="inline-flex rounded-lg border p-0.5 text-[13px]">{PERIODS.map((x) => <Link key={x.k} href={href({ period: x.k, d: t })} aria-current={x.k === period ? "true" : undefined} className={`rounded-md px-2.5 py-1 ${x.k === period ? "bg-raise font-medium" : "text-mute hover:text-fg"}`}>{x.label}</Link>)}</div>
-          <div className="flex items-center gap-1 text-[13px]"><Link href={href({ d: shiftPeriod(period, anchor, -1) })} aria-label="Previous period" className="btn !px-2"><Icon name="chevDown" size={14} className="rotate-90" /></Link><span className="min-w-[9.5rem] text-center font-medium tabular-nums">{rangeLabel}</span><Link href={href({ d: shiftPeriod(period, anchor, 1) })} aria-label="Next period" className="btn !px-2"><Icon name="chevDown" size={14} className="-rotate-90" /></Link></div>
+          <div role="group" aria-label="Period" className="inline-flex rounded-lg border p-0.5 text-[13px]">{[...(cfg ? [{ k: "pay", label: "Pay period" }] : []), ...PERIODS].map((x) => <Link key={x.k} href={href({ period: x.k, d: t })} aria-current={x.k === key ? "true" : undefined} className={`rounded-md px-2.5 py-1 ${x.k === key ? "bg-raise font-medium" : "text-mute hover:text-fg"}`}>{x.label}</Link>)}</div>
+          <div className="flex items-center gap-1 text-[13px]"><Link href={href({ d: prevD })} aria-label="Previous period" className="btn !px-2"><Icon name="chevDown" size={14} className="rotate-90" /></Link><span className="min-w-[9.5rem] text-center font-medium tabular-nums">{rangeLabel}</span><Link href={href({ d: nextD })} aria-label="Next period" className="btn !px-2"><Icon name="chevDown" size={14} className="-rotate-90" /></Link></div>
           <div className="ml-auto text-[13px] text-mute">{charges.length ? <><b className="text-fg">{charges.length - left.length}</b> of {charges.length} paid · <b className="text-fg">{f(leftSum)}</b> to go of {f(totalSum)}</> : "Nothing falls in this period"}</div>
         </div>
         <ul>{charges.map((c) => (
