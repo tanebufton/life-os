@@ -5,7 +5,8 @@ import { parseImport, runImport, type ImportFile, type ImportResult } from "./im
 import { deleteTag, pruneUnusedTags, renameTag, setTagColor } from "./tags";
 import { addLink, removeLink, type LinkKind } from "./links";
 import { setEntityTags, type TagKind } from "./entitytags";
-import { createNote, restoreNoteVersion, updateNote } from "./notes";
+import { createNote, moveNote, restoreNoteVersion, updateNote } from "./notes";
+import { toggleFavourite, type FavKind } from "./favourites";
 import { redirect } from "next/navigation";
 import { setSetting } from "./settings";
 import { parsePrefs } from "./sidebar";
@@ -42,9 +43,9 @@ export async function resetSidebarAction(): Promise<R> { return run(() => { setS
 export async function saveTagsAction(kind: TagKind, id: number, text: string): Promise<R> { return run(() => { if (!["note", "goal", "person"].includes(kind)) throw new Error("Can't tag that"); setEntityTags(kind, id, parseTags(text)); }); }
 export async function setNoteProjectAction(id: number, projectId: number | null): Promise<R> { return run(() => { updateNote(id, { project_id: projectId }); }); }
 export async function restoreNoteVersionAction(noteId: number, versionId: number): Promise<R> { return run(() => { if (!restoreNoteVersion(noteId, versionId)) throw new Error("That version is gone"); return "Restored. The text it replaced is kept as a version."; }); }
-export async function renameProjectAction(id: number, name: string, color: string): Promise<R> {
+export async function renameProjectAction(id: number, name: string, color: string, icon?: string, area?: string): Promise<R> {
   return run(() => { const n = name.replace(/\s+/g, " ").trim(); if (!n || n.length > 60) throw new Error("Give the project a name (up to 60 characters)"); if (!/^#[0-9a-fA-F]{6}$/.test(color)) throw new Error("Pick a colour");
-    if (db.prepare("SELECT 1 FROM projects WHERE lower(name)=lower(?) AND id!=? AND archived=0").get(n, id)) throw new Error("Another project already has that name"); db.prepare("UPDATE projects SET name=?, color=? WHERE id=?").run(n, color, id); return "Saved"; });
+    if (db.prepare("SELECT 1 FROM projects WHERE lower(name)=lower(?) AND id!=? AND archived=0").get(n, id)) throw new Error("Another project already has that name"); db.prepare("UPDATE projects SET name=?, color=? WHERE id=?").run(n, color, id); if (icon !== undefined) db.prepare("UPDATE projects SET icon=? WHERE id=?").run(cleanIcon(icon), id); if (area !== undefined) db.prepare("UPDATE projects SET area=? WHERE id=?").run(area.replace(/\s+/g, " ").trim().slice(0, 40), id); return "Saved"; });
 }
 export async function unarchiveProjectAction(id: number): Promise<R> { return run(() => { db.prepare("UPDATE projects SET archived=0 WHERE id=?").run(id); return "Project restored"; }); }
 
@@ -90,3 +91,10 @@ export async function bulkBoardAction(ids: number[], o: BulkOp): Promise<R> {
     return `${n} card${n === 1 ? "" : "s"} updated${bad ? `, ${bad} couldn't be changed` : ""}`;
   });
 }
+
+/** An emoji or a couple of characters. Anything longer is cut, so a paste can't fill the sidebar. */
+const cleanIcon = (v: string) => Array.from(v.trim()).slice(0, 8).join("");
+export async function toggleFavouriteAction(kind: FavKind, id: number): Promise<R> { return run(() => (toggleFavourite(kind, id) ? "Added to favourites" : "Removed from favourites")); }
+export async function moveNoteAction(id: number, parentId: number | null): Promise<R> { return run(() => { const e = moveNote(id, parentId); if (e) throw new Error(e); return "Moved"; }); }
+export async function newSubpageAction(parentId: number) { const id = createNote("", "", null, parentId); revalidatePath("/", "layout"); redirect(`/notes/${id}`); }
+export async function setNoteIconAction(id: number, icon: string): Promise<R> { return run(() => { db.prepare("UPDATE notes SET icon=? WHERE id=?").run(cleanIcon(icon), id); }); }

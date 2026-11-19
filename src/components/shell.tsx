@@ -4,6 +4,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { addProject } from "@/lib/actions";
 import { resetSidebarAction, saveSidebarAction } from "@/lib/actions5";
+import type { Fav } from "@/lib/favourites";
 import { arrange, withVisibility, EMPTY_PREFS, type SidebarPrefs } from "@/lib/sidebar";
 import { toast } from "sonner";
 import { NAV, SETTINGS_PAGE, visiblePages, type Features, type NavPage } from "@/lib/nav";
@@ -12,7 +13,7 @@ import { Icon } from "./Icon";
 import { ProjectAvatar } from "./Pill";
 import { ThemeToggle } from "./theme";
 
-export type NavProject = { id: number; name: string; color: string; open: number };
+export type NavProject = { id: number; name: string; color: string; open: number; icon?: string; area?: string };
 export type Counts = { due: number; open: number; doing: number; inbox: number };
 
 const isActive = (path: string, href: string) => (href === "/" ? path === "/" : path === href || path.startsWith(href + "/"));
@@ -46,7 +47,7 @@ export function Hotkeys({ features }: { features: Features }) {
 }
 
 const row = "flex min-h-[30px] items-center gap-2.5 rounded-md px-2 text-[14px] transition-colors";
-export function Sidebar({ counts, projects, features, filters = [], prefs: savedPrefs = EMPTY_PREFS }: { counts: Counts; projects: NavProject[]; features: Features; filters?: { id: number; name: string; query: string }[]; prefs?: SidebarPrefs }) {
+export function Sidebar({ counts, projects, features, filters = [], favourites = [], prefs: savedPrefs = EMPTY_PREFS }: { counts: Counts; projects: NavProject[]; features: Features; filters?: { id: number; name: string; query: string }[]; favourites?: Fav[]; prefs?: SidebarPrefs }) {
   const path = usePathname(), sp = useSearchParams();
   const [collapsed, setCollapsed] = useState<string[]>(["life", "money", "explore", "filters"]);
   useEffect(() => { try { const v = localStorage.getItem("lifeos.sb.collapsed"); if (v) setCollapsed(JSON.parse(v)); } catch { /* keep defaults */ } }, []);
@@ -90,6 +91,15 @@ export function Sidebar({ counts, projects, features, filters = [], prefs: saved
     const items = [["overview", "Overview", "today", true], ["list", "List", "list", true], ["board", "Board", "board", features.board], ["table", "Table", "grid", true], ["notes", "Notes", "notes", features.notes], ["memos", "Voice memos", "mic", features.voice], ["goals", "Goals", "goals", features.goals]] as const;
     return <div className="mb-1 ml-[15px] space-y-px border-l pl-2">{items.filter((i) => i[3]).map(([k, label, icon]) => <Link key={k} href={k === "overview" ? `/projects/${pid}` : `/projects/${pid}?tab=${k}`} className={`${row} !min-h-[27px] text-[13px] ${tab === k || (k === "list" && tab === "tasks") ? "bg-raise font-medium" : "text-fg/75 hover:bg-raise/70"}`}><Icon name={icon} size={15} className={tab === k ? "text-accent" : "text-mute"} />{label}</Link>)}</div>;
   };
+  const favSection = favourites.length > 0 ? (
+    <div key="favs" className="mt-3">
+      <div className="px-4 pb-1 text-xs font-semibold text-mute">Favourites</div>
+      <div className="space-y-px px-2">{favourites.map((f) => { const on = path === f.href; return (
+        <Link key={`${f.kind}${f.id}`} href={f.href} className={`${row} ${on ? "bg-raise font-medium" : "text-fg/80 hover:bg-raise/70"}`}>
+          {f.kind === "project" ? <ProjectAvatar name={f.title} color={f.color ?? "#6366f1"} icon={f.icon} /> : f.icon ? <span className="grid h-[17px] w-[17px] place-items-center text-[14px] leading-none" aria-hidden>{f.icon}</span> : <Icon name={f.kind === "note" ? "notes" : "list"} size={17} className="text-mute" />}
+          <span className="flex-1 truncate">{f.title}</span></Link>); })}</div>
+    </div>
+  ) : null;
   const projectsSection = (
     <div key="projects" className="mt-4">
       <div className="group flex items-center justify-between px-4 pb-1"><span className="text-xs font-semibold text-mute">Projects</span>
@@ -101,12 +111,13 @@ export function Sidebar({ counts, projects, features, filters = [], prefs: saved
             <input type="color" name="color" defaultValue="#1877f2" aria-label="Colour" className="h-8 w-9 shrink-0 cursor-pointer rounded-md border bg-transparent p-0.5" />
           </form>
         )}
-        {projects.map((p) => {
-          const here = path === `/projects/${p.id}`;
+        {projects.map((p, i) => {
+          const here = path === `/projects/${p.id}`, showArea = projects.some((x) => x.area) && (i === 0 || projects[i - 1].area !== p.area);
           return (
             <div key={p.id}>
+              {showArea && <div className="px-2 pb-0.5 pt-2 text-[11px] font-medium uppercase tracking-wide text-dim">{p.area || "Other"}</div>}
               <Link href={`/projects/${p.id}`} className={`${row} ${here && !sp.get("tab") ? "bg-raise font-medium" : here ? "font-medium" : "text-fg/80 hover:bg-raise/70"}`}>
-                <ProjectAvatar name={p.name} color={p.color} /><span className="flex-1 truncate">{p.name}</span>{p.open > 0 && <span className="text-xs text-dim">{p.open}</span>}
+                <ProjectAvatar name={p.name} color={p.color} icon={p.icon} /><span className="flex-1 truncate">{p.name}</span>{p.open > 0 && <span className="text-xs text-dim">{p.open}</span>}
               </Link>
               {here && projectNav(p.id)}
             </div>
@@ -118,7 +129,7 @@ export function Sidebar({ counts, projects, features, filters = [], prefs: saved
   );
   const sections = arranged.flatMap((g, gi) => {
     const visible = g.items.filter((i) => !i.hidden);
-    if (!editing && !visible.length) return g.key === "main" ? [projectsSection] : [];
+    if (!editing && !visible.length) return g.key === "main" ? [favSection, projectsSection] : [];
     const open = editing || !g.title || !collapsed.includes(g.key) || visible.some((i) => isActive(path, i.page.href));
     const out = (
       <div key={g.key} className={gi === 0 && !g.title ? "" : "mt-3"}>
@@ -128,7 +139,7 @@ export function Sidebar({ counts, projects, features, filters = [], prefs: saved
         {open && <div className="space-y-px px-2">{(editing ? g.items : visible).map((i) => (editing ? editRow(i.page, i.hidden, g.key) : link(i.page)))}</div>}
       </div>
     );
-    return g.key === "main" ? [out, projectsSection] : [out];
+    return g.key === "main" ? [out, favSection, projectsSection] : [out];
   });
   return (
     <aside className="side hidden w-[260px] shrink-0 flex-col border-r bg-side md:flex">

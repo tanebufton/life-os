@@ -112,6 +112,13 @@ function migrate(d: Database.Database) {
   // Notes can belong to a project; tags work on any kind of item; every change is recorded in an activity log; notes keep earlier versions.
   const ncols = (d.prepare("PRAGMA table_info(notes)").all() as { name: string }[]).map((c) => c.name);
   if (!ncols.includes("project_id")) d.exec("ALTER TABLE notes ADD COLUMN project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL");
+  // v6: nested notes (pages and sub-pages), emoji icons, project areas, favourites. All additive; nothing existing changes.
+  const has = (t: string, c: string) => (d.prepare(`PRAGMA table_info(${t})`).all() as { name: string }[]).some((x) => x.name === c);
+  if (!has("notes", "parent_id")) d.exec("ALTER TABLE notes ADD COLUMN parent_id INTEGER REFERENCES notes(id) ON DELETE SET NULL");
+  if (!has("notes", "icon")) d.exec("ALTER TABLE notes ADD COLUMN icon TEXT NOT NULL DEFAULT ''");
+  if (!has("projects", "icon")) d.exec("ALTER TABLE projects ADD COLUMN icon TEXT NOT NULL DEFAULT ''");
+  if (!has("projects", "area")) d.exec("ALTER TABLE projects ADD COLUMN area TEXT NOT NULL DEFAULT ''");
+  d.exec("CREATE TABLE IF NOT EXISTS favourites (kind TEXT NOT NULL, ref_id INTEGER NOT NULL, position INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now')), PRIMARY KEY (kind, ref_id))");
   // v5: voice memos can belong to a project (existing memos stay unassigned)
   if (!(d.prepare("PRAGMA table_info(voice_memos)").all() as { name: string }[]).some((c) => c.name === "project_id")) d.exec("ALTER TABLE voice_memos ADD COLUMN project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL");
   d.exec(`
@@ -134,7 +141,7 @@ function migrate(d: Database.Database) {
 }
 
 /** Bump when the schema changes. Existing databases below this get an automatic safety copy before they are migrated. */
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 /**
  * Before upgrading an existing database to a newer schema, save a complete copy next to it (VACUUM INTO is safe while the app runs).
  * If this can't be written the upgrade stops rather than risk your data; set LIFEOS_SKIP_UPGRADE_BACKUP=1 to override. Keeps the newest 3.
@@ -164,4 +171,4 @@ export const db = (g.__db ??= (() => {
   return d;
 })());
 
-export type Project = { id: number; name: string; color: string; archived: number };
+export type Project = { id: number; name: string; color: string; archived: number; icon: string; area: string };

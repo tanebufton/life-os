@@ -15,7 +15,9 @@ import { newNoteInProjectAction } from "@/lib/actions5";
 import { db, Project } from "@/lib/db";
 import { isOn } from "@/lib/features";
 import { goalProgress, listGoals } from "@/lib/goals";
-import { listNotes } from "@/lib/notes";
+import { listNotes, noteTree } from "@/lib/notes";
+import { FavouriteButton } from "@/components/favbutton";
+import { isFavourite } from "@/lib/favourites";
 import { hasCustomColumns } from "@/lib/statuses";
 import { queryTasks } from "@/lib/tasks";
 import { projectKey } from "@/lib/ui";
@@ -45,10 +47,10 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   return (
     <div className="proj">
       <div className="rise flex flex-wrap items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3"><ProjectAvatar name={p.name} color={p.color} size={36} />
+        <div className="flex min-w-0 items-center gap-3"><ProjectAvatar name={p.name} color={p.color} size={36} icon={p.icon} />
           <div className="min-w-0"><h1 className="truncate text-[26px] font-bold leading-tight tracking-tight">{p.name}</h1>
-            <p className="text-[13px] text-mute">{projectKey(p.name)} · {open.length} open{hasCustomColumns(id) ? " · own board columns" : ""}</p></div></div>
-        <div className="flex flex-wrap items-center gap-2"><ProjectEditor id={id} name={p.name} color={p.color} /><form action={archiveProject.bind(null, id)}><button className="btn text-mute hover:!text-danger">Archive</button></form></div>
+            <p className="text-[13px] text-mute">{p.area ? `${p.area} · ` : ""}{projectKey(p.name)} · {open.length} open{hasCustomColumns(id) ? " · own board columns" : ""}</p></div></div>
+        <div className="flex flex-wrap items-center gap-2"><FavouriteButton kind="project" id={id} on={isFavourite("project", id)} /><ProjectEditor id={id} name={p.name} color={p.color} icon={p.icon} area={p.area} areas={(db.prepare("SELECT DISTINCT area FROM projects WHERE area!='' ORDER BY area").all() as { area: string }[]).map((r) => r.area)} /><form action={archiveProject.bind(null, id)}><button className="btn text-mute hover:!text-danger">Archive</button></form></div>
       </div>
       <div className="mb-5 mt-1 hidden md:block" />
       <nav aria-label="Project views" className="ptabs mb-6 flex gap-0.5 overflow-x-auto border-b md:hidden">
@@ -75,7 +77,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
       {tab === "table" && <TaskTable rows={open} sort={sort} dir={dir} base={(o) => href("table", Object.entries(o).filter(([, v]) => v).map(([k, v]) => `&${k}=${encodeURIComponent(v as string)}`).join(""))} />}
       {tab === "notes" && (
         <div className="max-w-4xl"><Panel i={0} right={<form action={newNoteInProjectAction.bind(null, id)}><button className="font-medium text-accent hover:underline">New note</button></form>}>
-          <ul>{notes.map((n) => <li key={n.id} className="border-b last:border-b-0"><Link href={`/notes/${n.id}`} className="flex items-center gap-2 px-4 py-2.5 text-[14px] hover:bg-raise/50"><Icon name="notes" size={15} className="text-mute" /><span className="truncate">{n.title || "Untitled"}</span><span className="ml-auto text-xs text-dim">{n.updated_at.slice(0, 10)}</span></Link></li>)}
+          <ul>{noteTree(notes).map((n) => <li key={n.id} className="border-b last:border-b-0"><Link href={`/notes/${n.id}`} style={{ paddingLeft: 16 + n.depth * 22 }} className="flex items-center gap-2 py-2.5 pr-4 text-[14px] hover:bg-raise/50">{n.icon ? <span aria-hidden>{n.icon}</span> : <Icon name="notes" size={15} className="text-mute" />}<span className="truncate">{n.title || "Untitled"}</span><span className="ml-auto text-xs text-dim">{n.updated_at.slice(0, 10)}</span></Link></li>)}
             {!notes.length && <li className="px-4 py-10 text-center text-sm text-mute">No notes in this project yet.</li>}</ul></Panel></div>
       )}
       {tab === "memos" && (

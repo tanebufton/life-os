@@ -1,7 +1,7 @@
 import { db } from "./db";
 
 import { record } from "./activity";
-export type Note = { rev: number; project_id: number | null; id: number; title: string; body: string; pinned: number; created_at: string; updated_at: string };
+export type Note = { rev: number; project_id: number | null; parent_id: number | null; icon: string; id: number; title: string; body: string; pinned: number; created_at: string; updated_at: string };
 export const getNote = (id: number) => db.prepare("SELECT * FROM notes WHERE id=? AND deleted_at IS NULL").get(id) as Note | undefined;
 export const noteByTitle = (title: string) => db.prepare("SELECT * FROM notes WHERE lower(title)=lower(?) AND deleted_at IS NULL").get(title.trim()) as Note | undefined;
 export function listNotes(o: { q?: string; limit?: number; project?: number; ids?: number[] } = {}): Note[] {
@@ -11,7 +11,7 @@ export function listNotes(o: { q?: string; limit?: number; project?: number; ids
   if (o.ids) { if (!o.ids.length) return []; w.push(`id IN (${o.ids.map(() => "?").join(",")})`); a.push(...o.ids); }
   return db.prepare(`SELECT * FROM notes WHERE ${w.join(" AND ")} ORDER BY pinned DESC, updated_at DESC LIMIT ?`).all(...a, o.limit ?? 200) as Note[];
 }
-export function createNote(title = "", body = "", projectId: number | null = null): number { const id = Number(db.prepare("INSERT INTO notes (title, body, project_id) VALUES (?,?,?)").run(title.trim(), body, projectId).lastInsertRowid); record("note", id, "created", { new: title }); return id; }
+export function createNote(title = "", body = "", projectId: number | null = null, parentId: number | null = null): number { const parent = parentId ? getNote(parentId) : undefined; const id = Number(db.prepare("INSERT INTO notes (title, body, project_id, parent_id) VALUES (?,?,?,?)").run(title.trim(), body, projectId ?? parent?.project_id ?? null, parent ? parent.id : null).lastInsertRowid); record("note", id, "created", { new: title }); return id; }
 const VERSION_EVERY_MIN = 10, KEEP_VERSIONS = 30;
 export function updateNote(id: number, p: { title?: string; body?: string; pinned?: boolean; project_id?: number | null }): boolean {
   const before = db.prepare("SELECT * FROM notes WHERE id=? AND deleted_at IS NULL").get(id) as Note | undefined; if (!before) return false;
@@ -60,3 +60,32 @@ export const restoreNote = (id: number) => { const ok = db.prepare("UPDATE notes
 /** Notes that link to this one with [[Title]]. */
 export function backlinks(note: Note): Note[] { if (!note.title.trim()) return []; return db.prepare("SELECT * FROM notes WHERE deleted_at IS NULL AND id!=? AND lower(body) LIKE ? ORDER BY updated_at DESC").all(note.id, `%[[${note.title.toLowerCase().replace(/[\\%_]/g, (c) => "\\" + c)}]]%`.replace(/\\/g, "\\")) as Note[]; }
 export const resolver = () => { const m = new Map((db.prepare("SELECT id, title FROM notes WHERE deleted_at IS NULL").all() as { id: number; title: string }[]).map((n) => [n.title.toLowerCase(), n.id])); return (t: string) => m.get(t.toLowerCase()) ?? null; };
+
+// ---------- pages and sub-pages ----------
+export const noteChildren = (id: number) => db.prepare("SELECT * FROM notes WHERE parent_id=? AND deleted_at IS NULL ORDER BY pinned DESC, title COLLATE NOCASE").all(id) as Note[];
+/** From the top-level page down to (not including) this note. */
+export function noteAncestors(id: number): Note[] {
+  const out: Note[] = [], seen = new Set<number>([id]); let cur = getNote(id)?.parent_id ?? null;
+  while (cur && !seen.has(cur)) { seen.add(cur); const n = getNote(cur); if (!n) break; out.unshift(n); cur = n.parent_id; }
+  return out;
+}
+/** Every page under this one, at any depth. */
+export function noteDescendants(id: number): number[] {
+  const all = new Map<number, number | null>((db.prepare("SELECT id, parent_id FROM notes WHERE deleted_at IS NULL").all() as { id: number; parent_id: number | null }[]).map((r) => [r.id, r.parent_id])), out: number[] = [], q = [id];
+  while (q.length) { const c = q.shift()!; for (const [k, par] of all) if (par === c && !out.includes(k)) { out.push(k); q.push(k); } }
+  return out;
+}
+/** Move a note under another (or to the top level with null). A page can't go inside itself or one of its own sub-pages. */
+export function moveNote(id: number, parentId: number | null): string | null {
+  if (!getNote(id)) return "That note is gone";
+  if (parentId !== null) { if (!getNote(parentId)) return "That parent page is gone"; if (parentId === id || noteDescendants(id).includes(parentId)) return "A page can't go inside itself or one of its own sub-pages"; }
+  db.prepare("UPDATE notes SET parent_id=?, updated_at=datetime('now'), rev=rev+1 WHERE id=?").run(parentId, id); record("note", id, "changed", { field: "Parent page", new: parentId ? getNote(parentId)!.title || "Untitled" : "(top level)" }); return null;
+}
+/** Order a flat list as a tree: parents first, children indented under them. A page whose parent isn't in the list (filtered out or deleted) is treated as top level. */
+export function noteTree<T extends { id: number; parent_id: number | null }>(notes: T[]): (T & { depth: number })[] {
+  const ids = new Set(notes.map((n) => n.id)), kids = new Map<number | null, T[]>();
+  for (const n of notes) { const k = n.parent_id && ids.has(n.parent_id) ? n.parent_id : null; kids.set(k, [...(kids.get(k) ?? []), n]); }
+  const out: (T & { depth: number })[] = [], seen = new Set<number>();
+  const walk = (k: number | null, depth: number) => { for (const n of kids.get(k) ?? []) { if (seen.has(n.id)) continue; seen.add(n.id); out.push({ ...n, depth }); walk(n.id, depth + 1); } };
+  walk(null, 0); return out;
+}

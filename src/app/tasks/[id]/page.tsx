@@ -14,6 +14,8 @@ import { listStatuses } from "@/lib/statuses";
 import { History } from "@/components/history";
 import { LinksPanel } from "@/components/links";
 import { listLinks } from "@/lib/links";
+import { FavouriteButton } from "@/components/favbutton";
+import { isFavourite } from "@/lib/favourites";
 
 export const dynamic = "force-dynamic";
 export default async function TaskPage({ params }: { params: Promise<{ id: string }> }) {
@@ -35,6 +37,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
           <span>{t.status_name}</span>{t.done_at && <span className="lozenge bg-ok/15 text-ok">Done</span>}
           {t.source === "email" && <span className="inline-flex items-center gap-1"><Icon name="mail" size={12} />Imported from email</span>}
           {t.source === "share" && <span className="inline-flex items-center gap-1"><Icon name="share" size={12} />Shared to LifeOS</span>}
+          <span className="ml-auto"><FavouriteButton kind="task" id={t.id} on={isFavourite("task", t.id)} className="!py-0.5 text-xs" /></span>
         </div>
         {meta?.from && <p className="mb-2 text-xs text-mute">From {meta.from}{meta.subject ? <> · “{meta.subject}”</> : null}</p>}
         </>} task={{ id: t.id, title: t.title, notes: t.notes, status: t.status, priority: t.priority, project_id: t.project_id, due: t.due, due_time: t.due_time, estimate: t.estimate, repeat: t.repeat ? describeRepeat(t.repeat) : "", tags: t.tags.join(" ") }}>

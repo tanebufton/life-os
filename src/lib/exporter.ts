@@ -12,7 +12,7 @@ export function exportAll() {
     columns: db.prepare("SELECT * FROM statuses ORDER BY project_id, position").all(),
     tasks: queryTasks({ state: "all", includeSub: true, limit: 100000 }),
     task_comments: all("task_comments"), tags: all("tags"), item_links: all("item_links"),
-    notes: (db.prepare("SELECT * FROM notes WHERE deleted_at IS NULL").all() as { id: number }[]).map((n) => ({ ...n, tags: entityTags("note", n.id) })), note_versions: all("note_versions"),
+    notes: (db.prepare("SELECT * FROM notes WHERE deleted_at IS NULL").all() as { id: number }[]).map((n) => ({ ...n, tags: entityTags("note", n.id) })), note_versions: all("note_versions"), favourites: all("favourites"),
     goals: (db.prepare("SELECT * FROM goals").all() as { id: number }[]).map((g) => ({ ...g, tags: entityTags("goal", g.id) })), key_results: all("key_results"),
     people: (db.prepare("SELECT * FROM people").all() as { id: number }[]).map((p) => ({ ...p, tags: entityTags("person", p.id) })), interactions: all("interactions"),
     voice_memos: db.prepare("SELECT * FROM voice_memos WHERE deleted_at IS NULL").all(), templates: all("templates"), saved_filters: all("saved_filters"),
