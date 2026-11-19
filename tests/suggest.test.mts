@@ -1,0 +1,10 @@
+import assert from "node:assert/strict";
+const T = await import("../src/lib/tasks.ts"); const S = await import("../src/lib/suggest.ts"); const { db } = await import("../src/lib/db.ts"); const { today } = await import("../src/lib/time.ts"); const { addDays } = await import("../src/lib/dates.ts");
+const t = today();
+const fresh = T.createTask({ title: "Fresh idea", due: null }), old = T.createTask({ title: "Ancient", due: addDays(t, -20) }), soon = T.createTask({ title: "Soon", due: addDays(t, 1) });
+const slip = T.createTask({ title: "Slippy", due: addDays(t, 1) });
+for (const d of [2, 3]) T.updateTask(slip, { due: addDays(t, d) });
+const s = S.suggestions(t);
+assert.ok(s.recent.some((x: any) => x.id === fresh)); assert.ok(s.stale.some((x: any) => x.id === old)); assert.ok(s.soon.some((x: any) => x.id === soon));
+assert.ok(s.postponed.some((x: any) => x.id === slip && x.moves >= 2));
+console.log("  ✓ suggestions: recent, postponed, long overdue and coming up");

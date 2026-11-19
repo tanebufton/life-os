@@ -1,3 +1,4 @@
+import { InstallApp } from "@/components/installapp";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { Icon } from "@/components/Icon";
@@ -94,6 +95,8 @@ export default async function Settings({ searchParams }: { searchParams: Promise
           <div className="border-t px-4 py-3 text-xs text-mute">Reminders are sent by a small background process. Run <code className="rounded bg-raise px-1">npm run worker</code> alongside the app (a systemd unit or pm2 keeps it running).</div></Panel>
         </Section>
       </>)}
+
+      <Section cur={tab} tab="connect" id="install" i={0} title="Install the app" desc="Put LifeOS on your phone or desktop like any other app."><div className="p-4"><InstallApp /></div></Section>
 
       {f.voice && (
         <Section cur={tab} tab="connect" id="extension" i={0} title="Chrome extension" desc="Record a voice memo from any tab without opening LifeOS. It speaks to your LifeOS with an API token, so it works from anywhere you can reach it.">

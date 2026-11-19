@@ -8,6 +8,8 @@ import { Icon } from "./Icon";
 import { clearDraft as dropDraft, peekDraft as getDraft } from "@/lib/drafts";
 import { useSession } from "./session";
 import { Pill } from "./Pill";
+import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
 const SYNTAX: [string, string][] = [["#tag", "Label it"], ["@project", "File it in a project"], ["!high  !low  !doing", "Priority or status"], ["tomorrow · friday · in 3 days", "Due date"], ["daily · weekdays · every 2 weeks", "Repeat"]];
 
@@ -42,7 +44,15 @@ export function CaptureForm({ today, variant, onDone }: { today: string; variant
   const { guarded } = useSession(), dk = `capture:${variant}`;
   useEffect(() => { const d = getDraft<string>(dk); if (d?.value?.trim()) setV(d.value); }, [dk]);
   useEffect(() => { if (v.trim()) { try { localStorage.setItem(`lifeos:draft:${dk}`, JSON.stringify({ value: v, at: Date.now() })); } catch { /* ignore */ } } else dropDraft(dk); }, [v, dk]);
-  const pid = usePathname().match(/^\/projects\/(\d+)/)?.[1];
+  const pid = usePathname().match(/^\/projects\/(\d+)/)?.[1], router = useRouter();
+  /** Pasting several lines adds one task per line. */
+  const paste = async (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const lines = e.clipboardData.getData("text").split(/\r?\n/).map((l) => l.replace(/^\s*(?:[-*•]\s+(?:\[[ xX]\]\s+)?|\d+[.)]\s+)/, "").trim()).filter(Boolean);
+    if (lines.length < 2 || lines.length > 50) return;
+    e.preventDefault();
+    for (const l of lines) { const fd = new FormData(); fd.set("text", l); if (pid) fd.set("project_id", pid); await quickAdd(fd); }
+    toast(`Added ${lines.length} tasks`); router.refresh();
+  };
   const parsed = useMemo(() => { if (!v.trim()) return null; try { return parseQuickAdd(v, today); } catch { return null; } }, [v, today]);
   const sheet = variant === "sheet", formRef = useRef<HTMLFormElement>(null), base = useRef(""), vRef = useRef(""); vRef.current = v;
   const action = async (fd: FormData) => {
@@ -57,7 +67,7 @@ export function CaptureForm({ today, variant, onDone }: { today: string; variant
       {pid && <input type="hidden" name="project_id" value={pid} />}
       <div className={`flex items-center gap-2 transition ${sheet ? "rounded-xl border bg-panel px-3 focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/25" : "rounded-full bg-raise px-3.5 hover:bg-raise/70 focus-within:bg-panel focus-within:shadow-[0_0_0_2px_rgb(var(--accent)/0.5)]"}`}>
         <Icon name={ok ? "check" : "plus"} size={16} className={ok ? "text-ok" : "text-mute"} />
-        <input id={sheet ? undefined : "capture"} name="text" value={v} onChange={(e) => setV(e.target.value)} onFocus={() => setFocus(true)} onBlur={() => setTimeout(() => setFocus(false), 150)} autoFocus={sheet}
+        <input id={sheet ? undefined : "capture"} name="text" value={v} onChange={(e) => setV(e.target.value)} onPaste={paste} onFocus={() => setFocus(true)} onBlur={() => setTimeout(() => setFocus(false), 150)} autoFocus={sheet}
           autoComplete="off" enterKeyHint="done" placeholder={ok ? "Added!" : "Add a task…  e.g. Call mum friday #family"} className={`min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-mute ${sheet ? "py-3 text-base" : "py-2"}`} />
         <Mic onStart={() => { base.current = vRef.current.trim(); }} onChange={(t) => setV((base.current ? base.current + " " : "") + t)} onDone={() => { setTimeout(() => formRef.current?.requestSubmit(), 60); }} />
         {!sheet && !v && <kbd className="hidden rounded border bg-panel px-1.5 text-[11px] text-dim lg:block">C</kbd>}

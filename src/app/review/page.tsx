@@ -8,6 +8,7 @@ import { isOn } from "@/lib/features";
 import { getSetting } from "@/lib/settings";
 import { queryTasks, type TaskRow } from "@/lib/tasks";
 import { weeklyReview } from "@/lib/review";
+import { suggestions } from "@/lib/suggest";
 import { today } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +23,7 @@ export default async function Review({ searchParams }: { searchParams: Promise<{
   if (!week) {
     const overdue = open.filter((x) => x.due && x.due < t), today_ = open.filter((x) => x.due === t), unsorted = queryTasks({ inbox: true });
     const planned = today_.reduce((n, x) => n + (x.estimate ?? 0), 0), cap = Number(getSetting("capacity_min") ?? 360), ratio = cap ? planned / cap : 0;
+    const sg = suggestions(t), groups = [["Added recently, no date", sg.recent], ["Pushed back again and again", sg.postponed], ["Long overdue", sg.stale], ["Coming up in the next 2 days", sg.soon]] as const;
     return (
       <FeatureGate feature="review"><div>{head}
         <div className="space-y-5">
@@ -31,6 +33,9 @@ export default async function Review({ searchParams }: { searchParams: Promise<{
             {ratio > 1 && <p className="mx-4 mb-2 text-xs text-warn">Over capacity by {fmtMinutes(planned - cap)}. Move something to tomorrow.</p>}
             <TriageList today={t} items={today_.map(item)} actions={["tomorrow", "nextweek", "done"]} empty="Nothing scheduled for today yet. Pull something in from the inbox below." /></Panel>
           <Panel title="3 · Inbox: pull in what matters" count={unsorted.length} i={3}><TriageList today={t} items={unsorted.map(item)} actions={["today", "tomorrow", "nextweek", "drop"]} empty="Inbox is clear." /></Panel>
+          {groups.some(([, l]) => l.length) && <Panel title="4 · Suggestions: where to start" i={4}>
+            {groups.filter(([, l]) => l.length).map(([label, list]) => <div key={label} className="border-t first:border-t-0"><h3 className="px-4 pb-0.5 pt-3 text-[12px] font-semibold text-mute">{label}</h3><TriageList today={t} items={list.map(item)} actions={["today", "tomorrow", "drop"]} empty="" /></div>)}
+          </Panel>}
         </div></div>
       </FeatureGate>
     );
