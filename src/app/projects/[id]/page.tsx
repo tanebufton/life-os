@@ -53,10 +53,10 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
         <div className="flex items-center gap-2"><FavouriteButton kind="project" id={id} on={isFavourite("project", id)} /><ProjectEditor id={id} name={p.name} color={p.color} icon={p.icon} area={p.area} view={p.default_view} views={tabs.map((t) => ({ k: t.k, label: t.label }))} areas={(db.prepare("SELECT DISTINCT area FROM projects WHERE area!='' ORDER BY area").all() as { area: string }[]).map((r) => r.area)} /></div>
       </div>
       <div className="mb-6 hidden md:block" />
-      <nav aria-label="Project views" className="ptabs mb-3 flex gap-0.5 overflow-x-auto border-b md:mb-6 md:hidden">
+      <nav aria-label="Project views" className="ptabs mb-3 flex border-b md:mb-6 md:hidden">
         {tabs.map((t) => { const on = t.k === tab; return (
-          <Link key={t.k} href={href(t.k)} aria-current={on ? "page" : undefined} className={`-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-[14px] ${on ? "border-accent font-medium text-fg" : "border-transparent text-mute hover:text-fg"}`}>
-            <Icon name={t.icon} size={15} className={on ? "text-accent" : ""} />{t.label}{t.n ? <span className="text-xs text-dim">{t.n}</span> : null}</Link>); })}
+          <Link key={t.k} href={href(t.k)} aria-current={on ? "page" : undefined} className={`-mb-px flex min-w-0 flex-1 flex-col items-center gap-0.5 border-b-2 px-1 py-1.5 text-[11.5px] ${on ? "border-accent font-medium text-fg" : "border-transparent text-mute hover:text-fg"}`}>
+            <Icon name={t.icon} size={17} className={on ? "text-accent" : ""} /><span className="max-w-full truncate">{t.label}{t.n ? <span className="ml-1 text-dim">{t.n}</span> : null}</span></Link>); })}
       </nav>
 
       {tab === "overview" && (

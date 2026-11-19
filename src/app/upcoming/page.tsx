@@ -14,8 +14,8 @@ import { today } from "@/lib/time";
 export const dynamic = "force-dynamic";
 const dayLabel = (d: string, t: string) => (d === t ? "Today" : d === addDays(t, 1) ? "Tomorrow" : nice(d).replace(",", ""));
 
-export default async function Upcoming({ searchParams }: { searchParams: Promise<{ view?: string; m?: string; d?: string }> }) {
-  const { view, m, d: wd } = await searchParams;
+export default async function Upcoming({ searchParams }: { searchParams: Promise<{ view?: string; m?: string; d?: string; s?: string }> }) {
+  const { view, m, d: wd, s: pick } = await searchParams;
   const t = today(), month = view === "month", week = view === "week";
   const all = queryTasks({ dueBy: addDays(t, 400) });
   const tab = (on: boolean) => `rounded-md px-3 py-1 text-[13px] font-medium ${on ? "bg-panel shadow-sm" : "text-mute hover:text-fg"}`;
@@ -60,6 +60,7 @@ export default async function Upcoming({ searchParams }: { searchParams: Promise
   const base = m && /^\d{4}-\d{2}$/.test(m) ? `${m}-01` : monthStart(t);
   const next = monthStart(addDays(base.slice(0, 8) + "28", 7)), prev = monthStart(addDays(base, -1));
   const gridStart = addDays(base, -((weekday(base) + 6) % 7));
+  const sel = pick && /^\d{4}-\d{2}-\d{2}$/.test(pick) ? pick : t;
   const cells = Array.from({ length: 42 }, (_, i) => addDays(gridStart, i));
   const label = new Intl.DateTimeFormat("en-NZ", { timeZone: "UTC", month: "long", year: "numeric" }).format(new Date(base + "T00:00:00Z"));
   return (
@@ -71,12 +72,16 @@ export default async function Upcoming({ searchParams }: { searchParams: Promise
         <div className="grid grid-cols-7 border-b bg-raise/50 text-center text-[11px] font-semibold text-mute">{["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => <div key={d} className="py-1.5">{d}</div>)}</div>
         <div className="grid grid-cols-7">
           {cells.map((d, i) => { const list = all.filter((x) => x.due === d), inMonth = d.slice(0, 7) === base.slice(0, 7); return (
-            <div key={d} className={`min-h-[84px] border-b border-r p-1 md:min-h-[104px] md:p-1.5 ${i % 7 === 6 ? "border-r-0" : ""} ${inMonth ? "" : "bg-raise/30 text-dim"}`}>
+            <div key={d} className={`relative min-h-[52px] border-b border-r p-1 md:min-h-[104px] md:p-1.5 ${i % 7 === 6 ? "border-r-0" : ""} ${inMonth ? "" : "bg-raise/30 text-dim"} ${d === sel ? "bg-accent/10" : ""}`}>
+              <Link href={`/upcoming?view=month&m=${base.slice(0, 7)}&s=${d}`} aria-label={`${nice(d)}, ${list.length} tasks`} className="absolute inset-0 md:hidden" />
               <div className={`mb-1 grid h-6 w-6 place-items-center rounded-full text-xs ${d === t ? "bg-accent font-semibold text-ink" : ""}`}>{Number(d.slice(8))}</div>
-              <ul className="space-y-0.5">{list.slice(0, 3).map((x) => <li key={x.id}><Link href={`/tasks/${x.id}`} className={`block truncate rounded px-1 text-[11px] leading-5 ${x.due! < t ? "bg-danger/10 text-danger" : "bg-accent/10 text-accent"}`} title={x.title}>{x.title}</Link></li>)}
+              <div className="flex flex-wrap gap-0.5 md:hidden">{list.slice(0, 4).map((x) => <span key={x.id} className={`h-1.5 w-1.5 rounded-full ${x.due! < t ? "bg-danger" : "bg-accent"}`} />)}</div>
+              <ul className="hidden space-y-0.5 md:block">{list.slice(0, 3).map((x) => <li key={x.id}><Link href={`/tasks/${x.id}`} className={`block truncate rounded px-1 text-[11px] leading-5 ${x.due! < t ? "bg-danger/10 text-danger" : "bg-accent/10 text-accent"}`} title={x.title}>{x.title}</Link></li>)}
                 {list.length > 3 && <li className="px-1 text-[11px] text-mute">+{list.length - 3} more</li>}</ul></div>); })}
         </div>
       </div>
+      <div className="mt-4 md:hidden"><h3 className="mb-1 px-1 text-[13px] font-semibold text-mute">{dayLabel(sel, t)}</h3>
+        <ul className="rounded-xl border bg-panel px-1">{all.filter((x) => x.due === sel).map((x) => <TaskRow key={x.id} t={x} />)}{!all.some((x) => x.due === sel) && <li className="px-3 py-6 text-center text-sm text-mute">Nothing due.</li>}</ul></div>
     </FeatureGate>
   );
 }

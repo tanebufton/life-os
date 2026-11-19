@@ -14,7 +14,18 @@ export function TaskTable({ rows, sort, dir, base, hideProject = false }: { rows
   const col = COLS.find((c) => c.key === sort) ?? COLS[4], sign = dir === "desc" ? -1 : 1;
   const sorted = [...rows].sort((a, b) => { const x = col.get(a), y = col.get(b); return (x < y ? -1 : x > y ? 1 : 0) * sign || a.id - b.id; });
   return (
-    <div className="card overflow-x-auto">
+    <>
+    <div className="md:hidden">
+      <div className="mb-2 flex gap-1.5 overflow-x-auto text-[12px]">{[["due", "Due"], ["priority", "Priority"], ["created", "Added"], ["title", "Name"]].map(([k, l]) => <Link key={k} href={base({ sort: k, dir: k === col.key && sign === 1 ? "desc" : "asc" })} className={`shrink-0 rounded-full border px-2.5 py-1 ${k === col.key ? "border-accent/40 bg-accent/10 text-accent" : "text-mute"}`}>{l}{k === col.key ? (sign === 1 ? " ↑" : " ↓") : ""}</Link>)}</div>
+      <ul className="card divide-y">{sorted.map((t) => (
+        <li key={t.id} className="px-3 py-2.5">
+          <Link href={`/tasks/${t.id}`} className={`flex items-center gap-2 text-[14px] ${t.done_at ? "text-dim line-through" : ""}`}><StatusIcon status={t.status_kind} size={14} /><span className="min-w-0 flex-1">{t.title}</span></Link>
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 pl-[22px] text-xs text-mute">
+            {!hideProject && t.project_name && <span>{t.project_name}</span>}<span>{t.status_name}</span>{t.due && <span>{nice(t.due)}</span>}{t.estimate ? <span>{t.estimate}m</span> : null}{t.priority > 0 && <span className="text-danger">High</span>}{t.priority < 0 && <span>Low</span>}
+            {t.tags.map((g) => <Pill key={g} name={g} />)}</div>
+        </li>))}{!sorted.length && <li className="px-3 py-10 text-center text-mute">No tasks.</li>}</ul>
+    </div>
+    <div className="card hidden overflow-x-auto md:block">
       <table className="w-full min-w-[640px] text-left text-[13px]">
         <thead><tr className="border-b bg-raise/50 text-xs text-mute">{cols.map((c) => <th key={c.key} scope="col" aria-sort={c.key === col.key ? (sign === 1 ? "ascending" : "descending") : "none"} className="px-3 py-2 font-medium"><Link href={base({ sort: c.key, dir: c.key === col.key && sign === 1 ? "desc" : "asc" })} className="inline-flex items-center gap-1 hover:text-fg">{c.label}{c.key === col.key && <span aria-hidden>{sign === 1 ? "↑" : "↓"}</span>}</Link></th>)}<th scope="col" className="px-3 py-2 font-medium">Tags</th></tr></thead>
         <tbody>{sorted.map((t) => (
@@ -28,5 +39,6 @@ export function TaskTable({ rows, sort, dir, base, hideProject = false }: { rows
           {!sorted.length && <tr><td colSpan={cols.length} className="px-3 py-10 text-center text-mute">No tasks.</td></tr>}</tbody>
       </table>
     </div>
+    </>
   );
 }
