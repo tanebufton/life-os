@@ -122,6 +122,6 @@ export async function aiAsk(q: string) { try { guardAi(); if (!q.trim()) return 
 export const aiStatus = async () => ({ configured: aiConfigured() });
 
 // voice
-export async function saveMemoAction(text: string, as: MemoAs) { try { const m = saveMemo(text, as, "web"); refresh(); return ok({ id: m.id, task_id: m.task_id, note_id: m.note_id }); } catch (e) { return fail(e); } }
+export async function saveMemoAction(text: string, as: MemoAs, projectId?: number) { try { const m = saveMemo(text, as, "web", projectId || null); refresh(); return ok({ id: m.id, task_id: m.task_id, note_id: m.note_id }); } catch (e) { return fail(e); } }
 export async function convertMemoAction(id: number, as: "task" | "note") { convertMemo(id, as); refresh(); }
 export async function deleteMemoAction(id: number) { deleteMemo(id); refresh(); }

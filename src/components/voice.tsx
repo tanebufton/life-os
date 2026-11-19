@@ -11,7 +11,7 @@ type Rec = { lang: string; continuous: boolean; interimResults: boolean; onresul
 const ERR: Record<string, string> = { "not-allowed": "Microphone blocked. Allow it in the address bar and try again.", "service-not-allowed": "Microphone blocked. Allow it in the address bar and try again.", "no-speech": "I didn't hear anything. Try again.", "audio-capture": "No microphone found.", network: "Speech recognition needs a network connection in this browser." };
 
 /** Record speech into an editable transcript, then save it as a memo, task or note. */
-export function VoiceRecorder() {
+export function VoiceRecorder({ projectId }: { projectId?: number } = {}) {
   const [text, setText] = useState(""), [interim, setInterim] = useState(""), [on, setOn] = useState(false), [can, setCan] = useState(true), [err, setErr] = useState(""), [p, go] = useTransition();
   const rec = useRef<Rec | null>(null), base = useRef(""), { guarded } = useSession(), [restored, setRestored] = useState(false);
   const textRef = useRef(""), released = useRef(false), downAt = useRef(0), [auto, setAuto] = useState(true);
@@ -34,7 +34,7 @@ export function VoiceRecorder() {
     if (Date.now() - downAt.current < 350) { setErr("Hold the button while you speak, then let go."); return; }
     if (!said) { setErr("I didn't catch anything. Hold the button while you speak."); return; }
     if (!auto) return; // leave the transcript to edit and save by hand
-    const g = await guarded("voice", said, () => saveMemoAction(said, "task")); const r = g.result;
+    const g = await guarded("voice", said, () => saveMemoAction(said, "task", projectId)); const r = g.result;
     if (g.saved && r?.ok) {
       clearDraft("voice"); setRestored(false); setText(""); setInterim(""); textRef.current = "";
       toast(`Added: ${said.length > 60 ? said.slice(0, 57) + "…" : said}`, { action: r.task_id ? { label: "Undo", onClick: () => void deleteTaskInline(r.task_id as number) } : undefined });
@@ -43,7 +43,7 @@ export function VoiceRecorder() {
   }
   const press = () => { if (on || !can) return; downAt.current = Date.now(); released.current = false; start(); };
   const release = () => { if (!rec.current || !on) return; released.current = true; rec.current.stop(); };
-  const save = (as: "memo" | "task" | "note") => go(async () => { if (on) stop(); const g = await guarded("voice", text, () => saveMemoAction(text, as)); const r = g.result; if (g.saved && r?.ok) { clearDraft("voice"); setRestored(false); toast(as === "memo" ? "Memo saved" : as === "task" ? "Saved and added as a task" : "Saved and added as a note"); setText(""); setInterim(""); } else if (g.reason && g.reason !== "error") setErr("Not saved yet. Your transcript is kept safely and will save when you're signed in again."); else setErr(r && !r.ok ? r.error : "Couldn't save. Try again."); });
+  const save = (as: "memo" | "task" | "note") => go(async () => { if (on) stop(); const g = await guarded("voice", text, () => saveMemoAction(text, as, projectId)); const r = g.result; if (g.saved && r?.ok) { clearDraft("voice"); setRestored(false); toast(as === "memo" ? "Memo saved" : as === "task" ? "Saved and added as a task" : "Saved and added as a note"); setText(""); setInterim(""); } else if (g.reason && g.reason !== "error") setErr("Not saved yet. Your transcript is kept safely and will save when you're signed in again."); else setErr(r && !r.ok ? r.error : "Couldn't save. Try again."); });
   return (
     <div className="space-y-3 p-4">
       <div className="flex items-center gap-4">

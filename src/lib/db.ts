@@ -112,6 +112,8 @@ function migrate(d: Database.Database) {
   // Notes can belong to a project; tags work on any kind of item; every change is recorded in an activity log; notes keep earlier versions.
   const ncols = (d.prepare("PRAGMA table_info(notes)").all() as { name: string }[]).map((c) => c.name);
   if (!ncols.includes("project_id")) d.exec("ALTER TABLE notes ADD COLUMN project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL");
+  // v5: voice memos can belong to a project (existing memos stay unassigned)
+  if (!(d.prepare("PRAGMA table_info(voice_memos)").all() as { name: string }[]).some((c) => c.name === "project_id")) d.exec("ALTER TABLE voice_memos ADD COLUMN project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL");
   d.exec(`
     CREATE TABLE IF NOT EXISTS entity_tags (kind TEXT NOT NULL, entity_id INTEGER NOT NULL, tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE, PRIMARY KEY (kind, entity_id, tag_id));
     CREATE INDEX IF NOT EXISTS entity_tags_tag ON entity_tags(tag_id);
@@ -132,7 +134,7 @@ function migrate(d: Database.Database) {
 }
 
 /** Bump when the schema changes. Existing databases below this get an automatic safety copy before they are migrated. */
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 /**
  * Before upgrading an existing database to a newer schema, save a complete copy next to it (VACUUM INTO is safe while the app runs).
  * If this can't be written the upgrade stops rather than risk your data; set LIFEOS_SKIP_UPGRADE_BACKUP=1 to override. Keeps the newest 3.

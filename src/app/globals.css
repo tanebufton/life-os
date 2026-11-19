@@ -67,3 +67,6 @@ input[type="date"]::-webkit-calendar-picker-indicator, input[type="time"]::-webk
 .prose-note li.md-task { list-style: none; margin-left: -1.1rem; } .prose-note li.md-task input { margin-right: 0.5rem; vertical-align: -1px; } .prose-note blockquote { @apply my-3 border-l-2 pl-3 text-mute; }
 .prose-note code { @apply rounded bg-raise px-1 py-0.5 font-mono text-[13px]; } .prose-note pre { @apply my-3 overflow-x-auto rounded-lg border bg-raise/60 p-3; } .prose-note pre code { @apply bg-transparent p-0; }
 .prose-note hr { @apply my-5; } .md-link { @apply text-accent underline decoration-accent/30 underline-offset-2 hover:decoration-accent; } .md-link.missing { @apply text-mute decoration-dotted; }
+
+/* Sidebar hidden by the toggle (remembered in this browser) */
+html[data-sidebar="collapsed"] .side { display: none !important; }

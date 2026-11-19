@@ -18,6 +18,11 @@ export type Counts = { due: number; open: number; doing: number; inbox: number }
 const isActive = (path: string, href: string) => (href === "/" ? path === "/" : path === href || path.startsWith(href + "/"));
 export const openPalette = () => window.dispatchEvent(new Event("lifeos:palette"));
 export const openHelp = () => window.dispatchEvent(new Event("lifeos:help"));
+export function toggleSidebar() {
+  const h = document.documentElement, on = h.dataset.sidebar !== "collapsed";
+  if (on) h.dataset.sidebar = "collapsed"; else delete h.dataset.sidebar;
+  try { localStorage.setItem("lifeos.sidebar", on ? "collapsed" : "open"); } catch {}
+}
 export const focusCapture = () => (document.getElementById("capture") as HTMLInputElement | null)?.focus() ?? window.dispatchEvent(new Event("lifeos:capture"));
 
 export function Hotkeys({ features }: { features: Features }) {
@@ -29,6 +34,7 @@ export function Hotkeys({ features }: { features: Features }) {
       const el = e.target as HTMLElement;
       if (e.metaKey || e.ctrlKey || e.altKey || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable) return;
       if ((e.key === "c" || e.key === "/") && !g) { e.preventDefault(); focusCapture(); return; }
+      if (e.key === "[") { e.preventDefault(); toggleSidebar(); return; }
       if (e.key === "?") { e.preventDefault(); openHelp(); return; }
       if (g && Date.now() - g < 1200) { const p = pages.find((x) => x.key === e.key.toLowerCase()); g = 0; if (p) { e.preventDefault(); router.push(p.href); } return; }
       g = e.key === "g" ? Date.now() : 0;
@@ -87,7 +93,7 @@ export function Sidebar({ counts, projects, features, filters = [], prefs: saved
     );
   });
   return (
-    <aside className="hidden w-[260px] shrink-0 flex-col border-r bg-side md:flex">
+    <aside className="side hidden w-[260px] shrink-0 flex-col border-r bg-side md:flex">
       <div className="px-2 pb-1 pt-2.5">
         <WorkspaceMenu editing={editing} onEdit={() => setEditing((e) => !e)} onReset={() => void resetSidebarAction().then((r) => toast(r.ok ? (r.message ?? "Done") : r.error))} hiddenPages={arranged.flatMap((g) => g.items).filter((i) => i.hidden).map((i) => i.page)} />
       </div>
@@ -138,7 +144,8 @@ export function Topbar({ today, projects, money }: { today: string; projects: Na
   const path = usePathname();
   const c = crumbs(path, projects);
   return (
-    <header className="sticky top-0 z-20 shrink-0 border-b bg-bg/85 backdrop-blur"><div className="mx-auto flex h-12 max-w-[1180px] items-center gap-4 px-4 md:px-10">
+    <header className="sticky top-0 z-20 shrink-0 border-b bg-bg/85 backdrop-blur"><div className="flex h-12 items-center gap-4 px-4 md:px-8">
+      <button onClick={toggleSidebar} aria-label="Show or hide the sidebar" title="Show or hide the sidebar ([)" className="-ml-1 hidden rounded-md p-1.5 text-mute hover:bg-raise hover:text-fg md:block"><Icon name="sidebar" size={17} /></button>
       <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-1.5 text-[14px] md:w-48">
         {c.map((x, i) => (<span key={i} className="flex min-w-0 items-center gap-1.5">{i > 0 && <span className="text-dim">/</span>}<span className={`truncate ${i === c.length - 1 ? "font-semibold" : "text-mute"}`}>{x}</span></span>))}
       </nav>

@@ -1,0 +1,10 @@
+import assert from "node:assert/strict";
+const V = await import("../src/lib/voice.ts"); const T = await import("../src/lib/tasks.ts"); const N = await import("../src/lib/notes.ts"); const { db } = await import("../src/lib/db.ts");
+let n = 0; const ok = (m: string) => { n++; console.log("  ✓", m); };
+const pid = Number(db.prepare("INSERT INTO projects (name, color) VALUES ('Hub', '#123456')").run().lastInsertRowid);
+const a = V.saveMemo("buy cables", "task", "web", pid), b = V.saveMemo("loose thought"), c = V.saveMemo("write this up. then more", "note", "web", pid);
+assert.deepEqual(V.listMemos(50, pid).map((m: any) => m.id).sort(), [a.id, c.id].sort()); assert.equal(V.listMemos(50).length, 3); ok("memos can be filed under a project and listed by it");
+assert.equal(T.getTask(a.task_id!)!.project_id, pid); ok("a task made from a project memo lands in that project");
+assert.equal(N.listNotes({ project: pid }).length, 1); ok("a note made from a project memo lands in that project");
+assert.equal(V.getMemo(b.id)!.project_id, null); ok("memos saved elsewhere stay unassigned");
+console.log(`  ${n} checks`);

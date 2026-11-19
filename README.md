@@ -47,7 +47,19 @@ quick-add syntax (`Pay rent every month #bills @home !high 31 march at 9am ~30m`
 - Edit conflicts on notes are detected across devices (keep mine / use theirs / keep both)
 - Mobile board column tabs; sidebar editing in Settings
 
+## Projects, layout
+
+Each project is its own workspace with tabs: Overview, List, Board, Table, Notes, Voice memos and Goals, all filtered to that project. Anything recorded or created inside a project is filed under it. The sidebar can be hidden with the button in the top bar (or `[`), and boards, tables, projects and the week view use the full width.
+
 ## Upgrading
+
+Fastest: use the image CI already built, instead of building on your machine (about 30 seconds instead of minutes). Set `LIFEOS_IMAGE=ghcr.io/tanebufton/life-os:latest` in `.env`, `docker login ghcr.io` once (a token with `read:packages`), then:
+
+```
+docker compose --profile mcp pull web && docker compose --profile mcp up -d --no-build --force-recreate
+```
+
+Or build locally:
 
 `git pull` then `docker compose up -d --build web worker`. Database changes are additive, and a copy of your database is saved next to it before any schema upgrade (currently schema v4).
 

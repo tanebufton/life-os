@@ -9,6 +9,7 @@ import { PwaRegister } from "@/components/pwa";
 import { listFilters } from "@/lib/misc";
 import { parsePrefs } from "@/lib/sidebar";
 import { tagColorCss } from "@/lib/tags";
+import { Content } from "@/components/content";
 import { Hotkeys, MobileNav, Sidebar, Topbar, type NavProject } from "@/components/shell";
 import { db } from "@/lib/db";
 import { featureMap } from "@/lib/features";
@@ -33,7 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     FROM tasks WHERE done_at IS NULL AND deleted_at IS NULL AND parent_id IS NULL`).get(t) as { due: number; open: number; doing: number; inbox: number };
   return (
     <html lang="en" data-theme="light" suppressHydrationWarning>
-      <head><style dangerouslySetInnerHTML={{ __html: tagColorCss() }} /><script dangerouslySetInnerHTML={{ __html: "try{var t=localStorage.getItem('lifeos.theme');if(!t)t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.dataset.theme=t}catch(e){}" }} /></head>
+      <head><style dangerouslySetInnerHTML={{ __html: tagColorCss() }} /><script dangerouslySetInnerHTML={{ __html: "try{var t=localStorage.getItem('lifeos.theme');if(!t)t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.dataset.theme=t;if(localStorage.getItem('lifeos.sidebar')==='collapsed')document.documentElement.dataset.sidebar='collapsed'}catch(e){}" }} /></head>
       <body>
         <SessionProvider>
         <div className="flex h-dvh">
@@ -41,7 +42,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div className="flex min-w-0 flex-1 flex-col">
             <main className="min-h-0 flex-1 overflow-y-auto">
               <Topbar today={t} projects={projects} money={money} />
-              <div className="mx-auto max-w-[1180px] px-4 pb-28 pt-6 md:px-10 md:pb-12 md:pt-8">{children}</div>
+              <Content>{children}</Content>
             </main>
           </div>
         </div>
