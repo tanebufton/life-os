@@ -6,7 +6,8 @@ import { NoteEditor } from "@/components/clientbits";
 import { deleteNoteAction, saveNoteAction } from "@/lib/actions3";
 import { backlinks, getNote, noteAncestors, noteChildren, noteDescendants, noteTree } from "@/lib/notes";
 import { FavouriteButton } from "@/components/favbutton";
-import { NoteOrganise } from "@/components/noteorg";
+import { NoteIcon, NoteInside } from "@/components/noteorg";
+import { Icon } from "@/components/Icon";
 import { isFavourite } from "@/lib/favourites";
 import { newSubpageAction } from "@/lib/actions5";
 import { db } from "@/lib/db";
@@ -25,11 +26,16 @@ export default async function NotePage({ params }: { params: Promise<{ id: strin
   return (
     <FeatureGate feature="notes">
       <div className="max-w-4xl">
-        <div className="mb-4 flex items-center justify-between text-[13px] text-mute"><nav aria-label="Page path" className="flex min-w-0 flex-wrap items-center gap-1"><Link href="/notes" className="hover:text-fg">Notes</Link>{crumbs.map((c) => <span key={c.id} className="flex items-center gap-1"><span className="text-dim">/</span><Link href={`/notes/${c.id}`} className="max-w-[12rem] truncate hover:text-fg">{c.icon} {c.title || "Untitled"}</Link></span>)}</nav>
-          <div className="flex gap-2"><FavouriteButton kind="note" id={n.id} on={isFavourite("note", n.id)} className="!py-1 text-xs" /><form action={async () => { "use server"; await saveNoteAction(n.id, { pinned: !n.pinned }); }}><button className="btn !py-1 text-xs">{n.pinned ? "Unpin" : "Pin"}</button></form><form action={deleteNoteAction.bind(null, n.id)}><button className="btn !py-1 text-xs">Delete</button></form></div></div>
-        <div className="mb-2"><NoteOrganise id={n.id} parentId={n.parent_id} icon={n.icon} options={options} /></div>
-        <div className="mb-2 flex flex-wrap items-center gap-x-5 gap-y-1"><NoteProjectField id={n.id} value={n.project_id} projects={projects} /><TagField kind="note" id={n.id} value={entityTags("note", n.id)} /></div>
-        <NoteEditor id={n.id} title={n.title} body={n.body} rev={n.rev} links={links} />
+        <div className="mb-5 flex items-center justify-between gap-3 text-[13px] text-mute">
+          <nav aria-label="Page path" className="flex min-w-0 flex-wrap items-center gap-1"><Link href="/notes" className="hover:text-fg">Notes</Link>{crumbs.map((c) => <span key={c.id} className="flex items-center gap-1"><span className="text-dim">/</span><Link href={`/notes/${c.id}`} className="max-w-[12rem] truncate hover:text-fg">{c.icon} {c.title || "Untitled"}</Link></span>)}</nav>
+          <div className="flex shrink-0 gap-2">
+            <FavouriteButton kind="note" id={n.id} on={isFavourite("note", n.id)} />
+            <form action={async () => { "use server"; await saveNoteAction(n.id, { pinned: !n.pinned }); }}><button className="btn !px-2.5" aria-pressed={!!n.pinned} aria-label={n.pinned ? "Unpin from the top of the list" : "Pin to the top of the list"} title={n.pinned ? "Unpin from the top of the list" : "Pin to the top of the list"}><Icon name="pin" size={15} className={n.pinned ? "text-accent" : "text-mute"} /></button></form>
+            <form action={deleteNoteAction.bind(null, n.id)}><button className="btn !px-2.5 hover:!text-danger" aria-label="Delete note" title="Delete note"><Icon name="trash" size={15} className="text-mute" /></button></form>
+          </div>
+        </div>
+        <NoteEditor id={n.id} title={n.title} body={n.body} rev={n.rev} links={links} lead={<NoteIcon id={n.id} icon={n.icon} />}
+          meta={<div className="mb-4 flex flex-wrap items-center gap-x-5 gap-y-1 rounded-lg border bg-raise/30 px-3 py-1.5"><NoteProjectField id={n.id} value={n.project_id} projects={projects} /><NoteInside id={n.id} parentId={n.parent_id} options={options} /><TagField kind="note" id={n.id} value={entityTags("note", n.id)} /></div>} />
         <Panel title="Sub-pages" count={kids.length} className="mt-8" i={1} right={<form action={newSubpageAction.bind(null, n.id)}><button className="font-medium text-accent hover:underline">Add sub-page</button></form>}>
           <ul>{kids.map((k) => <li key={k.id} className="border-b last:border-b-0"><Link href={`/notes/${k.id}`} className="flex items-center gap-2 px-4 py-2 text-[14px] hover:bg-raise/50"><span className="w-5 text-center">{k.icon || "📄"}</span><span className="truncate">{k.title || "Untitled"}</span></Link></li>)}
             {!kids.length && <li className="px-4 py-4 text-sm text-mute">No sub-pages. Use them to break a big page into a tree, like a wiki.</li>}</ul></Panel>

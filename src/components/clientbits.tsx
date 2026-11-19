@@ -16,7 +16,7 @@ export function AutoSchedule({ date }: { date: string }) {
 }
 
 /** Markdown note editor: autosaves, with an edit/preview toggle. Preview HTML is rendered on the server and passed in. */
-export function NoteEditor({ id, title, body, rev, links }: { id: number; title: string; body: string; rev: number; links: Record<string, number> }) {
+export function NoteEditor({ id, title, body, rev, links, lead, meta }: { id: number; title: string; body: string; rev: number; links: Record<string, number>; lead?: React.ReactNode; meta?: React.ReactNode }) {
   const { guarded } = useSession(), key = `note:${id}`, router = useRouter();
   const [t, setT] = useState(title), [b, setB] = useState(body), [saved, setSaved] = useState<"saved" | "saving" | "kept" | "err">("saved");
   const first = useRef(true), skip = useRef(false), revRef = useRef(rev), timer = useRef<ReturnType<typeof setTimeout>>(undefined), [err, setErr] = useState(""), [found, setFound] = useState<{ value: { title: string; body: string }; at: number } | null>(null);
@@ -55,8 +55,9 @@ export function NoteEditor({ id, title, body, rev, links }: { id: number; title:
           <div className="mt-2 flex flex-wrap gap-2"><button className="btn !h-8" onClick={keepMine}>Keep my version</button><button className="btn !h-8" onClick={useTheirs}>Use the other version</button><button className="btn !h-8" onClick={both}>Keep both (mine as a new note)</button></div>
         </div>)}
       {found && <RestoreBanner at={ago(found.at)} what="edits to this note" onRestore={() => { setT(found.value.title); setB(found.value.body); setFound(null); }} onDiscard={() => { clearDraft(key); setFound(null); }} />}
-      <input value={t} onChange={(e) => setT(e.target.value)} placeholder="Untitled" aria-label="Title" className="w-full bg-transparent text-[28px] font-bold tracking-tight outline-none placeholder:text-dim md:text-[32px]" />
-      <div className="mb-3 mt-2 h-4 text-xs text-mute" aria-live="polite">{saved === "saving" ? "Saving…" : saved === "kept" ? <span className="text-warn">Not saved yet. Kept safely in this browser</span> : saved === "err" ? <span className="text-danger">{err || "Couldn't save"}</span> : "Saved"}</div>
+      <div className="flex items-center gap-2">{lead}<input value={t} onChange={(e) => setT(e.target.value)} placeholder="Untitled" aria-label="Title" className="min-w-0 flex-1 bg-transparent text-[22px] font-bold tracking-tight outline-none placeholder:text-dim md:text-[32px]" /></div>
+      <div className="mb-3 mt-1 h-4 text-xs text-mute" aria-live="polite">{saved === "saving" ? "Saving…" : saved === "kept" ? <span className="text-warn">Not saved yet. Kept safely in this browser</span> : saved === "err" ? <span className="text-danger">{err || "Couldn't save"}</span> : "Saved"}</div>
+      {meta}
       <MarkdownField value={b} onChange={setB} links={links} label="Note body" rows={18} defaultMode={body ? "view" : "edit"} placeholder="Write in Markdown. Link notes with [[Note title]]." />
     </div>
   );

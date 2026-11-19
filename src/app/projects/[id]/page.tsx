@@ -10,7 +10,6 @@ import { TaskTable } from "@/components/tasktable";
 import { TaskGroups, bucket } from "@/components/tasks";
 import { MemoList } from "@/components/memolist";
 import { VoiceRecorder } from "@/components/voice";
-import { archiveProject } from "@/lib/actions";
 import { addGoalAction } from "@/lib/actions3";
 import { newNoteInProjectAction } from "@/lib/actions5";
 import { db, Project } from "@/lib/db";
@@ -51,9 +50,9 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
         <div className="flex min-w-0 items-center gap-3"><ProjectAvatar name={p.name} color={p.color} size={36} icon={p.icon} />
           <div className="min-w-0"><h1 className="truncate text-[26px] font-bold leading-tight tracking-tight">{p.name}</h1>
             <p className="text-[13px] text-mute">{p.area ? `${p.area} · ` : ""}{projectKey(p.name)} · {open.length} open{hasCustomColumns(id) ? " · own board columns" : ""}</p></div></div>
-        <div className="flex flex-wrap items-center gap-2"><FavouriteButton kind="project" id={id} on={isFavourite("project", id)} /><ProjectEditor id={id} name={p.name} color={p.color} icon={p.icon} area={p.area} areas={(db.prepare("SELECT DISTINCT area FROM projects WHERE area!='' ORDER BY area").all() as { area: string }[]).map((r) => r.area)} /><form action={archiveProject.bind(null, id)}><button className="btn text-mute hover:!text-danger">Archive</button></form></div>
+        <div className="flex items-center gap-2"><FavouriteButton kind="project" id={id} on={isFavourite("project", id)} /><ProjectEditor id={id} name={p.name} color={p.color} icon={p.icon} area={p.area} areas={(db.prepare("SELECT DISTINCT area FROM projects WHERE area!='' ORDER BY area").all() as { area: string }[]).map((r) => r.area)} /></div>
       </div>
-      <div className="mb-5 mt-1 hidden md:block" />
+      <div className="mb-6 hidden md:block" />
       <nav aria-label="Project views" className="ptabs mb-6 flex gap-0.5 overflow-x-auto border-b md:hidden">
         {tabs.map((t) => { const on = t.k === tab; return (
           <Link key={t.k} href={t.k === "overview" ? base : href(t.k)} aria-current={on ? "page" : undefined} className={`-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-[14px] ${on ? "border-accent font-medium text-fg" : "border-transparent text-mute hover:text-fg"}`}>

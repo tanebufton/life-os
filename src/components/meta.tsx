@@ -9,7 +9,7 @@ import { Icon } from "./Icon";
 export function TagField({ kind, id, value }: { kind: TagKind; id: number; value: string[] }) {
   const [text, setText] = useState(value.join(" ")), [, start] = useTransition();
   const save = () => { if (text.trim() === value.join(" ")) return; start(async () => { const r = await saveTagsAction(kind, id, text); if (!r.ok) toast(r.error); }); };
-  return <label className="inline-flex min-w-0 items-center gap-1.5 text-[13px] text-mute"><Icon name="inbox" size={14} /><input value={text} onChange={(e) => setText(e.target.value)} onBlur={save} onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} placeholder="Add tags" aria-label="Tags" title="Separate tags with spaces" className="ghost !w-48 !py-0.5" /></label>;
+  return <label className="inline-flex min-w-0 items-center gap-1.5 text-[13px] text-mute"><Icon name="tag" size={14} /><input value={text} onChange={(e) => setText(e.target.value)} onBlur={save} onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} placeholder="Add tags" aria-label="Tags" title="Separate tags with spaces" className="ghost !w-48 !py-0.5" /></label>;
 }
 export function NoteProjectField({ id, value, projects }: { id: number; value: number | null; projects: { id: number; name: string }[] }) {
   const [, start] = useTransition();
