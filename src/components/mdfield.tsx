@@ -2,7 +2,7 @@
 import { useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { Icon } from "./Icon";
-import { heading, link, onEnter, toggleLines, wrap, type Edit, type Kind } from "@/lib/mdedit";
+import { heading, link, onEnter, onSpace, toggleLines, wrap, type Edit, type Kind } from "@/lib/mdedit";
 import { renderMarkdown } from "@/lib/markdown";
 
 type Props = { value: string; onChange: (v: string) => void; onBlur?: () => void; links?: Record<string, number>; placeholder?: string; label: string; rows?: number; defaultMode?: "edit" | "view"; mono?: boolean; className?: string };
@@ -19,6 +19,7 @@ export function MarkdownField({ value, onChange, onBlur, links, placeholder, lab
     if (m && !e.shiftKey && e.key.toLowerCase() === "b") { e.preventDefault(); run((s, x) => wrap(value, s, x, "**", "**", "bold")); }
     else if (m && !e.shiftKey && e.key.toLowerCase() === "i") { e.preventDefault(); run((s, x) => wrap(value, s, x, "*", "*", "italic")); }
     else if (m && !e.shiftKey && e.key.toLowerCase() === "k") { e.preventDefault(); run((s, x) => link(value, s, x)); }
+    else if (e.key === " " && !m) { const { s, e: x } = sel(); if (s === x) { const r = onSpace(value, s); if (r) { e.preventDefault(); apply(r); } } }
     else if (e.key === "Enter" && !e.shiftKey && !m && !e.altKey) { const { s, e: x } = sel(); if (s === x) { const r = onEnter(value, s); if (r) { e.preventDefault(); apply(r); } } }
   };
   const B = ({ icon, title, onClick }: { icon: string; title: string; onClick: () => void }) => <button type="button" title={title} aria-label={title} onMouseDown={(e) => e.preventDefault()} onClick={onClick} className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-mute hover:bg-raise hover:text-fg"><Icon name={icon} size={16} /></button>;

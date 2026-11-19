@@ -20,3 +20,6 @@ assert.equal(onEnter("plain text", 10), null); assert.equal(onEnter("- one", 2),
 console.log(`\n${n} checks passed`);
 { const r = toggleLines("", 0, 0, "ul"); assert.equal(r.text, "- "); assert.equal(r.start, 2); assert.equal(r.end, 2); console.log("  ✓ bullet on an empty line inserts the marker and leaves the cursor after it"); }
 { const r = toggleLines("x\n", 2, 2, "check"); assert.equal(r.text, "x\n- [ ] "); console.log("  ✓ checklist on a fresh empty line"); }
+{ const { onSpace } = await import("../src/lib/mdedit.ts");
+  const r = onSpace("a\n[]", 4)!; assert.equal(r.text, "a\n- [ ] "); assert.equal(r.start, 8);
+  assert.equal(onSpace("hello", 5), null); console.log("  ✓ typing [] then space starts a checklist item"); }

@@ -46,3 +46,11 @@ export function onEnter(t: string, pos: number): Edit | null {
   const next = /^\d+\. $/.test(marker) ? `${parseInt(marker, 10) + 1}. ` : /^- \[/.test(marker) ? "- [ ] " : marker, ins = "\n" + indent + next;
   return { text: t.slice(0, pos) + ins + t.slice(pos), start: pos + ins.length, end: pos + ins.length };
 }
+
+/** Typing "[]" then a space at the start of a line becomes a checklist item. */
+export function onSpace(t: string, pos: number): Edit | null {
+  const ls = t.lastIndexOf("\n", pos - 1) + 1, m = t.slice(ls, pos).match(/^(\s*)(\[\]|\[ \]|-\[\])$/);
+  if (!m) return null;
+  const text = t.slice(0, ls) + m[1] + "- [ ] " + t.slice(pos), at = ls + m[1].length + 6;
+  return { text, start: at, end: at };
+}

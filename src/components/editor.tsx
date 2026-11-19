@@ -72,6 +72,7 @@ export function TaskEditor({ task, projects, focus, columns, head, children, tod
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2 border-t pt-3">
           {focus && <button className="btn !h-8" onClick={async () => { await startFocus(task.id); router.push(`/focus?task=${task.id}`); }}><Icon name="focus" size={15} className="text-accent" />Focus</button>}
+          <button className="btn !h-8" onClick={async () => { try { await navigator.clipboard.writeText(`${location.origin}/tasks/${task.id}`); toast("Link copied"); } catch { toast("Couldn't copy the link"); } }}><Icon name="link" size={15} />Copy link</button>
           <button className="btn !h-8" onClick={async () => { const n = await duplicateTaskAction(task.id); if (n) { toast("Task duplicated"); router.push(`/tasks/${n}`); } }}><Icon name="copy" size={15} />Duplicate</button>
           <button className="btn !h-8 ml-auto text-danger" onClick={async () => { const r = await deleteTaskInline(task.id); if (r) { router.push("/tasks"); toast(`Deleted “${r.title}”`, { action: { label: "Undo", onClick: () => void restoreTaskAction(task.id).then(() => router.push(`/tasks/${task.id}`)) } }); } }}><Icon name="trash" size={15} />Delete</button>
         </div>
