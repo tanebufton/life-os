@@ -8,3 +8,4 @@ demo-shots
 
 tests/fixtures/*-wal
 tests/fixtures/*-shm
+*.tsbuildinfo

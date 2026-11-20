@@ -26,7 +26,6 @@ export function TaskEditor({ task, projects, focus, columns, head, children, tod
   const [v, setV] = useState(task), [est, setEst] = useState(task.estimate ? `${task.estimate}m` : ""), [state, setState] = useState<"idle" | "saving" | "saved" | string>("idle");
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined), pending = useRef<Record<string, unknown>>({}), unsaved = useRef<Record<string, unknown>>({});
   const { guarded } = useSession(), dkey = `task:${task.id}`, [found, setFound] = useState<{ value: Record<string, unknown>; at: number } | null>(null);
-  useEffect(() => () => clearTimeout(timer.current), []);
   useEffect(() => { const d = peekDraft<Record<string, unknown>>(dkey); if (d && Object.keys(d.value ?? {}).length) setFound(d); }, [dkey]);
   const flush = async () => {
     const p = pending.current; pending.current = {}; if (!Object.keys(p).length) return;
@@ -36,6 +35,13 @@ export function TaskEditor({ task, projects, focus, columns, head, children, tod
     else if (g.reason && g.reason !== "error") setState("Not saved yet. Kept safely in this browser");
     else setState((g.result as { error?: string } | undefined)?.error ?? "Couldn't save. Try again");
   };
+  // Never drop a change that is still waiting out its pause: send it when the page is closed or left, or when the pop-up asks.
+  const flushRef = useRef(flush); flushRef.current = flush;
+  useEffect(() => {
+    const h = () => { clearTimeout(timer.current); void flushRef.current(); };
+    window.addEventListener("lifeos:flush", h);
+    return () => { window.removeEventListener("lifeos:flush", h); clearTimeout(timer.current); void flushRef.current(); };
+  }, []);
   const save = (patch: Record<string, unknown>, delay = 0) => { Object.assign(pending.current, patch); clearTimeout(timer.current); timer.current = setTimeout(() => void flush(), delay); };
   const set = <K extends keyof EditorTask>(k: K, val: EditorTask[K]) => setV((s) => ({ ...s, [k]: val }));
   const err = state !== "idle" && state !== "saving" && state !== "saved";

@@ -20,14 +20,15 @@ export function AutoSchedule({ date }: { date: string }) {
 export function NoteEditor({ id, title, body, rev, links, lead, meta }: { id: number; title: string; body: string; rev: number; links: Record<string, number>; lead?: React.ReactNode; meta?: React.ReactNode }) {
   const { guarded } = useSession(), key = `note:${id}`, router = useRouter();
   const [t, setT] = useState(title), [b, setB] = useState(body), [saved, setSaved] = useState<"saved" | "saving" | "kept" | "err">("saved");
-  const first = useRef(true), skip = useRef(false), revRef = useRef(rev), timer = useRef<ReturnType<typeof setTimeout>>(undefined), [err, setErr] = useState(""), [found, setFound] = useState<{ value: { title: string; body: string }; at: number } | null>(null);
+  const first = useRef(true), timerPending = useRef(false), skip = useRef(false), revRef = useRef(rev), timer = useRef<ReturnType<typeof setTimeout>>(undefined), [err, setErr] = useState(""), [found, setFound] = useState<{ value: { title: string; body: string }; at: number } | null>(null);
   const [conflict, setConflict] = useState<{ title: string; body: string; rev: number; updated_at: string } | null>(null), mine = useRef({ t, b }); mine.current = { t, b };
   useEffect(() => { const d = peekDraft<{ title: string; body: string }>(key); if (d && (d.value.title !== title || d.value.body !== body)) setFound(d); else if (d) clearDraft(key); }, [key, title, body]);
   useEffect(() => {
     if (first.current) { first.current = false; return; }
     if (skip.current) { skip.current = false; return; } // text just replaced by a newer version from elsewhere: nothing of ours to save
-    setSaved("saving"); clearTimeout(timer.current);
+    setSaved("saving"); clearTimeout(timer.current); timerPending.current = true;
     timer.current = setTimeout(async () => {
+      timerPending.current = false;
       const g = await guarded(key, { title: t, body: b }, () => saveNoteAction(id, { title: t, body: b }, revRef.current), () => setSaved("saved"));
       const r = g.result as NoteSave | undefined;
       if (g.saved && r?.ok) { revRef.current = r.rev; setSaved("saved"); setErr(""); }
@@ -36,6 +37,8 @@ export function NoteEditor({ id, title, body, rev, links, lead, meta }: { id: nu
     }, 600);
     return () => clearTimeout(timer.current);
   }, [t, b, id, key, guarded]);
+  // Leaving the page within the pause after typing must not lose the last edit.
+  useEffect(() => () => { if (timerPending.current) void saveNoteAction(id, { title: mine.current.t, body: mine.current.b }, revRef.current); }, [id]);
   // Coming back to this tab: if another device saved a newer version and we have nothing unsaved, load it; if we do, say so.
   useEffect(() => {
     const check = async () => {
