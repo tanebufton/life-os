@@ -52,6 +52,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   }, [check]);
   // Don't wait for a save to fail: look when the tab comes back into view and every minute. If the session ended and there's nothing unsaved, go straight to the Cloudflare login.
   useEffect(() => {
+    if (window.self !== window.top) return; // never inside an embedded frame (the desktop task pop-up); only the page itself checks
     let last = 0;
     const editing = () => { const a = document.activeElement as HTMLInputElement | null; return !!a && /^(INPUT|TEXTAREA)$/.test(a.tagName) && !!a.value; };
     const run = async () => {
