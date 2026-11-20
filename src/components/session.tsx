@@ -50,6 +50,20 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     const bu = (e: BeforeUnloadEvent) => { if (retries.current.size) { e.preventDefault(); e.returnValue = ""; } }; window.addEventListener("beforeunload", bu);
     return () => { ch?.close(); window.removeEventListener("storage", st); window.removeEventListener("offline", off); window.removeEventListener("beforeunload", bu); };
   }, [check]);
+  // Don't wait for a save to fail: look when the tab comes back into view and every minute. If the session ended and there's nothing unsaved, go straight to the Cloudflare login.
+  useEffect(() => {
+    let last = 0;
+    const editing = () => { const a = document.activeElement as HTMLInputElement | null; return !!a && /^(INPUT|TEXTAREA)$/.test(a.tagName) && !!a.value; };
+    const run = async () => {
+      if (document.visibilityState !== "visible" || Date.now() - last < 15_000) return; last = Date.now();
+      if ((await check()) !== "expired" || retries.current.size || editing()) return; // with unsaved work, the banner stays and nothing is lost
+      try { const t = Number(sessionStorage.getItem("lifeos:autologin") ?? 0); if (Date.now() - t < 30_000) return; sessionStorage.setItem("lifeos:autologin", String(Date.now())); } catch { /* ignore */ }
+      location.reload();
+    };
+    const go = () => void run(), id = setInterval(go, 60_000);
+    document.addEventListener("visibilitychange", go); window.addEventListener("focus", go); window.addEventListener("pageshow", go); go();
+    return () => { clearInterval(id); document.removeEventListener("visibilitychange", go); window.removeEventListener("focus", go); window.removeEventListener("pageshow", go); };
+  }, [check]);
   const value = useMemo(() => ({ health, guarded }), [health, guarded]);
   const msg = { expired: "Your session has expired.", offline: "You're offline.", unreachable: "Can't reach LifeOS right now." }[health as Exclude<Health, "ok">];
   return (

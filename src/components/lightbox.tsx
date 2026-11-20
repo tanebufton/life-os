@@ -8,7 +8,14 @@ import { Icon } from "./Icon";
  * edit, subtasks, comments, delete. Closing it, or leaving the task (e.g. after deleting), brings you back to the board.
  */
 export function TaskLightbox({ id, onClose }: { id: number; onClose: () => void }) {
-  const frame = useRef<HTMLIFrameElement>(null);
+  const frame = useRef<HTMLIFrameElement>(null), closeRef = useRef(onClose); closeRef.current = onClose;
+  // The browser's Back (a swipe on a phone) closes the pop-up and stays on the board, instead of leaving the page.
+  useEffect(() => {
+    history.pushState({ ...(history.state ?? {}), lifeosLightbox: true }, "");
+    let popped = false; const pop = () => { popped = true; closeRef.current(); };
+    window.addEventListener("popstate", pop);
+    return () => { window.removeEventListener("popstate", pop); if (!popped && history.state?.lifeosLightbox) history.back(); };
+  }, []);
   useEffect(() => {
     const k = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", k); const prev = document.body.style.overflow; document.body.style.overflow = "hidden";

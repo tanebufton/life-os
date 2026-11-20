@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useOptimistic, useState, useTransition } from "react";
+import { useOptimistic, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { deleteTaskInline, moveTask, restoreTaskAction } from "@/lib/actions";
 import { TaskLightbox } from "./lightbox";
@@ -21,8 +21,11 @@ export function Board({ columns, cards, today, projectId = null, hiddenNote, too
   const router = useRouter();
   const [items, setItems] = useOptimistic(cards, (s, a: { id: number; status: string; before?: number | null }) => { const c = s.find((x) => x.id === a.id); if (!c) return s; const rest = s.filter((x) => x.id !== a.id), at = a.before ? rest.findIndex((x) => x.id === a.before) : -1; const moved = { ...c, status: a.status }; return at < 0 ? [...rest, moved] : [...rest.slice(0, at), moved, ...rest.slice(at)]; });
   const [, start] = useTransition();
-  const [over, setOver] = useState<string | null>(null), [selecting, setSelecting] = useState(false), [sel, setSel] = useState<Set<number>>(new Set()), [mobileCol, setMobileCol] = useState(columns[0]?.key ?? "");
-  const shownCol = columns.some((c) => c.key === mobileCol) ? mobileCol : columns[0]?.key; // a different project can have different columns; never leave none showing
+  const [over, setOver] = useState<string | null>(null), [selecting, setSelecting] = useState(false), [sel, setSel] = useState<Set<number>>(new Set()), [active, setActive] = useState(0), track = useRef<HTMLDivElement>(null);
+  const step = () => { const el = track.current, first = el?.children[0] as HTMLElement | undefined; return first ? first.offsetWidth + 10 : 0; }; // a column plus the gap
+  const onScroll = () => { const el = track.current, w = step(); if (el && w && window.matchMedia("(max-width: 767px)").matches) setActive(Math.max(0, Math.min(columns.length - 1, Math.round(el.scrollLeft / w)))); };
+  const goTo = (i: number) => { setActive(i); track.current?.scrollTo({ left: i * step(), behavior: "smooth" }); };
+  const shownCol = columns[Math.min(active, columns.length - 1)]?.key;
   const toggle = (id: number) => setSel((s) => { const n = new Set(s); if (!n.delete(id)) n.add(id); return n; });
   const bulk = (o: BulkOp) => start(async () => { const r = await bulkBoardAction([...sel], o); toast(r.ok ? (r.message ?? "Done") : r.error); if (r.ok && o.op === "delete") { setSel(new Set()); setSelecting(false); } }); // other changes keep the selection, so you can apply several in a row
   const kindOf = (key: string): Kind => columns.find((c) => c.key === key)?.kind ?? "todo";
@@ -44,7 +47,7 @@ export function Board({ columns, cards, today, projectId = null, hiddenNote, too
   return (
     <>
     {lightbox !== null && <TaskLightbox id={lightbox} onClose={closeLightbox} />}
-    <div role="tablist" aria-label="Columns" className="sticky top-12 z-10 -mx-4 mb-2 flex gap-1.5 overflow-x-auto bg-bg/95 px-4 py-1.5 backdrop-blur md:hidden">{columns.map((c) => <button key={c.key} role="tab" aria-selected={shownCol === c.key} onClick={() => setMobileCol(c.key)} className={`shrink-0 rounded-full border px-3 py-1.5 text-[13px] ${shownCol === c.key ? "border-accent/50 bg-accent/10 font-medium text-accent" : "text-mute"}`}>{c.name} <span className="text-dim">{items.filter((x) => x.status === c.key).length}</span></button>)}</div>
+    <div role="tablist" aria-label="Columns" className="sticky top-12 z-10 -mx-4 mb-2 flex gap-1.5 overflow-x-auto bg-bg/95 px-4 py-1.5 backdrop-blur md:hidden">{columns.map((c) => <button key={c.key} role="tab" aria-selected={shownCol === c.key} onClick={() => goTo(columns.findIndex((x) => x.key === c.key))} className={`shrink-0 rounded-full border px-3 py-1.5 text-[13px] ${shownCol === c.key ? "border-accent/50 bg-accent/10 font-medium text-accent" : "text-mute"}`}>{c.name} <span className="text-dim">{items.filter((x) => x.status === c.key).length}</span></button>)}</div>
     <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
       <button type="button" aria-expanded={tools} onClick={() => setTools((v) => !v)} className={`btn !h-8 text-xs md:hidden ${tools ? "!border-accent/40 !bg-accent/10 !text-accent" : ""}`}><Icon name="search" size={13} />Filters</button>
       <div className={`${tools ? "flex" : "hidden"} w-full flex-wrap items-center gap-x-3 gap-y-2 md:order-none md:flex md:w-auto`}>{toolbar}</div>
@@ -53,13 +56,13 @@ export function Board({ columns, cards, today, projectId = null, hiddenNote, too
         <button className={selecting ? "btn-primary !h-8 text-xs" : "btn !h-8 text-xs"} onClick={() => { setSelecting((v) => !v); setSel(new Set()); }}>{selecting ? "Done" : "Select"}</button>
       </div>
     </div>
-    <div className="-mx-4 flex snap-x snap-mandatory items-start gap-2.5 overflow-x-auto px-4 pb-3 md:-mx-8 md:snap-none md:px-8">
+    <div ref={track} onScroll={onScroll} className="-mx-4 flex snap-x snap-mandatory scroll-pl-4 items-start gap-2.5 overflow-x-auto overscroll-x-contain px-4 pb-3 md:-mx-8 md:snap-none md:px-8">
       {columns.map((col, ci) => {
         const list = items.filter((c) => c.status === col.key);
         return (
           <section key={col.key} onDragOver={(e) => { e.preventDefault(); setOver(col.key); }} onDragLeave={() => setOver(null)}
             onDrop={(e) => { e.preventDefault(); setOver(null); const id = Number(e.dataTransfer.getData("text/plain")); if (id) place(id, col.key, null); }}
-            className={`rise w-full shrink-0 rounded-xl bg-raise/60 p-1.5 transition md:block md:min-h-[calc(100dvh-17rem)] md:w-auto md:min-w-[272px] md:max-w-[480px] md:flex-1 ${shownCol === col.key ? "" : "hidden"} ${over === col.key ? "ring-2 ring-accent/50" : ""}`} style={{ ["--i" as string]: ci }}>
+            className={`rise w-full shrink-0 snap-start rounded-xl bg-raise/60 p-1.5 transition md:block md:min-h-[calc(100dvh-17rem)] md:w-auto md:min-w-[272px] md:max-w-[480px] md:flex-1 ${over === col.key ? "ring-2 ring-accent/50" : ""}`} style={{ ["--i" as string]: ci }}>
             <h2 className="flex items-center gap-1.5 px-1.5 pb-1.5 pt-1 text-[12px] font-semibold text-mute"><StatusIcon status={col.kind} size={12} /><span className="truncate">{col.name}</span><span className="font-medium text-dim">{list.length}</span>{col.kind !== "done" && list.some((c) => c.estimate) && <span className="ml-auto font-normal text-dim" title="Estimated time in this column">{fmtMinutes(list.reduce((n, c) => n + (c.estimate ?? 0), 0))}</span>}</h2>
             <ul className="space-y-1.5">
               {list.map((c) => {
