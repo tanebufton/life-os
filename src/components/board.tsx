@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useOptimistic, useRef, useState, useTransition } from "react";
+import { useEffect, useOptimistic, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { deleteTaskInline, moveTask, restoreTaskAction } from "@/lib/actions";
 import { TaskLightbox } from "./lightbox";
@@ -24,6 +24,9 @@ export function Board({ columns, cards, today, projectId = null, hiddenNote, too
   const [over, setOver] = useState<string | null>(null), [selecting, setSelecting] = useState(false), [sel, setSel] = useState<Set<number>>(new Set()), [active, setActive] = useState(0), track = useRef<HTMLDivElement>(null);
   const step = () => { const el = track.current, first = el?.children[0] as HTMLElement | undefined; return first ? first.offsetWidth + 10 : 0; }; // a column plus the gap
   const onScroll = () => { const el = track.current, w = step(); if (el && w && window.matchMedia("(max-width: 767px)").matches) setActive(Math.max(0, Math.min(columns.length - 1, Math.round(el.scrollLeft / w)))); };
+  const memo = `lifeos.boardcol.${projectId ?? "all"}`;
+  useEffect(() => { try { const i = Number(sessionStorage.getItem(memo)); if (i > 0 && i < columns.length && window.matchMedia("(max-width: 767px)").matches) requestAnimationFrame(() => { setActive(i); track.current?.scrollTo({ left: i * step() }); }); } catch { /* ignore */ } }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { try { sessionStorage.setItem(memo, String(active)); } catch { /* ignore */ } }, [active, memo]);
   const goTo = (i: number) => { setActive(i); track.current?.scrollTo({ left: i * step(), behavior: "smooth" }); };
   const shownCol = columns[Math.min(active, columns.length - 1)]?.key;
   const toggle = (id: number) => setSel((s) => { const n = new Set(s); if (!n.delete(id)) n.add(id); return n; });
@@ -38,8 +41,10 @@ export function Board({ columns, cards, today, projectId = null, hiddenNote, too
   });
   // The whole card opens the task (not just the title). Buttons and links inside keep their own behaviour; a drag never counts as a click.
   const [lightbox, setLightbox] = useState<number | null>(null), [tools, setTools] = useState(false);
-  const open = (e: React.MouseEvent | React.KeyboardEvent, id: number) => { if ((e.target as HTMLElement).closest("button, a, input")) return; if (selecting) { toggle(id); return; } setLightbox(id); };
-  const closeLightbox = () => { setLightbox(null); router.refresh(); };
+  const phone = () => window.matchMedia("(max-width: 767px)").matches; // on a phone the pop-up would fill the screen anyway: go to the task page, and Back returns here
+  const show = (id: number) => { if (phone()) router.push(`/tasks/${id}`); else setLightbox(id); };
+  const open = (e: React.MouseEvent | React.KeyboardEvent, id: number) => { if ((e.target as HTMLElement).closest("button, a, input")) return; if (selecting) { toggle(id); return; } show(id); };
+  const closeLightbox = (changed = true) => { setLightbox(null); if (changed) router.refresh(); };
   /** Tick a card: it moves to the first Done column; ticking a finished one puts it back in the first To do column. */
   const complete = (c: Card) => { const toDone = kindOf(c.status) !== "done", dest = columns.find((x) => x.kind === (toDone ? "done" : "todo")) ?? columns[0]; if (!dest) return; move(c.id, dest.key); toast(c.repeat && toDone ? `Done. Next one is back in ${columns[0].name}` : toDone ? "Done" : "Reopened", { description: c.title, ...(c.repeat ? {} : { action: { label: "Undo", onClick: () => move(c.id, c.status) } }) }); };
   const remove = (c: Card) => start(async () => { const r = await deleteTaskInline(c.id); if (r) toast(`Deleted “${r.title}”`, { action: { label: "Undo", onClick: () => void restoreTaskAction(c.id).then(() => router.refresh()) } }); else toast("Couldn't delete that"); router.refresh(); });
@@ -75,7 +80,7 @@ export function Board({ columns, cards, today, projectId = null, hiddenNote, too
                     {selecting && <input type="checkbox" checked={sel.has(c.id)} onChange={() => toggle(c.id)} aria-label={`Select ${c.title}`} className="absolute left-2.5 top-2.5 h-4 w-4" />}
                     <div className={`flex items-start gap-2 ${selecting ? "pl-6" : ""} pr-12`}>
                       {!selecting && <button type="button" aria-label={done ? `Reopen ${c.title}` : `Complete ${c.title}`} title={done ? "Reopen" : "Mark done"} onClick={() => complete(c)} className={`mt-[2px] grid h-[16px] w-[16px] shrink-0 place-items-center rounded-full border-[1.5px] transition ${done ? "border-ok bg-ok text-white" : "border-fg/35 text-transparent hover:border-ok hover:text-ok"}`}><Icon name="check" size={10} /></button>}
-                      <Link href={`/tasks/${c.id}`} draggable={false} onClick={(e) => { if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return; e.preventDefault(); if (selecting) toggle(c.id); else setLightbox(c.id); }} className={`block text-[13.5px] leading-snug ${done ? "text-dim line-through" : ""}`}>{c.title}</Link></div>
+                      <Link href={`/tasks/${c.id}`} draggable={false} onClick={(e) => { if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return; e.preventDefault(); if (selecting) toggle(c.id); else show(c.id); }} className={`block text-[13.5px] leading-snug ${done ? "text-dim line-through" : ""}`}>{c.title}</Link></div>
                     {(c.tags.length > 0 || !!c.sub_total || c.repeat || c.due || c.priority !== 0 || !!c.estimate || (projectId === null && !!c.project_name)) && (
                       <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 pl-[24px] text-[11px] text-mute">
                         {projectId === null && c.project_name && <span className="inline-flex items-center gap-1" title="Project"><span className="h-2 w-2 rounded-full" style={{ background: c.project_color ?? "currentColor" }} />{c.project_name}</span>}{c.tags.map((g) => <Pill key={g} name={g} />)}
@@ -85,7 +90,7 @@ export function Board({ columns, cards, today, projectId = null, hiddenNote, too
                         {c.priority > 0 && <Icon name="chevUp2" size={13} className="text-danger" />}{c.priority < 0 && <Icon name="chevDown1" size={13} className="text-accent" />}
                       </div>)}
                     <div className="absolute right-1 top-1 flex text-mute [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:transition-opacity [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-within:opacity-100">
-                      <button onClick={() => setLightbox(c.id)} aria-label={`Open ${c.title}`} title="Open" className="grid h-5 w-5 place-items-center rounded hover:bg-raise hover:text-fg"><Icon name="ext" size={12} /></button>
+                      <button onClick={() => show(c.id)} aria-label={`Open ${c.title}`} title="Open" className="grid h-5 w-5 place-items-center rounded hover:bg-raise hover:text-fg"><Icon name="ext" size={12} /></button>
                       <button onClick={() => remove(c)} aria-label={`Delete ${c.title}`} title="Delete" className="grid h-5 w-5 place-items-center rounded hover:bg-raise hover:text-danger"><Icon name="trash" size={12} /></button>
                     </div>
                   </li>

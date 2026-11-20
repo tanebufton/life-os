@@ -7,8 +7,10 @@ import { Icon } from "./Icon";
  * A task in a pop-up, so you don't lose your place on the board. It shows the real task page (with the app chrome hidden), so everything works:
  * edit, subtasks, comments, delete. Closing it, or leaving the task (e.g. after deleting), brings you back to the board.
  */
-export function TaskLightbox({ id, onClose }: { id: number; onClose: () => void }) {
-  const frame = useRef<HTMLIFrameElement>(null), closeRef = useRef(onClose); closeRef.current = onClose;
+export function TaskLightbox({ id, onClose: done }: { id: number; onClose: (changed: boolean) => void }) {
+  const frame = useRef<HTMLIFrameElement>(null), dirty = useRef(false), closeRef = useRef(() => done(dirty.current)), onClose = () => done(dirty.current); closeRef.current = onClose;
+  // The embedded page tells us when it saved something, so the board only reloads if it needs to.
+  useEffect(() => { const m = (e: MessageEvent) => { if (e.origin === location.origin && e.data === "lifeos:changed") dirty.current = true; }; window.addEventListener("message", m); return () => window.removeEventListener("message", m); }, []);
   // The browser's Back (a swipe on a phone) closes the pop-up and stays on the board, instead of leaving the page.
   useEffect(() => {
     history.pushState({ ...(history.state ?? {}), lifeosLightbox: true }, "");
