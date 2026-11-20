@@ -2,7 +2,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { deleteTaskInline, patchTask, restoreTaskAction, toggleTask } from "@/lib/actions";
+import { deleteTaskInline, duplicateTaskAction, patchTask, restoreTaskAction, startFocus, toggleTask } from "@/lib/actions";
 import { moveTaskToProjectAction } from "@/lib/actions5";
 import { addDays } from "@/lib/dates";
 import { Icon } from "./Icon";
@@ -10,7 +10,7 @@ import { Icon } from "./Icon";
 type Proj = { id: number; name: string; color: string };
 /** Right-click any task (a list row or a board card) for the common changes, without opening it. */
 export function TaskMenu({ today, projects }: { today: string; projects: Proj[] }) {
-  const router = useRouter(), [m, setM] = useState<{ id: number; x: number; y: number } | null>(null), [sub, setSub] = useState<null | "move">(null), ref = useRef<HTMLDivElement>(null);
+  const router = useRouter(), [m, setM] = useState<{ id: number; x: number; y: number; focus?: boolean } | null>(null), [sub, setSub] = useState<null | "move">(null), ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const ctx = (e: MouseEvent) => {
       const el = (e.target as HTMLElement | null)?.closest?.("[data-task-id], [data-ctx-task]") as HTMLElement | null;
@@ -18,9 +18,11 @@ export function TaskMenu({ today, projects }: { today: string; projects: Proj[] 
       const id = Number(el.dataset.taskId ?? el.dataset.ctxTask); if (!id) return;
       e.preventDefault(); setSub(null); setM({ id, x: Math.min(e.clientX, innerWidth - 232), y: Math.min(e.clientY, innerHeight - 330) });
     };
+    const fromButton = (e: Event) => { const d = (e as CustomEvent<{ id: number; x: number; y: number; focus?: boolean }>).detail; setSub(null); setM({ id: d.id, focus: d.focus, x: Math.max(8, Math.min(d.x - 224, innerWidth - 232)), y: Math.min(d.y, innerHeight - 380) }); };
+    window.addEventListener("lifeos:taskmenu", fromButton);
     const close = (e: Event) => { if (e instanceof KeyboardEvent ? e.key === "Escape" : !ref.current?.contains(e.target as Node)) setM(null); };
     document.addEventListener("contextmenu", ctx); document.addEventListener("mousedown", close); document.addEventListener("keydown", close); window.addEventListener("scroll", () => setM(null), true);
-    return () => { document.removeEventListener("contextmenu", ctx); document.removeEventListener("mousedown", close); document.removeEventListener("keydown", close); };
+    return () => { window.removeEventListener("lifeos:taskmenu", fromButton); document.removeEventListener("contextmenu", ctx); document.removeEventListener("mousedown", close); document.removeEventListener("keydown", close); };
   }, []);
   if (!m) return null;
   const run = async (f: () => Promise<unknown>) => { setM(null); await f(); router.refresh(); };
@@ -46,6 +48,8 @@ export function TaskMenu({ today, projects }: { today: string; projects: Proj[] 
         <div className="my-1 border-t" />
         <button role="menuitem" className={it} onClick={() => setSub("move")}><Icon name="list" size={14} className="text-mute" />Move to project<Icon name="chevRight" size={13} className="ml-auto text-dim" /></button>
         <button role="menuitem" className={it} onClick={() => { const id = m.id; setM(null); void navigator.clipboard.writeText(`${location.origin}/tasks/${id}`).then(() => toast("Link copied")); }}><Icon name="link" size={14} className="text-mute" />Copy link</button>
+        {m.focus && <button role="menuitem" className={it} onClick={() => { const id = m.id; void run(async () => { await startFocus(id); router.push(`/focus?task=${id}`); }); }}><Icon name="focus" size={14} className="text-accent" />Start focus</button>}
+        <button role="menuitem" className={it} onClick={() => { const id = m.id; void run(async () => { const n = await duplicateTaskAction(id); if (n) toast("Task duplicated", { action: { label: "Open", onClick: () => router.push(`/tasks/${n}`) } }); }); }}><Icon name="copy" size={14} className="text-mute" />Duplicate</button>
         <button role="menuitem" className={`${it} text-danger`} onClick={() => { const id = m.id; void run(async () => { const r = await deleteTaskInline(id); if (r) toast(`Deleted “${r.title}”`, { action: { label: "Undo", onClick: () => void restoreTaskAction(id).then(() => router.refresh()) } }); }); }}><Icon name="trash" size={14} />Delete</button>
       </>}
     </div>

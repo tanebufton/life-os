@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { addProject } from "@/lib/actions";
 import { moveProjectToAreaAction, moveTaskToProjectAction, reorderProjectsAction, resetSidebarAction, saveSidebarAction } from "@/lib/actions5";
 import type { Fav } from "@/lib/favourites";
@@ -9,6 +9,7 @@ import { arrange, withVisibility, EMPTY_PREFS, type SidebarPrefs } from "@/lib/s
 import { toast } from "sonner";
 import { NAV, SETTINGS_PAGE, visiblePages, type Features, type NavPage } from "@/lib/nav";
 import { CaptureForm } from "./capture";
+import { useBackToClose } from "@/lib/useback";
 import { FocusChip } from "./focuschip";
 import { Icon } from "./Icon";
 import { ProjectAvatar } from "./Pill";
@@ -192,6 +193,11 @@ function crumbs(path: string, projects: NavProject[]): string[] {
 export function Topbar({ today, projects }: { today: string; projects: NavProject[] }) {
   const path = usePathname();
   const c = crumbs(path, projects);
+  // Browser tab titles that say where you are, so several open tabs are easy to tell apart.
+  useEffect(() => {
+    const t = setTimeout(() => { const el = document.querySelector("main h1, main input[aria-label=Title]") as HTMLElement | null; const name = ((el as HTMLInputElement | null)?.value || el?.textContent || c[c.length - 1] || "").trim(); const full = name && name !== "LifeOS" ? `${name} · LifeOS` : "LifeOS"; document.documentElement.dataset.pageTitle = full; if (!/^\d+:\d\d · /.test(document.title)) document.title = full; }, 350);
+    return () => clearTimeout(t);
+  }, [path, c]);
   return (
     <header className="topbar sticky top-0 z-20 shrink-0 border-b bg-bg/85 backdrop-blur"><div className="flex h-12 items-center gap-4 px-4 md:px-8">
       <button onClick={() => window.dispatchEvent(new Event("lifeos:menu"))} aria-label="Open the menu" className="-ml-1 rounded-md p-1.5 text-mute hover:bg-raise hover:text-fg md:hidden"><Icon name="sidebar" size={19} /></button>
@@ -207,7 +213,8 @@ export function Topbar({ today, projects }: { today: string; projects: NavProjec
 
 /** Phone: the sidebar as a slide-in menu, opened from the button in the top bar. */
 export function MobileDrawer(props: React.ComponentProps<typeof Sidebar>) {
-  const [open, setOpen] = useState(false), path = usePathname();
+  const [open, setOpen] = useState(false), path = usePathname(), leaving = useRef(false);
+  useBackToClose(open, () => setOpen(false), leaving);
   useEffect(() => { const f = () => setOpen(true); window.addEventListener("lifeos:menu", f); return () => window.removeEventListener("lifeos:menu", f); }, []);
   useEffect(() => setOpen(false), [path]);
   useEffect(() => { if (!open) return; const k = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false); window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }, [open]);
@@ -215,7 +222,7 @@ export function MobileDrawer(props: React.ComponentProps<typeof Sidebar>) {
   return (
     <div className="drawer-root fixed inset-0 z-50 md:hidden" role="dialog" aria-label="Menu">
       <div className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
-      <div onClick={(e) => { if ((e.target as HTMLElement).closest("a")) setOpen(false); }}><Sidebar {...props} drawer /></div>
+      <div onClick={(e) => { if ((e.target as HTMLElement).closest("a")) { leaving.current = true; setOpen(false); } }}><Sidebar {...props} drawer /></div>
     </div>
   );
 }

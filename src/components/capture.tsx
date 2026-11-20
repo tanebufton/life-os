@@ -7,6 +7,7 @@ import { parseQuickAdd, repeatLabel } from "@/lib/parse";
 import { Icon } from "./Icon";
 import { clearDraft as dropDraft, peekDraft as getDraft } from "@/lib/drafts";
 import { useSession } from "./session";
+import { useBackToClose } from "@/lib/useback";
 import { Pill } from "./Pill";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -135,6 +136,7 @@ export function CaptureFab({ today, projects = [] }: { today: string; projects?:
   useEffect(() => { const f = () => setOpen(true); window.addEventListener("lifeos:capture", f); return () => window.removeEventListener("lifeos:capture", f); }, []);
   // keep the sheet just above the on-screen keyboard
   useEffect(() => { if (!open) return; const vv = window.visualViewport; if (!vv) return; const f = () => setLift(Math.max(0, window.innerHeight - vv.height - vv.offsetTop)); f(); vv.addEventListener("resize", f); vv.addEventListener("scroll", f); return () => { vv.removeEventListener("resize", f); vv.removeEventListener("scroll", f); setLift(0); }; }, [open]);
+  useBackToClose(open, () => setOpen(false));
   useEffect(() => { if (!open) return; const k = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); }; window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }, [open]);
   const path = usePathname();
   return (

@@ -41,7 +41,7 @@ export function Board({ columns, cards, today, projectId = null, hiddenNote, too
   const open = (e: React.MouseEvent | React.KeyboardEvent, id: number) => { if ((e.target as HTMLElement).closest("button, a, input")) return; if (selecting) { toggle(id); return; } setLightbox(id); };
   const closeLightbox = () => { setLightbox(null); router.refresh(); };
   /** Tick a card: it moves to the first Done column; ticking a finished one puts it back in the first To do column. */
-  const complete = (c: Card) => { const toDone = kindOf(c.status) !== "done", dest = columns.find((x) => x.kind === (toDone ? "done" : "todo")) ?? columns[0]; if (dest) move(c.id, dest.key); };
+  const complete = (c: Card) => { const toDone = kindOf(c.status) !== "done", dest = columns.find((x) => x.kind === (toDone ? "done" : "todo")) ?? columns[0]; if (!dest) return; move(c.id, dest.key); toast(c.repeat && toDone ? `Done. Next one is back in ${columns[0].name}` : toDone ? "Done" : "Reopened", { description: c.title, ...(c.repeat ? {} : { action: { label: "Undo", onClick: () => move(c.id, c.status) } }) }); };
   const remove = (c: Card) => start(async () => { const r = await deleteTaskInline(c.id); if (r) toast(`Deleted “${r.title}”`, { action: { label: "Undo", onClick: () => void restoreTaskAction(c.id).then(() => router.refresh()) } }); else toast("Couldn't delete that"); router.refresh(); });
 
   return (

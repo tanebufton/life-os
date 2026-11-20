@@ -13,7 +13,7 @@ import { Icon } from "./Icon";
 export function FocusChip() {
   const path = usePathname(), onFocus = path.startsWith("/focus"), [chip, setChip] = useState<{ text: string; label: string; hot: boolean } | null>(null), busy = useRef(false);
   useEffect(() => {
-    const oldTitle = document.title;
+    let showing = false; const pageTitle = () => document.documentElement.dataset.pageTitle || "LifeOS"; // the page's own title, put back when no timer is running
     const tick = () => {
       const now = Date.now(); let best: { left: number; label: string; hot: boolean } | null = null;
       const p = load<P | null>("lifeos.pomo", null);
@@ -34,10 +34,10 @@ export function FocusChip() {
       if (!onFocus && ts.some((t) => !t.done && t.endsAt <= now)) { beep(); for (const t of ts) if (!t.done && t.endsAt <= now) notify("Timer done", t.label || mmss(t.total)); save("lifeos.timers", ts.map((t) => (!t.done && t.endsAt <= now ? { ...t, done: true } : t))); }
       for (const t of ts) if (!t.done && t.endsAt > now) { const left = Math.ceil((t.endsAt - now) / 1000); if (!best || left < best.left) best = { left, label: t.label || "Timer", hot: false }; }
       setChip(best ? { text: mmss(best.left), label: best.label, hot: best.hot } : null);
-      if (best && !onFocus) document.title = `${mmss(best.left)} · ${best.label}`; else document.title = oldTitle;
+      if (best && !onFocus) { showing = true; document.title = `${mmss(best.left)} · ${best.label}`; } else if (showing) { showing = false; document.title = pageTitle(); }
     };
     tick(); const i = setInterval(tick, 500);
-    return () => { clearInterval(i); document.title = oldTitle; };
+    return () => { clearInterval(i); if (showing) document.title = pageTitle(); };
   }, [onFocus]);
   if (!chip || onFocus) return null;
   return <Link href="/focus" title="Open Focus" className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[13px] font-medium tabular-nums transition hover:bg-raise ${chip.hot ? "border-accent/40 text-accent" : "text-fg"}`}><Icon name="focus" size={14} className={chip.hot ? "animate-pulse" : ""} />{chip.text}<span className="hidden text-xs font-normal text-mute lg:inline">{chip.label}</span></Link>;
