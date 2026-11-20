@@ -6,6 +6,7 @@ import { CaptureFab } from "@/components/capture";
 import { ListKeys, ShortcutsHelp } from "@/components/keys";
 import { Palette } from "@/components/palette";
 import { PwaRegister } from "@/components/pwa";
+import { KeyboardAware } from "@/components/keyboardaware";
 import { TaskMenu } from "@/components/taskmenu";
 import { ReminderWatcher } from "@/components/reminderwatcher";
 import { browserNotifyConfig } from "@/lib/browsernotify";
@@ -23,7 +24,7 @@ import { today } from "@/lib/time";
 
 export const metadata = { title: "LifeOS", applicationName: "LifeOS", appleWebApp: { capable: true, title: "LifeOS", statusBarStyle: "default" as const }, icons: { icon: "/icons/icon.svg", apple: "/icons/apple-touch-icon.png" } };
 export const dynamic = "force-dynamic";
-export const viewport = { width: "device-width", initialScale: 1, themeColor: "#1877f2" };
+export const viewport = { width: "device-width", initialScale: 1, themeColor: "#1877f2", interactiveWidget: "resizes-content" as const };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const t = today();
@@ -58,6 +59,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Palette projects={projects} features={features} />
         <Hotkeys features={features} />
         <ListKeys />
+        <KeyboardAware />
         <TaskMenu today={t} projects={projects.map((p) => ({ id: p.id, name: p.name, color: p.color }))} />
         <ShortcutsHelp />
       </body>

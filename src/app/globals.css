@@ -100,3 +100,6 @@ html[data-embed] .page { max-width: none; padding-top: 1rem; padding-bottom: 2re
 
 /* When the text size is changed with zoom, keep the app filling the screen */
 .shell { height: calc(100dvh / var(--z, 1)) !important; }
+
+/* On-screen keyboard up: give the space back to the page */
+html[data-kb] .mobilenav, html[data-kb] .fab { display: none !important; }
