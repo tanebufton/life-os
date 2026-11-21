@@ -1,0 +1,30 @@
+import assert from "node:assert/strict"; import http from "node:http";
+import { SignJWT, exportJWK, generateKeyPair } from "jose";
+const good = await generateKeyPair("RS256"), other = await generateKeyPair("RS256");
+const jwk = { ...(await exportJWK(good.publicKey)), kid: "k1", alg: "RS256", use: "sig" };
+const srv = http.createServer((_q, res) => { res.setHeader("content-type", "application/json"); res.end(JSON.stringify({ keys: [jwk] })); }); srv.listen(0, "127.0.0.1"); await new Promise((r) => srv.once("listening", r));
+const certs = `http://127.0.0.1:${(srv.address() as any).port}/certs`;
+const { checkAccess } = await import("../src/lib/access.ts");
+const TEAM = "myteam.cloudflareaccess.com", AUD = "aud-123", ME = "me@example.com";
+const env = { LIFEOS_CF_TEAM_DOMAIN: "myteam", LIFEOS_CF_AUD: AUD, LIFEOS_ADMIN_EMAIL: ME, LIFEOS_CF_CERTS_URL: certs };
+const tok = (o: { key?: any; aud?: string; email?: string; iss?: string; exp?: string | number | null; alg?: string } = {}) => { let j = new SignJWT({ email: o.email ?? ME }).setProtectedHeader({ alg: (o.alg ?? "RS256") as any, kid: "k1" }).setAudience(o.aud ?? AUD).setIssuer(o.iss ?? `https://${TEAM}`).setIssuedAt(); if (o.exp !== null) j = j.setExpirationTime(o.exp ?? "1h"); return j.sign(o.key ?? good.privateKey); };
+const run = (jwt: string | null | undefined, e = env, path = "/tasks", emailHeader?: string) => checkAccess({ pathname: path, jwt, emailHeader }, e);
+let n = 0; const ok = (m: string) => { n++; console.log("  ✓", m); };
+assert.equal((await run(await tok())).ok, true); ok("a correctly signed token for the admin email is allowed");
+assert.equal((await run(await tok({ email: "ME@Example.COM" }))).ok, true); ok("the email check ignores case");
+for (const [name, jwt] of [["no token", null], ["empty token", ""], ["garbage", "not.a.jwt"], ["signed with a different key", await tok({ key: other.privateKey })], ["wrong audience", await tok({ aud: "other-app" })], ["a different email (shared Access application)", await tok({ email: "someone@else.com" })], ["wrong issuer", await tok({ iss: "https://evil.cloudflareaccess.com" })], ["expired", await tok({ exp: Math.floor(Date.now() / 1000) - 60 })], ["no expiry", await tok({ exp: null })]] as const)
+  assert.equal((await run(jwt)).ok, false, name);
+ok("no/empty/garbage/other-key/wrong-audience/wrong-email/wrong-issuer/expired/no-expiry tokens are all refused");
+const unsigned = `${Buffer.from('{"alg":"none"}').toString("base64url")}.${Buffer.from(JSON.stringify({ email: ME, aud: AUD, iss: `https://${TEAM}`, exp: 9999999999 })).toString("base64url")}.`;
+assert.equal((await run(unsigned)).ok, false); ok("an unsigned (alg=none) token is refused");
+const hs = await new SignJWT({ email: ME }).setProtectedHeader({ alg: "HS256" }).setAudience(AUD).setIssuer(`https://${TEAM}`).setExpirationTime("1h").sign(new TextEncoder().encode("secret"));
+assert.equal((await run(hs)).ok, false); ok("an HS256 token is refused");
+assert.equal((await run(null, env, "/tasks", ME)).ok, false); ok("a spoofed identity header does not replace the token");
+assert.equal((await run(null, env, "/api/v1/tasks")).ok, true); assert.equal((await run(null, env, "/api/health")).ok, true); ok("paths with their own credentials, and health, stay reachable");
+// settings
+assert.equal((await run(await tok(), { LIFEOS_ADMIN_EMAIL: ME })).ok, false); ok("an admin email without the Access settings refuses everything (misconfiguration can't open the app)");
+assert.equal((await run(null, { LIFEOS_FAIL_CLOSED: "1" })).ok, false); ok("fail-closed refuses everything unless Access is configured");
+assert.equal((await run(await tok(), { LIFEOS_CF_TEAM_DOMAIN: "myteam", LIFEOS_CF_AUD: AUD, LIFEOS_CF_CERTS_URL: certs })).ok, true); ok("without an admin email, any valid token for the application is allowed (as before)");
+assert.equal((await run(null, {})).ok, true); ok("with nothing configured the app is open (as before: put it behind Access)");
+assert.equal((await run(null, { LIFEOS_REQUIRE_CF_ACCESS: "1" })).ok, false); assert.equal((await run(null, { LIFEOS_REQUIRE_CF_ACCESS: "1" }, "/", "a@b.c")).ok, true); ok("the basic header mode still works");
+srv.close(); console.log(`  ${n} checks`);

@@ -35,6 +35,7 @@ Zero Trust → **Networks → Tunnels → Create tunnel (Cloudflared)**. Copy th
 ## 3. Cloudflare Access (the login)
 Zero Trust → **Access → Applications → Add → Self-hosted**, for the same hostname, with a policy that allows only your email. Then:
 - Copy the **Application Audience (AUD) tag** to `LIFEOS_CF_AUD`, and your team name (`<team>.cloudflareaccess.com`) to `LIFEOS_CF_TEAM_DOMAIN`. With these set, LifeOS verifies the signed Access token on every request, so nothing that reaches the app by another route can pretend to be you.
+- **Only you:** set `LIFEOS_ADMIN_EMAIL` to your address. LifeOS then also requires the token's email to match, which matters if one Access application (and so one AUD tag) covers several of your sites: Cloudflare alone lets everyone on that policy reach every site. Set `LIFEOS_FAIL_CLOSED=1` too and LifeOS refuses all requests whenever the Access settings are missing, instead of running open. An admin email without the team name and AUD tag also refuses everything.
 - **Session length:** set the application's session duration to what you like. When it ends, LifeOS keeps what you were typing, shows "Your session has expired", and saves automatically once you sign in again (it opens a new tab for that).
 - **The most secure setup opens nothing.** Leave the Cloudflare hostname fully behind Access, add **no Bypass policies**, and use the options below for everything that can't sign in through a login page:
 

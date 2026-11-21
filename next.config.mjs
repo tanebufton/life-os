@@ -4,6 +4,7 @@ const allowed = [];
 try { if (base) allowed.push(new URL(base).host); } catch { /* ignore a malformed value */ }
 const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "Strict-Transport-Security", value: "max-age=31536000" }, // browsers only honour this over https; no includeSubDomains, so other sites on the domain are unaffected
   { key: "Referrer-Policy", value: "no-referrer" }, // keeps secret URLs (calendar feed etc.) out of Referer headers
   { key: "X-Frame-Options", value: "SAMEORIGIN" },
   { key: "Permissions-Policy", value: "camera=(), geolocation=(), microphone=(self)" }, // microphone only for voice memos
