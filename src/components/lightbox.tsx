@@ -8,7 +8,15 @@ import { Icon } from "./Icon";
  * edit, subtasks, comments, delete. Closing it, or leaving the task (e.g. after deleting), brings you back to the board.
  */
 export function TaskLightbox({ id, onClose: done }: { id: number; onClose: (changed: boolean) => void }) {
-  const frame = useRef<HTMLIFrameElement>(null), dirty = useRef(false), closing = useRef(false), leave = () => done(dirty.current);
+  const frame = useRef<HTMLIFrameElement>(null), dirty = useRef(false), closing = useRef(false), popped = useRef(false), pushed = useRef(false), finished = useRef(false), openedAt = useRef(Date.now());
+  const finish = () => { if (finished.current) return; finished.current = true; done(dirty.current); };
+  /** Step back past our history entry first, and only then let the board refresh. Otherwise Next.js restoring its saved page for that entry would overwrite the fresh data with the old. */
+  const leave = () => {
+    if (popped.current || !pushed.current) { setTimeout(finish, 0); return; }
+    const t = setTimeout(finish, 700); // fallback if no popstate arrives
+    window.addEventListener("popstate", () => { clearTimeout(t); setTimeout(finish, 0); }, { once: true });
+    popped.current = true; history.back();
+  };
   /** Close, but first let the task page finish saving: leave the field you were in, send any change still waiting out its pause, and wait for requests in flight. Closing at once would tear the page down mid-save. */
   const onClose = async () => {
     if (closing.current) return; closing.current = true;
@@ -27,10 +35,10 @@ export function TaskLightbox({ id, onClose: done }: { id: number; onClose: (chan
   useEffect(() => { const m = (e: MessageEvent) => { if (e.origin === location.origin && e.data === "lifeos:changed") dirty.current = true; }; window.addEventListener("message", m); return () => window.removeEventListener("message", m); }, []);
   // The browser's Back (a swipe on a phone) closes the pop-up and stays on the board, instead of leaving the page.
   useEffect(() => {
-    history.pushState({ ...(history.state ?? {}), lifeosLightbox: true }, "");
-    let popped = false; const pop = () => { popped = true; void closeRef.current(); };
+    history.pushState({ ...(history.state ?? {}), lifeosLightbox: true }, ""); pushed.current = true;
+    const pop = () => { popped.current = true; void closeRef.current(); };
     window.addEventListener("popstate", pop);
-    return () => { window.removeEventListener("popstate", pop); if (!popped && history.state?.lifeosLightbox) history.back(); };
+    return () => { window.removeEventListener("popstate", pop); if (pushed.current && !popped.current) { popped.current = true; history.back(); } };
   }, []);
   useEffect(() => {
     const k = (e: KeyboardEvent) => { if (e.key === "Escape") void closeRef.current(); };
@@ -47,7 +55,7 @@ export function TaskLightbox({ id, onClose: done }: { id: number; onClose: (chan
     } catch { /* cross-origin: leave it */ }
   };
   return (
-    <div className="fixed inset-0 z-[60] grid place-items-center bg-black/50 p-3 md:p-8" role="dialog" aria-modal="true" aria-label="Task" onMouseDown={(e) => { if (e.target === e.currentTarget) void onClose(); }}>
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-black/50 p-3 md:p-8" role="dialog" aria-modal="true" aria-label="Task" onMouseDown={(e) => { if (e.target === e.currentTarget && Date.now() - openedAt.current > 700) void onClose(); }}>
       <div className="flex h-full max-h-[900px] w-full max-w-[1100px] flex-col overflow-hidden rounded-2xl border bg-bg shadow-[0_20px_60px_rgb(0_0_0/0.35)]">
         <div className="flex shrink-0 items-center justify-between border-b px-4 py-2">
           <Link href={`/tasks/${id}`} className="inline-flex items-center gap-1.5 text-[13px] text-mute hover:text-fg"><Icon name="ext" size={14} />Open full page</Link>
