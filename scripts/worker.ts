@@ -9,6 +9,7 @@ import { getSetting, setSetting } from "../src/lib/settings";
 import { pollOnce, tgMode, tgToken } from "../src/lib/telegram";
 import { pruneActivity, setProcessActor } from "../src/lib/activity";
 import { syncAll } from "../src/lib/calendar";
+import { runBoardAutomations } from "../src/lib/automations";
 
 setProcessActor("worker");
 const log = (...a: unknown[]) => console.log(new Date().toISOString().slice(11, 19), ...a);
@@ -16,6 +17,7 @@ let busy = false;
 async function tick(n: number) {
   if (busy) return; busy = true;
   try {
+    const mv = runBoardAutomations({ force: true }); if (mv) log(`board automations moved ${mv} card${mv === 1 ? "" : "s"}`);
     const sent = await runReminders(); if (sent) log(`sent ${sent} notification${sent === 1 ? "" : "s"}`);
     if (n % 30 === 0 && isOn("calendar")) { const r = await syncAll(); const c = Object.values(r).reduce((a, x) => a + x.events, 0); if (Object.keys(r).length) log(`synced ${Object.keys(r).length} calendar${Object.keys(r).length === 1 ? "" : "s"} (${c} events)`); }
     if (n % 20 === 0) { const b = await backupIfDue(); if (b.ran) { if (b.error) { log("backup failed:", b.error); const d = new Date().toISOString().slice(0, 10); if (getSetting("backup_alert_day") !== d) { setSetting("backup_alert_day", d); await notify({ title: "LifeOS backup failed", body: b.error, tags: ["warning"] }).catch(() => {}); } } else log("backup completed and verified"); } }

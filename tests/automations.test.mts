@@ -1,0 +1,25 @@
+import assert from "node:assert/strict";
+const A = await import("../src/lib/automations.ts"); const T = await import("../src/lib/tasks.ts"); const { db, dbFile } = await import("../src/lib/db.ts"); const { today } = await import("../src/lib/time.ts"); const { addDays } = await import("../src/lib/dates.ts");
+const Database = (await import("better-sqlite3")).default;
+let n = 0; const ok = (m: string) => { n++; console.log("  ✓", m); };
+const t0 = today();
+db.prepare("INSERT INTO statuses (project_id, key, name, kind, position) VALUES (NULL, 'today', 'Today', 'doing', 1)").run();
+const rev = () => (db.prepare("SELECT rev FROM data_rev WHERE id=1").get() as { rev: number }).rev;
+const r0 = rev(); T.createTask({ title: "bump" }); assert.ok(rev() > r0); ok("any change bumps the change counter");
+const other = new Database(dbFile); const r1 = rev(); other.prepare("UPDATE tasks SET title='bump2' WHERE title='bump'").run(); other.close(); assert.ok(rev() > r1); ok("a change from another connection (the worker, the MCP server) bumps it too");
+
+const first = T.createTask({ title: "Already in Today", due: addDays(t0, 5) }); db.prepare("UPDATE tasks SET status='today', position=100 WHERE id=?").run(first);
+const due = T.createTask({ title: "Due today", due: t0 }), later = T.createTask({ title: "Due in ten days", due: addDays(t0, 10) }), none = T.createTask({ title: "No date" }), dn = T.createTask({ title: "Finished", due: t0 }); T.completeTask(dn);
+const stale = T.createTask({ title: "Overdue before the rule", due: addDays(t0, -4) });
+const rid = A.saveRule({ project_id: null, offset_days: 0, column_key: "today", to_top: true, set_priority: 1 });
+assert.equal(A.runBoardAutomations({ force: true }), 1);
+let c = T.getTask(due)!; assert.equal(c.status, "today"); assert.equal(c.priority, 1); assert.ok((c.position ?? 0) < 100); ok("on the due date the card moves to the column, to the top, with the priority set");
+assert.equal(T.getTask(later)!.status, "todo"); assert.equal(T.getTask(none)!.status, "todo"); assert.equal(T.getTask(dn)!.status, "done"); ok("cards that aren't due, have no date, or are finished are left alone");
+assert.equal(T.getTask(stale)!.status, "todo"); ok("cards already overdue when the rule was made are left where they are");
+T.setStatus(due, "todo"); assert.equal(A.runBoardAutomations({ force: true }), 0); assert.equal(T.getTask(due)!.status, "todo"); ok("a card you move back by hand stays put (once per due date)");
+T.updateTask(due, { due: addDays(t0, 3) }); assert.equal(A.runBoardAutomations({ force: true, now: addDays(t0, 3) }), 1); assert.equal(T.getTask(due)!.status, "today"); ok("a new due date triggers it again when that day comes");
+A.saveRule({ id: rid, project_id: null, offset_days: 1, column_key: "today", to_top: true, set_priority: null }); assert.equal(A.runBoardAutomations({ force: true, now: addDays(t0, 9) }), 1); assert.equal(T.getTask(later)!.status, "today"); ok("\"1 day before\" catches the cards due the next day");
+assert.throws(() => A.saveRule({ project_id: null, offset_days: 0, column_key: "done", to_top: true, set_priority: null })); assert.throws(() => A.saveRule({ project_id: null, offset_days: 0, column_key: "nope", to_top: true, set_priority: null })); ok("rules can't target a Done column or a column that doesn't exist");
+db.prepare("UPDATE board_rules SET enabled=0 WHERE id=?").run(rid); const x = T.createTask({ title: "Off", due: t0 }); assert.equal(A.runBoardAutomations({ force: true }), 0); assert.equal(T.getTask(x)!.status, "todo"); ok("a switched-off rule does nothing");
+assert.equal(A.deleteRule(rid), true); assert.equal(A.listRules(null).length, 0); ok("rules can be deleted");
+console.log(`  ${n} checks`);

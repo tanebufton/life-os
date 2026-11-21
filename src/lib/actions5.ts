@@ -10,6 +10,7 @@ import { toggleFavourite, type FavKind } from "./favourites";
 import { PROJECT_VIEWS } from "./projectviews";
 import { redirect } from "next/navigation";
 import { setSetting } from "./settings";
+import { deleteRule, runBoardAutomations, saveRule, type RuleInput } from "./automations";
 import { parsePrefs } from "./sidebar";
 import { createTask, deleteTask, getTask, moveCard, parseQuickAdd, parseTags, queryTasks, reschedule, setStatus, setTaskOrder, updateTask } from "./tasks";
 import { today } from "./time";
@@ -128,3 +129,7 @@ export async function toggleFavouriteAction(kind: FavKind, id: number): Promise<
 export async function moveNoteAction(id: number, parentId: number | null): Promise<R> { return run(() => { const e = moveNote(id, parentId); if (e) throw new Error(e); return "Moved"; }); }
 export async function newSubpageAction(parentId: number) { const id = createNote("", "", null, parentId); revalidatePath("/", "layout"); redirect(`/notes/${id}`); }
 export async function setNoteIconAction(id: number, icon: string): Promise<R> { return run(() => { db.prepare("UPDATE notes SET icon=? WHERE id=?").run(cleanIcon(icon), id); }); }
+
+// ---------- board automations ----------
+export async function saveRuleAction(i: RuleInput): Promise<R> { return run(() => { saveRule(i); const n = runBoardAutomations({ force: true }); return n ? `Saved. ${n} card${n === 1 ? "" : "s"} moved now` : "Saved"; }); }
+export async function deleteRuleAction(id: number): Promise<R> { return run(() => { deleteRule(id); return "Automation removed"; }); }

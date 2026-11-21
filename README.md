@@ -36,7 +36,7 @@ On a phone it uses a bottom bar (which can hold a project of your choice), a sli
 
 **Organise**
 - **Projects** with their own overview, list, board, table and notes. Group them into **areas**, give them an emoji, reorder them by dragging, pick the view they open to, and drag any task onto a project in the sidebar to move it.
-- **Boards** with custom columns (per project if you like), filters, sorting, bulk edit, drag between columns, tick to complete.
+- **Boards** with custom columns (per project if you like), filters, sorting, bulk edit, drag between columns, tick to complete. **Automations**: for example, on the due date move the card to your Today column, at the top. Boards also **update live** across your tabs and devices.
 - **Notes**: Markdown, `[[links]]`, pages and sub-pages, backlinks, version history, and conflict protection if two devices edit at once.
 - **Goals** with key results, **Templates** (a task plus its checklist in one click), **Tags** (rename, merge, recolour; they keep the capitals you type), **Favourites** pinned in the sidebar, **links** between any tasks, notes and goals.
 - Subtasks (editable in place), repeating tasks, saved searches with operators (`#tag @project due:week is:overdue no:date has:link`), manual ordering, trash with undo.
