@@ -1,23 +1,26 @@
 # syntax=docker/dockerfile:1
 # One image runs everything: the web app (default), the worker, and the MCP server (see docker-compose.yml).
-# Built in three stages so BuildKit can do the slow parts side by side and cache each one on its own:
-#   deps  - production node_modules (rebuilt only when package-lock.json changes)
-#   build - all dependencies + the Next.js build (rebuilt when the source changes)
-#   final - a small runtime image assembled from the two
+# Built in stages so each slow part is cached on its own:
+#   deps-all - every dependency, installed once (rebuilt only when package-lock.json changes)
+#   deps     - the same with dev packages removed (also only when package-lock.json changes)
+#   build    - the Next.js build (rebuilt when the source changes)
+#   final    - a small runtime image assembled from deps and build
 FROM node:22-bookworm-slim AS base
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 
-FROM base AS deps
+# One network install, shared by both stages below (two parallel installs competed for CPU on small servers and each took twice as long).
+FROM base AS deps-all
 COPY package.json package-lock.json ./
 # better-sqlite3 ships a prebuilt binary for common platforms, so no compiler is needed. If there isn't one, install a compiler and try again.
-RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev \
- || (apt-get update && apt-get install -y --no-install-recommends python3 make g++ && rm -rf /var/lib/apt/lists/* && npm ci --omit=dev)
+RUN --mount=type=cache,target=/root/.npm npm ci --no-audit --no-fund --prefer-offline \
+ || (apt-get update && apt-get install -y --no-install-recommends python3 make g++ && rm -rf /var/lib/apt/lists/* && npm ci --no-audit --no-fund)
 
-FROM base AS build
-COPY package.json package-lock.json ./
-RUN --mount=type=cache,target=/root/.npm npm ci \
- || (apt-get update && apt-get install -y --no-install-recommends python3 make g++ && rm -rf /var/lib/apt/lists/* && npm ci)
+# Production dependencies only: the same install with the dev packages taken out (no network, a few seconds, cached until package-lock.json changes).
+FROM deps-all AS deps
+RUN npm prune --omit=dev --no-audit --no-fund
+
+FROM deps-all AS build
 COPY . .
 # Types are already checked before every commit, so the server skips that slow step (see next.config.mjs).
 ENV LIFEOS_FAST_BUILD=1
