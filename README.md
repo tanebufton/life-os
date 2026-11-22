@@ -31,7 +31,7 @@ On a phone it uses a bottom bar (which can hold a project of your choice), a sli
 - **Today** with a workload meter (estimates against your daily capacity), **Inbox**, **Upcoming** (agenda, week and month), and a **Planner** timeline that can auto-schedule into free slots around your calendar.
 - **Workload bars** on every day of the week and agenda show when you're overbooked. **Move all overdue** to today, tomorrow or next week in one click, or triage them one by one in **Plan & review**.
 - **Focus**: a Pomodoro and timers that keep running while you move around the app, with a countdown in the top bar.
-- **Reminders**: a browser notification with **Mark done** and **Snooze** (15 minutes by default) while LifeOS is open, plus ntfy or webhook push and a morning brief from the worker.
+- **Reminders**: a notification with **Mark done** and **Snooze** (15 minutes by default). With **push notifications** on (Settings → Reminders, once per device) they arrive even when LifeOS is closed, on desktop browsers, Android, and iPhone once it's added to the Home Screen. Also ntfy, a webhook or Telegram, and a morning brief, all sent by the worker.
 - **Calendar sync** (read-only, from any private `.ics` link) and a subscribable **iCal feed** of your tasks.
 
 **Organise**
@@ -97,7 +97,7 @@ Settings is organised into tabs: **General** (features, time and capacity, layou
 | **Chrome extension** | Download from Settings → Connections. The recorder opens from the toolbar icon (or Alt+Shift+V), sends text to `/api/v1/voice`, and can file everything under a default project. The microphone is allowed once on its options page. See `extension/README.md`. |
 | **Email to tasks** | Webhook: POST any email (Postmark, Mailgun, SendGrid, JSON, or raw RFC 822 from a Cloudflare Email Worker) to the URL in Settings. Or IMAP: set `LIFEOS_IMAP_HOST/USER/PASS` (+ `_MAILBOX`, `_FLAGGED_ONLY=1`) and run the worker. The subject accepts quick-add syntax; `tasks+work@` adds the tag `work`; duplicates are skipped. |
 | **Calendar** | Subscribe to the iCal URL in Settings from Google, Apple or Outlook. To show your own calendars in LifeOS, paste a private `.ics` link under Calendar sync (read-only, refreshed by the worker). |
-| **Push** | ntfy topic and/or any webhook; due-time reminders and a morning brief. Needs `npm run worker` and `LIFEOS_BASE_URL` for tap-through links. |
+| **Push** | **Web Push**: Settings → Reminders → *Turn on push for this device*. Nothing to configure: the server makes its own keys, and only needs outbound https to the browsers' push services. Reminders follow the Browser reminders timing and snooze, respect quiet hours, and never show twice next to the in-tab pop-up. If your Access sign-in has ended, *Mark done* opens the task (through sign-in) with the buttons waiting, so no bypass is needed. On iPhone/iPad it needs iOS 16.4+ and LifeOS added to the Home Screen. Or use an ntfy topic and/or any webhook. All need `npm run worker`; set `LIFEOS_BASE_URL` for tap-through links. |
 | **Telegram** | Create a bot with @BotFather, paste the token in Settings, send the shown `/start <code>` to link your chat. Polling by default (no public URL needed). Free text adds a task; `/today /inbox /done 12 /search /brief`. |
 | **AI assistant** | Off by default. Set `ANTHROPIC_API_KEY` and switch it on: smart paste, plan-my-day and ask. Text is sent to Anthropic only when you press a button. |
 

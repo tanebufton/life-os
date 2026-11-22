@@ -3,7 +3,7 @@ import { queryTasks } from "./tasks";
 
 import { entityTags } from "./entitytags";
 const all = (table: string) => { try { return db.prepare(`SELECT * FROM ${table}`).all(); } catch { return []; } };
-const SECRET = /^(spotify_|ntfy_token|ical_secret|inbound_secret|webhook_url|telegram_|backup_)/;
+const SECRET = /^(spotify_|ntfy_token|ical_secret|inbound_secret|webhook_url|telegram_|backup_|vapid_private)/;
 export function exportAll() {
   const settings = Object.fromEntries((db.prepare("SELECT key, value FROM settings").all() as { key: string; value: string }[]).filter((r) => !SECRET.test(r.key)).map((r) => [r.key, r.value]));
   return {

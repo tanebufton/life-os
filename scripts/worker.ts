@@ -1,4 +1,4 @@
-// Background worker: reminders + morning brief (ntfy/webhook), and IMAP email import.  Run with: npm run worker
+// Background worker: reminders + morning brief (Web Push/ntfy/webhook), and IMAP email import.  Run with: npm run worker
 import { db } from "../src/lib/db";
 import { isOn } from "../src/lib/features";
 import { imapConfigured, pollMailbox } from "../src/lib/imap";
@@ -10,6 +10,7 @@ import { pollOnce, tgMode, tgToken } from "../src/lib/telegram";
 import { pruneActivity, setProcessActor } from "../src/lib/activity";
 import { syncAll } from "../src/lib/calendar";
 import { runBoardAutomations } from "../src/lib/automations";
+import { listDevices } from "../src/lib/webpush";
 
 setProcessActor("worker");
 const log = (...a: unknown[]) => console.log(new Date().toISOString().slice(11, 19), ...a);
@@ -26,7 +27,7 @@ async function tick(n: number) {
     if (n % 2880 === 0) db.prepare("DELETE FROM notifications_sent WHERE sent_at < datetime('now','-14 days')").run();
   } catch (e) { log("worker error:", (e as Error).message); } finally { busy = false; }
 }
-log(`LifeOS worker started · reminders ${isOn("reminders") ? "on" : "off"} · IMAP ${imapConfigured() ? "configured" : "not configured"}`);
+log(`LifeOS worker started · reminders ${isOn("reminders") ? "on" : "off"} · push devices ${listDevices().length} · IMAP ${imapConfigured() ? "configured" : "not configured"}`);
 let n = 0; void tick(n++); setInterval(() => void tick(n++), 30_000);
 
 // Telegram long-polling runs in its own loop (a poll waits up to ~25 s for a message, which would stall the 30 s tick).

@@ -39,12 +39,37 @@ self.addEventListener("message", (e) => {
 });
 
 // Task reminders: the notification's buttons talk to LifeOS directly, so they work even if you don't switch to the tab.
+// If that can't go through (most often: the Cloudflare Access sign-in has ended while LifeOS was closed), the task opens instead,
+// through sign-in, with the same Mark done / Snooze buttons waiting at the top. Nothing is skipped silently.
+const openTask = (url) => self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((cs) => { const c = cs.find((x) => new URL(x.url).origin === location.origin); if (c) { if ("navigate" in c) c.navigate(url).catch(() => {}); return c.focus(); } return self.clients.openWindow(url); });
 self.addEventListener("notificationclick", (e) => {
   const n = e.notification, d = n.data || {}; n.close();
-  if (e.action === "done" || e.action === "snooze") {
-    e.waitUntil(fetch("/api/reminders", { method: "POST", headers: { "content-type": "application/json", "x-lifeos": "1" }, credentials: "same-origin", body: JSON.stringify({ id: d.id, action: e.action, minutes: d.snooze }) })
-      .then(() => self.clients.matchAll({ type: "window" }).then((cs) => cs.forEach((c) => c.postMessage({ type: "lifeos:refresh" })))).catch(() => {}));
+  if ((e.action === "done" || e.action === "snooze") && d.id) {
+    const fallback = () => openTask(`/tasks/${encodeURIComponent(d.id)}?reminder=${e.action}`);
+    e.waitUntil(fetch("/api/reminders", { method: "POST", redirect: "manual", headers: { "content-type": "application/json", "x-lifeos": "1" }, credentials: "same-origin", body: JSON.stringify({ id: d.id, action: e.action, minutes: d.snooze }) })
+      .then(async (res) => { const j = res.ok ? await res.json().catch(() => ({})) : {}; if (!j.ok) throw new Error("not done"); })
+      .then(() => self.clients.matchAll({ type: "window" }).then((cs) => cs.forEach((c) => c.postMessage({ type: "lifeos:refresh" }))))
+      .catch(fallback));
     return;
   }
-  e.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((cs) => { const c = cs[0]; if (c) { if (d.url && "navigate" in c) c.navigate(d.url); return c.focus(); } return self.clients.openWindow(d.url || "/"); }));
+  e.waitUntil(openTask(d.url || "/"));
+});
+
+// Web Push: the server sends reminders and the morning brief here, so they arrive even when no LifeOS tab is open.
+// The tag matches the pop-up an open tab would show (task-<id>), so the same reminder never appears twice.
+self.addEventListener("push", (e) => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch { d = { title: e.data ? e.data.text() : "" }; }
+  const opts = { body: d.body || "", icon: "/icons/icon-192.png", badge: "/icons/icon-192.png", tag: d.tag || undefined, renotify: false, timestamp: Date.now(), data: { id: d.id, snooze: d.snooze, url: d.url || "/" } };
+  if (d.actions && d.id) { opts.actions = [{ action: "done", title: "Mark done" }, { action: "snooze", title: `Snooze ${d.snooze || 15} min` }]; opts.requireInteraction = true; }
+  e.waitUntil(self.registration.showNotification(d.title || "LifeOS", opts));
+});
+// Browsers can replace a push subscription at any time. Tell LifeOS the new one so reminders keep arriving.
+const keyBytes = (b64) => { const s = atob((b64 + "===".slice((b64.length + 3) % 4)).replace(/-/g, "+").replace(/_/g, "/")); return Uint8Array.from(s, (c) => c.charCodeAt(0)); };
+self.addEventListener("pushsubscriptionchange", (e) => {
+  e.waitUntil((async () => {
+    let sub = e.newSubscription;
+    if (!sub) { const k = await (await fetch("/api/push", { credentials: "same-origin" })).json(); sub = await self.registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(k.key) }); }
+    await fetch("/api/push", { method: "POST", headers: { "content-type": "application/json", "x-lifeos": "1" }, credentials: "same-origin", body: JSON.stringify({ sub: sub.toJSON(), old: e.oldSubscription ? e.oldSubscription.endpoint : undefined }) });
+  })().catch(() => {}));
 });

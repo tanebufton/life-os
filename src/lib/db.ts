@@ -157,10 +157,12 @@ function migrate(d: Database.Database) {
   if (!n2.includes("rev")) d.exec("ALTER TABLE notes ADD COLUMN rev INTEGER NOT NULL DEFAULT 0");
   const g2 = (d.prepare("PRAGMA table_info(tags)").all() as { name: string }[]).map((c) => c.name);
   if (!g2.includes("color")) d.exec("ALTER TABLE tags ADD COLUMN color TEXT");
+  // Web Push: one row per browser or installed app that turned push on (schema v11).
+  d.exec("CREATE TABLE IF NOT EXISTS push_subscriptions (id INTEGER PRIMARY KEY, endpoint TEXT NOT NULL UNIQUE, p256dh TEXT NOT NULL, auth TEXT NOT NULL, label TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL DEFAULT (datetime('now')), last_ok TEXT, last_error TEXT, fails INTEGER NOT NULL DEFAULT 0)");
 }
 
 /** Bump when the schema changes. Existing databases below this get an automatic safety copy before they are migrated. */
-export const SCHEMA_VERSION = 10;
+export const SCHEMA_VERSION = 11;
 /**
  * Before upgrading an existing database to a newer schema, save a complete copy next to it (VACUUM INTO is safe while the app runs).
  * If this can't be written the upgrade stops rather than risk your data; set LIFEOS_SKIP_UPGRADE_BACKUP=1 to override. Keeps the newest 3.

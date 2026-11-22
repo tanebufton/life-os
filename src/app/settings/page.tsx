@@ -13,6 +13,8 @@ import { OfflineSettings } from "@/components/offlinesync";
 import { listAllFields } from "@/lib/fields";
 import { BrowserReminders } from "@/components/browserreminders";
 import { browserNotifyConfig } from "@/lib/browsernotify";
+import { PushDevices } from "@/components/pushdevices";
+import { listDevices, vapidPublicKey } from "@/lib/webpush";
 import { saveVoiceProject, resetFeatures, saveCapacity, saveNotifySettings, saveTimezone } from "@/lib/actions";
 import { MobileTabsEditor, SidebarEditor, TodayWidgetsEditor } from "@/components/layoutprefs";
 import { parsePrefs } from "@/lib/sidebar";
@@ -88,6 +90,7 @@ export default async function Settings({ searchParams }: { searchParams: Promise
 
       {f.reminders && (<>
         <Section cur={tab} tab="reminders" id="browser-reminders" i={2} title="Browser reminders" desc="A pop-up while LifeOS is open, with Mark done and Snooze buttons, like Outlook."><Panel>{(() => { const b = browserNotifyConfig(); return <BrowserReminders on={b.on} lead={b.lead} snooze={b.snooze} />; })()}</Panel></Section>
+        <Section cur={tab} tab="reminders" id="push" i={2} title="Push notifications" desc="Reminders on your phone or computer even when LifeOS is closed. Works in Chrome, Edge, Firefox and Android, and on iPhone once LifeOS is added to the Home Screen."><Panel>{tab === "reminders" ? <PushDevices publicKey={vapidPublicKey()} devices={listDevices().map(({ id, endpoint, label, created_at, last_ok, last_error }) => ({ id, endpoint, label, created_at, last_ok, last_error }))} /> : null}</Panel></Section>
         <Section cur={tab} tab="reminders" id="reminders" i={3} title="Reminders & push" desc="Get a push when a task with a time is due, plus a morning brief and an evening habit nudge. Uses ntfy (free app, self-hostable) and/or any webhook (Slack, Discord, Home Assistant…).">
           <Panel><form action={saveNotifySettings} className="space-y-4 p-4">
             <div className="grid gap-3 sm:grid-cols-2"><label className="space-y-1.5 text-[13px] font-medium">Server (ntfy)<input name="ntfy_url" defaultValue={nv("ntfy_url")} placeholder="https://ntfy.sh" className="field font-normal" /></label>

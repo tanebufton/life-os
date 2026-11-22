@@ -20,6 +20,9 @@ import { LinksPanel } from "@/components/links";
 import { listLinks } from "@/lib/links";
 import { FavouriteButton } from "@/components/favbutton";
 import { isFavourite } from "@/lib/favourites";
+import { Suspense } from "react";
+import { ReminderBanner } from "@/components/reminderbanner";
+import { browserNotifyConfig } from "@/lib/browsernotify";
 
 export const dynamic = "force-dynamic";
 export default async function TaskPage({ params }: { params: Promise<{ id: string }> }) {
@@ -33,6 +36,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
   const columns = Object.fromEntries([["0", listStatuses(null)], ...projects.map((p) => [String(p.id), listStatuses(p.id)])].map(([k, v]) => [k, (v as ReturnType<typeof listStatuses>).map((c) => ({ key: c.key, name: c.name, kind: c.kind }))]));
   return (
     <div className="max-w-[1500px]">
+      <Suspense fallback={null}><ReminderBanner id={t.id} done={!!t.done_at} snooze={browserNotifyConfig().snooze} /></Suspense>
       <div className="rise">
         <TaskEditor fields={(() => { const vals = taskFieldValues(t.id); return listFields(t.project_id).map((f) => ({ id: f.id, name: f.name, type: f.type, options: f.options, value: vals[f.id] ?? "" })); })()} today={today()} focus={isOn("focus")} projects={projects} columns={columns} head={<>
         <div className="mb-1 flex items-center gap-2 text-xs text-mute">

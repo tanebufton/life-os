@@ -18,6 +18,7 @@ import { deleteRule, runBoardAutomations, saveRule, type RuleInput } from "./aut
 import { parsePrefs } from "./sidebar";
 import { createTask, deleteTask, getTask, moveCard, parseQuickAdd, parseTags, queryTasks, reschedule, setStatus, setTaskOrder, updateTask } from "./tasks";
 import { today } from "./time";
+import { listDevices, removeDevice, removeEndpoint, saveSubscription, sendPush, type SubscriptionInput } from "./webpush";
 import { listStatuses } from "./statuses";
 import { addColumn, customizeProject, deleteColumn, moveColumn, renameColumn, resetProject, setColumnKind, type Kind } from "./statuses";
 
@@ -155,4 +156,21 @@ export async function createExtensionToken(label: string): Promise<{ token: stri
   const token = createToken(name, { level: "write", areas: ["tasks", "voice"], days: 365 });
   revalidatePath("/settings");
   return { token };
+}
+
+// ---------- Web Push devices ----------
+/** Turn push on for the device that calls this (the browser made the subscription; we only store it). */
+export async function savePushSubscriptionAction(sub: SubscriptionInput, label: string): Promise<R> { return run(() => { saveSubscription(sub, label); return "Push is on for this device"; }); }
+export async function removePushDeviceAction(id: number): Promise<R> { return run(() => { if (!removeDevice(id)) throw new Error("That device was already removed."); return "Device removed"; }); }
+export async function removePushEndpointAction(endpoint: string): Promise<R> { return run(() => { removeEndpoint(endpoint); }); }
+/** Send a test push to one device (by its endpoint, so "this device" works without knowing its id) or to all of them. */
+export async function testPushAction(endpoint?: string): Promise<R> {
+  try {
+    const ids = endpoint ? listDevices().filter((d) => d.endpoint === endpoint).map((d) => d.id) : undefined;
+    if (ids && !ids.length) return { ok: false, error: "This device isn't registered. Turn push on again." };
+    const r = await sendPush({ title: "LifeOS push works", body: "Task reminders will arrive like this, with Mark done and Snooze, even when LifeOS is closed.", url: "/settings?tab=reminders", tag: "lifeos-test" }, { ids, ttl: 300 });
+    revalidatePath("/settings");
+    if (r.sent) return { ok: true, message: r.failed ? `Sent to ${r.sent}; ${r.failed} failed (${r.errors.join("; ")})` : `Sent to ${r.sent} device${r.sent === 1 ? "" : "s"}` };
+    return { ok: false, error: r.errors.length ? `Not delivered: ${r.errors.join("; ")}` : "No devices have push turned on." };
+  } catch (e) { return { ok: false, error: (e as Error).message }; }
 }
