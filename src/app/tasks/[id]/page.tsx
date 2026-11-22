@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Icon } from "@/components/Icon";
 import { Attachments } from "@/components/attachments";
 import { listAttachments } from "@/lib/attachments";
+import { listFields, taskFieldValues } from "@/lib/fields";
 import { SubtaskList, TaskEditor } from "@/components/editor";
 import { StatusIcon } from "@/components/StatusIcon";
 import { db, Project } from "@/lib/db";
@@ -33,7 +34,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
   return (
     <div className="max-w-[1500px]">
       <div className="rise">
-        <TaskEditor today={today()} focus={isOn("focus")} projects={projects} columns={columns} head={<>
+        <TaskEditor fields={(() => { const vals = taskFieldValues(t.id); return listFields(t.project_id).map((f) => ({ id: f.id, name: f.name, type: f.type, options: f.options, value: vals[f.id] ?? "" })); })()} today={today()} focus={isOn("focus")} projects={projects} columns={columns} head={<>
         <div className="mb-1 flex items-center gap-2 text-xs text-mute">
           {parent && <><Link href={`/tasks/${parent.id}`} className="inline-flex max-w-[16rem] items-center gap-1 truncate hover:text-fg"><Icon name="chevRight" size={12} className="rotate-180" />{parent.title}</Link><span aria-hidden>/</span></>}
           <StatusIcon status={t.status_kind} size={15} /><span className="font-medium">{issueKey(t.project_name, t.id)}</span>

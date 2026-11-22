@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { addSubtask, deleteTaskInline, duplicateTaskAction, patchTask, restoreTaskAction, startFocus, toggleTask } from "@/lib/actions";
+import { setFieldValueAction } from "@/lib/actions5";
 import { Icon } from "./Icon";
 import { MarkdownField } from "./mdfield";
 import { ago, clearDraft, peekDraft } from "@/lib/drafts";
@@ -18,10 +19,25 @@ const Prop = ({ icon, label, children, top }: { icon: string; label: string; chi
     <span className={`flex items-center gap-2 px-1 text-[13px] text-mute ${top ? "pt-1.5" : ""}`}><Icon name={icon} size={15} />{label}</span>{children}</div>
 );
 
+export type EditorField = { id: number; name: string; type: string; options: string[]; value: string };
+/** One custom field on a task. Saves when you leave it (or change it, for choices). */
+function FieldRow({ taskId, f }: { taskId: number; f: EditorField }) {
+  const [v, setV] = useState(f.value), [bad, setBad] = useState("");
+  const save = async (val: string) => { const r = await setFieldValueAction(taskId, f.id, val); if (!r.ok) { setBad(r.error); toast(r.error); } else setBad(""); };
+  const common = "ghost max-w-full";
+  return (
+    <Prop icon={f.type === "date" ? "calendar" : f.type === "checkbox" ? "circleCheck" : f.type === "url" ? "link" : "tag"} label={f.name}>
+      {f.type === "select" ? <select value={v} onChange={(e) => { setV(e.target.value); void save(e.target.value); }} className={common}><option value="">None</option>{f.options.map((o) => <option key={o} value={o}>{o}</option>)}</select>
+        : f.type === "checkbox" ? <label className="flex items-center gap-2 px-2 py-1 text-sm"><input type="checkbox" checked={v === "1"} onChange={(e) => { const n = e.target.checked ? "1" : ""; setV(n); void save(n); }} className="h-4 w-4" />{v === "1" ? "Yes" : "No"}</label>
+        : f.type === "date" ? <input type="date" value={v} onChange={(e) => { setV(e.target.value); void save(e.target.value); }} className={common} />
+        : <span className="flex min-w-0 items-center gap-1"><input value={v} inputMode={f.type === "number" ? "decimal" : undefined} placeholder={f.type === "url" ? "https://…" : f.type === "number" ? "0" : "Empty"} aria-invalid={!!bad} onChange={(e) => setV(e.target.value)} onBlur={() => { if (v !== f.value || bad) void save(v); }} onKeyDown={enterBlur} className={common} />{f.type === "url" && /^https?:\/\//i.test(v) && <a href={v} target="_blank" rel="noreferrer noopener" aria-label="Open link" className="shrink-0 rounded p-1 text-mute hover:text-accent"><Icon name="ext" size={14} /></a>}</span>}
+    </Prop>
+  );
+}
 /** Notion-style editor: every change saves itself, no Save button. */
 /** Enter commits a field that otherwise saves when you leave it. */
 const enterBlur = (e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); e.currentTarget.blur(); } };
-export function TaskEditor({ task, projects, focus, columns, head, children, today }: { today?: string; task: EditorTask; projects: { id: number; name: string }[]; focus: boolean; columns?: Record<string, { key: string; name: string; kind: string }[]>; head?: React.ReactNode; children?: React.ReactNode }) {
+export function TaskEditor({ task, projects, focus, columns, head, children, today, fields = [] }: { fields?: EditorField[]; today?: string; task: EditorTask; projects: { id: number; name: string }[]; focus: boolean; columns?: Record<string, { key: string; name: string; kind: string }[]>; head?: React.ReactNode; children?: React.ReactNode }) {
   const router = useRouter();
   const [v, setV] = useState(task), [est, setEst] = useState(task.estimate ? `${task.estimate}m` : ""), [state, setState] = useState<"idle" | "saving" | "saved" | string>("idle");
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined), pending = useRef<Record<string, unknown>>({}), unsaved = useRef<Record<string, unknown>>({});
@@ -75,6 +91,7 @@ export function TaskEditor({ task, projects, focus, columns, head, children, tod
           <Prop icon="clock" label="Estimate"><input value={est} onChange={(e) => setEst(e.target.value)} onBlur={() => { const n = parseEst(est); if (n === undefined) setState("Try 30m, 1h or 90"); else { set("estimate", n); save({ estimate: n }); void flush(); } }} placeholder="e.g. 30m, 1.5h" onKeyDown={enterBlur} className="ghost max-w-full" /></Prop>
           <Prop icon="repeat" label="Repeat"><input value={v.repeat} onChange={(e) => set("repeat", e.target.value)} onBlur={() => { save({ repeat: v.repeat.trim() || null }); void flush(); }} placeholder="Doesn't repeat" title="Try: weekly, every 2 weeks, 15th of the month" onKeyDown={enterBlur} className="ghost max-w-full" /></Prop>
           <Prop icon="tag" label="Tags"><input value={v.tags} onChange={(e) => set("tags", e.target.value)} onBlur={() => { save({ tags: v.tags }); void flush(); }} placeholder="Add tags" title="Separate tags with spaces. Press Enter to save." onKeyDown={enterBlur} className="ghost max-w-full" /></Prop>
+          {fields.map((f) => <FieldRow key={f.id} taskId={task.id} f={f} />)}
         </div>
         <div className="mt-3 grid grid-cols-2 gap-2 border-t pt-3 [&>button]:justify-center">
           {focus && <button className="btn !h-8" onClick={async () => { await startFocus(task.id); router.push(`/focus?task=${task.id}`); }}><Icon name="focus" size={15} className="text-accent" />Focus</button>}

@@ -14,7 +14,7 @@ import { Pill } from "./Pill";
 
 type Kind = "todo" | "doing" | "done";
 export type Column = { id: number; key: string; name: string; kind: Kind };
-export type Card = { id: number; title: string; status: string; priority: number; due: string | null; project_name: string | null; project_color: string | null; tags: string[]; repeat: string | null; estimate?: number | null; sub_total?: number; sub_done?: number; att_total?: number };
+export type Card = { id: number; title: string; status: string; priority: number; due: string | null; project_name: string | null; project_color: string | null; tags: string[]; repeat: string | null; estimate?: number | null; sub_total?: number; sub_done?: number; att_total?: number; fields?: { name: string; type: string; value: string }[] };
 const lift = "shadow-[0_1px_1px_rgb(9_30_66/0.25),0_0_1px_rgb(9_30_66/0.31)] dark:shadow-none dark:border";
 
 export function Board({ columns, cards, today, projectId = null, hiddenNote, toolbar }: { columns: Column[]; cards: Card[]; today: string; projectId?: number | null; hiddenNote?: React.ReactNode; toolbar?: React.ReactNode }) {
@@ -81,11 +81,11 @@ export function Board({ columns, cards, today, projectId = null, hiddenNote, too
                     <div className={`flex items-start gap-2 ${selecting ? "pl-6" : ""} pr-12`}>
                       {!selecting && <button type="button" aria-label={done ? `Reopen ${c.title}` : `Complete ${c.title}`} title={done ? "Reopen" : "Mark done"} onClick={() => complete(c)} className={`mt-[2px] grid h-[16px] w-[16px] shrink-0 place-items-center rounded-full border-[1.5px] transition ${done ? "border-ok bg-ok text-white" : "border-fg/35 text-transparent hover:border-ok hover:text-ok"}`}><Icon name="check" size={10} /></button>}
                       <Link href={`/tasks/${c.id}`} draggable={false} onClick={(e) => { if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return; e.preventDefault(); if (selecting) toggle(c.id); else show(c.id); }} className={`block text-[13.5px] leading-snug ${done ? "text-dim line-through" : ""}`}>{c.title}</Link></div>
-                    {(c.tags.length > 0 || !!c.sub_total || !!c.att_total || c.repeat || c.due || c.priority !== 0 || !!c.estimate || (projectId === null && !!c.project_name)) && (
+                    {(c.tags.length > 0 || !!c.sub_total || !!c.att_total || !!c.fields?.length || c.repeat || c.due || c.priority !== 0 || !!c.estimate || (projectId === null && !!c.project_name)) && (
                       <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 pl-[24px] text-[11px] text-mute">
                         {projectId === null && c.project_name && <span className="inline-flex items-center gap-1" title="Project"><span className="h-2 w-2 rounded-full" style={{ background: c.project_color ?? "currentColor" }} />{c.project_name}</span>}{c.tags.map((g) => <Pill key={g} name={g} />)}
                         {!!c.sub_total && <span className="inline-flex items-center gap-1" title={`${c.sub_done ?? 0} of ${c.sub_total} subtasks done`}><Icon name="list" size={11} />{c.sub_done ?? 0}/{c.sub_total}</span>}
-                        {!!c.estimate && <span className="inline-flex items-center gap-1"><Icon name="clock" size={11} />{fmtMinutes(c.estimate)}</span>}{!!c.att_total && <span className="inline-flex items-center gap-1" title="Attachments"><Icon name="paperclip" size={11} />{c.att_total}</span>}{c.repeat && <Icon name="repeat" size={12} />}
+                        {!!c.estimate && <span className="inline-flex items-center gap-1"><Icon name="clock" size={11} />{fmtMinutes(c.estimate)}</span>}{c.fields?.map((f) => <span key={f.name} className="inline-flex items-center gap-1 rounded bg-raise px-1.5 py-0.5" title={f.name}><span className="text-dim">{f.name}:</span>{f.type === "checkbox" ? "Yes" : f.type === "url" ? "link" : f.value}</span>)}{!!c.att_total && <span className="inline-flex items-center gap-1" title="Attachments"><Icon name="paperclip" size={11} />{c.att_total}</span>}{c.repeat && <Icon name="repeat" size={12} />}
                         {c.due && <span className={`inline-flex items-center gap-1 ${d}`}><Icon name="calendar" size={11} />{c.due === today ? "Today" : nice(c.due).split(", ")[1]}</span>}
                         {c.priority > 0 && <Icon name="chevUp2" size={13} className="text-danger" />}{c.priority < 0 && <Icon name="chevDown1" size={13} className="text-accent" />}
                       </div>)}

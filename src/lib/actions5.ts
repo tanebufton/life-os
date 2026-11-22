@@ -11,6 +11,7 @@ import { PROJECT_VIEWS } from "./projectviews";
 import { redirect } from "next/navigation";
 import { setSetting } from "./settings";
 import { deleteAttachment } from "./attachments";
+import { deleteField, moveField, saveField, setFieldValue, type FieldInput } from "./fields";
 import { deleteRule, runBoardAutomations, saveRule, type RuleInput } from "./automations";
 import { parsePrefs } from "./sidebar";
 import { createTask, deleteTask, getTask, moveCard, parseQuickAdd, parseTags, queryTasks, reschedule, setStatus, setTaskOrder, updateTask } from "./tasks";
@@ -135,3 +136,9 @@ export async function setNoteIconAction(id: number, icon: string): Promise<R> { 
 export async function saveRuleAction(i: RuleInput): Promise<R> { return run(() => { saveRule(i); const n = runBoardAutomations({ force: true }); return n ? `Saved. ${n} card${n === 1 ? "" : "s"} moved now` : "Saved"; }); }
 export async function deleteRuleAction(id: number): Promise<R> { return run(() => { deleteRule(id); return "Automation removed"; }); }
 export async function deleteAttachmentAction(id: number): Promise<R> { return run(() => { deleteAttachment(id); }); }
+
+// ---------- custom fields ----------
+export async function saveFieldAction(i: FieldInput): Promise<R> { return run(() => { saveField(i); return "Saved"; }); }
+export async function deleteFieldAction(id: number): Promise<R> { return run(() => { deleteField(id); return "Field removed"; }); }
+export async function moveFieldAction(id: number, dir: -1 | 1): Promise<R> { return run(() => { moveField(id, dir); }); }
+export async function setFieldValueAction(taskId: number, fieldId: number, value: string): Promise<R> { return run(() => { setFieldValue(taskId, fieldId, value); }); }

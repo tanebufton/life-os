@@ -1,0 +1,17 @@
+import assert from "node:assert/strict";
+const F = await import("../src/lib/fields.ts"); const T = await import("../src/lib/tasks.ts"); const { db } = await import("../src/lib/db.ts");
+let n = 0; const ok = (m: string) => { n++; console.log("  ✓", m); };
+const proj = Number(db.prepare("INSERT INTO projects (name, color) VALUES ('Clients','#123456')").run().lastInsertRowid), other = Number(db.prepare("INSERT INTO projects (name, color) VALUES ('Home','#654321')").run().lastInsertRowid);
+const client = F.saveField({ project_id: null, name: "Client", type: "text" }), cost = F.saveField({ project_id: proj, name: "Cost", type: "number", show_on_card: true }), stage = F.saveField({ project_id: proj, name: "Stage", type: "select", options: ["Lead", "Won", "Lost", "Won"] }), link = F.saveField({ project_id: null, name: "Link", type: "url" }), paid = F.saveField({ project_id: null, name: "Paid", type: "checkbox" }), when = F.saveField({ project_id: null, name: "Signed", type: "date" });
+assert.deepEqual(F.listFields(proj).map((f) => f.name), ["Client", "Link", "Paid", "Signed", "Cost", "Stage"]); assert.deepEqual(F.listFields(other).map((f) => f.name), ["Client", "Link", "Paid", "Signed"]); assert.deepEqual(F.listFields(proj).find((f) => f.id === stage)!.options, ["Lead", "Won", "Lost"]); ok("fields apply to every task or to one project; choices are tidied");
+const t = T.createTask({ title: "Acme", project_id: proj }), t2 = T.createTask({ title: "Elsewhere", project_id: other });
+F.setFieldValue(t, client, "Acme Ltd"); F.setFieldValue(t, cost, "1,250.50"); F.setFieldValue(t, stage, "Won"); F.setFieldValue(t, paid, "true"); F.setFieldValue(t, when, "2026-12-01"); F.setFieldValue(t, link, "acme.example.com/deal");
+assert.deepEqual(F.taskFieldValues(t), { [client]: "Acme Ltd", [cost]: "1250.5", [stage]: "Won", [paid]: "1", [when]: "2026-12-01", [link]: "https://acme.example.com/deal" }); ok("values are checked and stored in a clean form");
+for (const [id, v] of [[cost, "lots"], [stage, "Maybe"], [when, "tomorrow"], [link, "javascript:alert(1)"], [link, "ftp://x.y/z"]] as const) assert.throws(() => F.setFieldValue(t, id, v), undefined, `${id} ${v}`); ok("bad numbers, unknown choices, bad dates and non-web links are refused");
+assert.throws(() => F.setFieldValue(t2, cost, "5")); ok("a project's field can't be set on another project's task");
+F.setFieldValue(t, client, ""); assert.equal(F.taskFieldValues(t)[client], undefined); ok("clearing a value removes it");
+assert.deepEqual(F.fieldValuesFor([t, t2]).get(t)![cost], "1250.5"); assert.equal(F.fieldValuesFor([t2]).get(t2), undefined); ok("values can be fetched for many tasks at once");
+assert.throws(() => F.saveField({ project_id: null, name: "client", type: "text" })); assert.throws(() => F.saveField({ project_id: null, name: "", type: "text" })); assert.throws(() => F.saveField({ project_id: null, name: "Pick", type: "select", options: [] })); assert.throws(() => F.saveField({ project_id: null, name: "X", type: "weird" })); ok("duplicate names, empty names, empty choices and unknown types are refused");
+F.moveField(cost, 1); assert.deepEqual(F.listFields(proj).slice(-2).map((f) => f.name), ["Stage", "Cost"]); ok("fields can be reordered");
+F.deleteField(stage); assert.equal(F.taskFieldValues(t)[stage], undefined); db.prepare("DELETE FROM tasks WHERE id=?").run(t); assert.equal((db.prepare("SELECT count(*) c FROM task_fields WHERE task_id=?").get(t) as any).c, 0); ok("deleting a field or a task removes the values");
+console.log(`  ${n} checks`);

@@ -19,6 +19,7 @@ import { FavouriteButton } from "@/components/favbutton";
 import { isFavourite } from "@/lib/favourites";
 import { hasCustomColumns } from "@/lib/statuses";
 import { queryTasks } from "@/lib/tasks";
+import { listFields, fieldValuesFor } from "@/lib/fields";
 import { projectKey } from "@/lib/ui";
 
 export const dynamic = "force-dynamic";
@@ -73,7 +74,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
       )}
       {tab === "list" && <div><TaskGroups groups={bucket(open)} empty="No open tasks here yet. New tasks you add from this page land in this project." /><AddTaskRow /></div>}
       {tab === "board" && <BoardView sp={sp} lockProject={id} base={href("board")} />}
-      {tab === "table" && <TaskTable hideProject rows={open} sort={sort} dir={dir} base={(o) => href("table", Object.entries(o).filter(([, v]) => v).map(([k, v]) => `&${k}=${encodeURIComponent(v as string)}`).join(""))} />}
+      {tab === "table" && <TaskTable hideProject fields={listFields(id)} values={Object.fromEntries(fieldValuesFor(open.map((t) => t.id)))} rows={open} sort={sort} dir={dir} base={(o) => href("table", Object.entries(o).filter(([, v]) => v).map(([k, v]) => `&${k}=${encodeURIComponent(v as string)}`).join(""))} />}
       {tab === "table" && <div className="mt-2"><AddTaskRow /></div>}
       {tab === "notes" && (
         <div><div className="mb-3 flex justify-end"><form action={newNoteInProjectAction.bind(null, id)}><button className="btn-primary"><Icon name="plus" size={14} />New note</button></form></div><Panel i={0}>

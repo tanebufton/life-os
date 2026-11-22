@@ -6,6 +6,7 @@ import { FilterChip } from "@/components/chip";
 import { ColumnsEditor, DoneWindow } from "@/components/columns";
 import { AutomationsEditor } from "@/components/automations";
 import { listRules, runBoardAutomations } from "@/lib/automations";
+import { listAllFields, fieldValuesFor } from "@/lib/fields";
 import { getSetting } from "@/lib/settings";
 import { Icon } from "@/components/Icon";
 import { Panel } from "@/components/Panel";
@@ -37,7 +38,9 @@ export function BoardView({ sp, lockProject, base }: { sp: BoardParams; lockProj
     && (!sp.due || (sp.due === "overdue" ? !!t.due && t.due < t0 : sp.due === "today" ? t.due === t0 : sp.due === "week" ? !!t.due && t.due >= t0 && t.due <= week : !t.due));
   const sorted = (list: typeof open) => sp.sort === "due" ? [...list].sort((a, b) => (a.due ?? "9999").localeCompare(b.due ?? "9999")) : sp.sort === "priority" ? [...list].sort((a, b) => b.priority - a.priority) : sp.sort === "newest" ? [...list].sort((a, b) => b.id - a.id) : sp.sort === "oldest" ? [...list].sort((a, b) => a.id - b.id) : byPosition(list);
   const allTags = [...new Set([...open, ...allDone].flatMap((t) => t.tags))].sort();
-  const cards = sorted([...open, ...done].filter(pass)), counts = Object.fromEntries(columns.map((c) => [c.key, queryTasks({ project: pid ?? undefined, state: "all", status: c.key, limit: 5000 }).length]));
+  const cardFields = listAllFields().filter((f) => f.show_on_card), vals = cardFields.length ? fieldValuesFor([...open, ...done].map((t) => t.id)) : new Map<number, Record<number, string>>();
+  const withFields = (t: (typeof open)[number]) => ({ ...t, fields: cardFields.filter((f) => f.project_id === null || f.project_id === t.project_id).map((f) => ({ name: f.name, type: f.type, value: vals.get(t.id)?.[f.id] ?? "" })).filter((f) => f.value) });
+  const cards = sorted([...open, ...done].filter(pass)).map(withFields), counts = Object.fromEntries(columns.map((c) => [c.key, queryTasks({ project: pid ?? undefined, state: "all", status: c.key, limit: 5000 }).length]));
   return (
     <>
       {lockProject === undefined && <BoardProjectSelect current={project ?? null} projects={projects.map((p) => ({ id: p.id, name: p.name, own: hasCustomColumns(p.id) }))} />}

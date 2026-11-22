@@ -8,6 +8,8 @@ import { FeatureSwitch } from "@/components/switch";
 import { PageHead } from "@/components/tasks";
 import { ThemeToggle } from "@/components/theme";
 import { TextScale } from "@/components/textscale";
+import { FieldsManager } from "@/components/fieldsmanager";
+import { listAllFields } from "@/lib/fields";
 import { BrowserReminders } from "@/components/browserreminders";
 import { browserNotifyConfig } from "@/lib/browsernotify";
 import { saveVoiceProject, resetFeatures, saveCapacity, saveNotifySettings, saveTimezone } from "@/lib/actions";
@@ -80,6 +82,7 @@ export default async function Settings({ searchParams }: { searchParams: Promise
           <Panel title="Today widgets" bodyClass="p-4">{(() => { let order: string[] = [], hidden: string[] = []; try { const p = nv("today_widgets") ? JSON.parse(nv("today_widgets")) : null; if (p) { order = p.order ?? []; hidden = p.hidden ?? []; } } catch {} const ids = WIDGETS.map((w) => w.id), full = [...order.filter((i: string) => ids.includes(i)), ...ids.filter((i) => !order.includes(i))]; return <TodayWidgetsEditor items={full.filter((id) => { const w = WIDGETS.find((x) => x.id === id)!; return widgetOn(w, (k) => f[k]); }).map((id) => { const w = WIDGETS.find((x) => x.id === id)!; return { id, label: w.label, on: !hidden.includes(id) }; })} />; })()}</Panel>
         </div>
       </Section>
+      <Section cur={tab} tab="general" i={2} title="Custom fields" desc="Add your own properties to tasks (a client, a cost, a link, a stage). They appear in the task, and optionally on board cards and in project tables."><FieldsManager fields={listAllFields()} projects={(db.prepare("SELECT id, name FROM projects WHERE archived=0 ORDER BY name").all() as { id: number; name: string }[])} /></Section>
       <Section cur={tab} tab="general" i={2} title="Appearance" desc="Light or dark. LifeOS follows your system until you pick one."><Panel bodyClass="space-y-4 p-4"><div className="flex items-center justify-between"><span className="text-sm">Theme</span><ThemeToggle label className="border" /></div><TextScale /></Panel></Section>
 
       {f.reminders && (<>
