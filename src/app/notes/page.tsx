@@ -18,7 +18,7 @@ export default async function Notes({ searchParams }: { searchParams: Promise<{ 
   return (
     <FeatureGate feature="notes">
       <div>
-        <PageHead title="Notes" sub="Markdown, with [[links]] between notes" right={<form action={newNoteAction}><button className="btn-primary">New note</button></form>} />
+        <PageHead title="Notes" sub="Markdown, with [[links]] between notes" right={<div className="flex items-center gap-2"><Link href="/notes/print" target="_blank" className="btn">Export all as PDF</Link><form action={newNoteAction}><button className="btn-primary">New note</button></form></div>} />
         <form className="mb-3"><input name="q" defaultValue={q} placeholder="Search notes…" aria-label="Search notes" className="field" />{tag && <input type="hidden" name="tag" value={tag} />}{project && <input type="hidden" name="project" value={project} />}</form>
         {(allTags.length > 0 || projects.length > 0) && <div className="mb-4 flex flex-wrap items-center gap-1.5">
           <FilterChip href={href({})} active={!tag && !project}>All</FilterChip>

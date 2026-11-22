@@ -16,6 +16,7 @@ import { LinksPanel } from "@/components/links";
 import { listLinks } from "@/lib/links";
 import { NoteProjectField, TagField } from "@/components/meta";
 import { entityTags } from "@/lib/entitytags";
+import { ExportMenu } from "@/components/exportmenu";
 
 export const dynamic = "force-dynamic";
 export default async function NotePage({ params }: { params: Promise<{ id: string }> }) {
@@ -29,6 +30,7 @@ export default async function NotePage({ params }: { params: Promise<{ id: strin
         <div className="mb-5 flex items-center justify-between gap-3 text-[13px] text-mute">
           <nav aria-label="Page path" className="flex min-w-0 flex-wrap items-center gap-1"><Link href="/notes" className="hover:text-fg">Notes</Link>{crumbs.map((c) => <span key={c.id} className="flex items-center gap-1"><span className="text-dim">/</span><Link href={`/notes/${c.id}`} className="max-w-[12rem] truncate hover:text-fg">{c.icon} {c.title || "Untitled"}</Link></span>)}</nav>
           <div className="flex shrink-0 gap-2">
+            <ExportMenu items={[{ label: "Save as PDF…", href: `/notes/${n.id}/print`, newTab: true }, ...(kids.length ? [{ label: "Save as PDF with sub-pages…", href: `/notes/${n.id}/print?sub=1`, newTab: true }] : []), { label: "Download Markdown (.md)", href: `/api/notes/${n.id}/export`, download: true }]} />
             <FavouriteButton kind="note" id={n.id} on={isFavourite("note", n.id)} />
             <form action={async () => { "use server"; await saveNoteAction(n.id, { pinned: !n.pinned }); }}><button className="btn !px-2.5" aria-pressed={!!n.pinned} aria-label={n.pinned ? "Unpin from the top of the list" : "Pin to the top of the list"} title={n.pinned ? "Unpin from the top of the list" : "Pin to the top of the list"}><Icon name="pin" size={15} className={n.pinned ? "text-accent" : "text-mute"} /></button></form>
             <form action={deleteNoteAction.bind(null, n.id)}><button className="btn !px-2.5 hover:!text-danger" aria-label="Delete note" title="Delete note"><Icon name="trash" size={15} className="text-mute" /></button></form>

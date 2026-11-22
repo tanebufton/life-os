@@ -7,6 +7,7 @@ import { ColumnsEditor, DoneWindow } from "@/components/columns";
 import { AutomationsEditor } from "@/components/automations";
 import { listRules, runBoardAutomations } from "@/lib/automations";
 import { listAllFields, fieldValuesFor } from "@/lib/fields";
+import { cardSnippet } from "@/lib/snippet";
 import { getSetting } from "@/lib/settings";
 import { Icon } from "@/components/Icon";
 import { Panel } from "@/components/Panel";
@@ -39,7 +40,8 @@ export function BoardView({ sp, lockProject, base }: { sp: BoardParams; lockProj
   const sorted = (list: typeof open) => sp.sort === "due" ? [...list].sort((a, b) => (a.due ?? "9999").localeCompare(b.due ?? "9999")) : sp.sort === "priority" ? [...list].sort((a, b) => b.priority - a.priority) : sp.sort === "newest" ? [...list].sort((a, b) => b.id - a.id) : sp.sort === "oldest" ? [...list].sort((a, b) => a.id - b.id) : byPosition(list);
   const allTags = [...new Set([...open, ...allDone].flatMap((t) => t.tags))].sort();
   const cardFields = listAllFields().filter((f) => f.show_on_card), vals = cardFields.length ? fieldValuesFor([...open, ...done].map((t) => t.id)) : new Map<number, Record<number, string>>();
-  const withFields = (t: (typeof open)[number]) => ({ ...t, fields: cardFields.filter((f) => f.project_id === null || f.project_id === t.project_id).map((f) => ({ name: f.name, type: f.type, value: vals.get(t.id)?.[f.id] ?? "" })).filter((f) => f.value) });
+  const covers = new Map((db.prepare(`SELECT task_id, min(id) AS id FROM attachments WHERE mime LIKE 'image/%' AND task_id IN (SELECT id FROM tasks WHERE done_at IS NULL AND deleted_at IS NULL) GROUP BY task_id`).all() as { task_id: number; id: number }[]).map((r) => [r.task_id, r.id]));
+  const withFields = (t: (typeof open)[number]) => ({ ...t, snippet: cardSnippet(t.notes), cover: covers.get(t.id) ?? null, fields: cardFields.filter((f) => f.project_id === null || f.project_id === t.project_id).map((f) => ({ name: f.name, type: f.type, value: vals.get(t.id)?.[f.id] ?? "" })).filter((f) => f.value) });
   const cards = sorted([...open, ...done].filter(pass)).map(withFields), counts = Object.fromEntries(columns.map((c) => [c.key, queryTasks({ project: pid ?? undefined, state: "all", status: c.key, limit: 5000 }).length]));
   return (
     <>
