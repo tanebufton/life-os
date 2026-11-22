@@ -8,6 +8,7 @@ import { Icon } from "./Icon";
 import { clearDraft as dropDraft, peekDraft as getDraft } from "@/lib/drafts";
 import { useSession } from "./session";
 import { useBackToClose } from "@/lib/useback";
+import { enqueue } from "@/lib/offlinequeue";
 import { Pill } from "./Pill";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -58,6 +59,7 @@ export function CaptureForm({ today, variant, onDone }: { today: string; variant
   const sheet = variant === "sheet", formRef = useRef<HTMLFormElement>(null), base = useRef(""), vRef = useRef(""); vRef.current = v;
   const action = async (fd: FormData) => {
     if (!parsed?.title) return;
+    if (navigator.onLine === false) { enqueue({ type: "add", fields: Object.fromEntries([...fd.entries()].filter(([, x]) => typeof x === "string")) as Record<string, string> }); setV(""); toast("Saved. Will sync when you\'re back online"); onDone?.(); return; }
     const g = await guarded(`capture-save:${dk}`, v, async () => { await quickAdd(fd); });
     if (!g.saved) return; // text stays in the box (and in local storage) until it really saved
     setV(""); setOk(true); setTimeout(() => setOk(false), 1800); onDone?.();
@@ -94,7 +96,9 @@ function QuickSheet({ today, projects, onDone }: { today: string; projects: Proj
   const { guarded } = useSession();
   const parsed = useMemo(() => { if (!v.trim()) return null; try { return parseQuickAdd(v, today); } catch { return null; } }, [v, today]);
   const submit = async (fd: FormData) => {
-    if (!parsed?.title || busy) return; setBusy(true);
+    if (!parsed?.title || busy) return;
+    if (navigator.onLine === false) { enqueue({ type: "add", fields: Object.fromEntries([...fd.entries()].filter(([, x]) => typeof x === "string")) as Record<string, string> }); toast("Saved. Will sync when you\'re back online"); onDone(); return; }
+    setBusy(true);
     const g = await guarded("capture-save:sheet", v, async () => { await quickAdd(fd); });
     setBusy(false); if (g.saved) onDone();
   };

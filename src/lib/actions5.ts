@@ -10,6 +10,7 @@ import { toggleFavourite, type FavKind } from "./favourites";
 import { PROJECT_VIEWS } from "./projectviews";
 import { redirect } from "next/navigation";
 import { setSetting } from "./settings";
+import { completeTask, reopenTask } from "./tasks";
 import { deleteAttachment } from "./attachments";
 import { deleteField, moveField, saveField, setFieldValue, type FieldInput } from "./fields";
 import { deleteRule, runBoardAutomations, saveRule, type RuleInput } from "./automations";
@@ -142,3 +143,7 @@ export async function saveFieldAction(i: FieldInput): Promise<R> { return run(()
 export async function deleteFieldAction(id: number): Promise<R> { return run(() => { deleteField(id); return "Field removed"; }); }
 export async function moveFieldAction(id: number, dir: -1 | 1): Promise<R> { return run(() => { moveField(id, dir); }); }
 export async function setFieldValueAction(taskId: number, fieldId: number, value: string): Promise<R> { return run(() => { setFieldValue(taskId, fieldId, value); }); }
+
+// ---------- offline sync (idempotent forms of tick and move, so replaying them is safe) ----------
+export async function setDoneAction(id: number, done: boolean): Promise<R> { return run(() => { const t = getTask(id); if (!t) throw new Error("Task not found"); if (done && !t.done_at) completeTask(id); else if (!done && t.done_at) reopenTask(id); }); }
+export async function moveTask(id: number, status: string): Promise<R> { return run(() => { if (!getTask(id)) throw new Error("Task not found"); setStatus(id, status); }); }

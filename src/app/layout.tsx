@@ -6,6 +6,7 @@ import { CaptureFab } from "@/components/capture";
 import { ListKeys, ShortcutsHelp } from "@/components/keys";
 import { Palette } from "@/components/palette";
 import { PwaRegister } from "@/components/pwa";
+import { OfflineSync } from "@/components/offlinesync";
 import { LiveSync } from "@/components/livesync";
 import { KeyboardAware } from "@/components/keyboardaware";
 import { TaskMenu } from "@/components/taskmenu";
@@ -62,6 +63,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ListKeys />
         <KeyboardAware />
         <LiveSync />
+        <OfflineSync />
         <TaskMenu today={t} projects={projects.map((p) => ({ id: p.id, name: p.name, color: p.color }))} />
         <ShortcutsHelp />
       </body>

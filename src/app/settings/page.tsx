@@ -9,6 +9,7 @@ import { PageHead } from "@/components/tasks";
 import { ThemeToggle } from "@/components/theme";
 import { TextScale } from "@/components/textscale";
 import { FieldsManager } from "@/components/fieldsmanager";
+import { OfflineSettings } from "@/components/offlinesync";
 import { listAllFields } from "@/lib/fields";
 import { BrowserReminders } from "@/components/browserreminders";
 import { browserNotifyConfig } from "@/lib/browsernotify";
@@ -83,7 +84,7 @@ export default async function Settings({ searchParams }: { searchParams: Promise
         </div>
       </Section>
       <Section cur={tab} tab="general" i={2} title="Custom fields" desc="Add your own properties to tasks (a client, a cost, a link, a stage). They appear in the task, and optionally on board cards and in project tables."><FieldsManager fields={listAllFields()} projects={(db.prepare("SELECT id, name FROM projects WHERE archived=0 ORDER BY name").all() as { id: number; name: string }[])} /></Section>
-      <Section cur={tab} tab="general" i={2} title="Appearance" desc="Light or dark. LifeOS follows your system until you pick one."><Panel bodyClass="space-y-4 p-4"><div className="flex items-center justify-between"><span className="text-sm">Theme</span><ThemeToggle label className="border" /></div><TextScale /></Panel></Section>
+      <Section cur={tab} tab="general" i={2} title="Appearance" desc="Light or dark. LifeOS follows your system until you pick one."><Panel bodyClass="space-y-4 p-4"><div className="flex items-center justify-between"><span className="text-sm">Theme</span><ThemeToggle label className="border" /></div><TextScale /><OfflineSettings /></Panel></Section>
 
       {f.reminders && (<>
         <Section cur={tab} tab="reminders" id="browser-reminders" i={2} title="Browser reminders" desc="A pop-up while LifeOS is open, with Mark done and Snooze buttons, like Outlook."><Panel>{(() => { const b = browserNotifyConfig(); return <BrowserReminders on={b.on} lead={b.lead} snooze={b.snooze} />; })()}</Panel></Section>

@@ -69,7 +69,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const msg = { expired: "Your session has expired.", offline: "You're offline.", unreachable: "Can't reach LifeOS right now." }[health as Exclude<Health, "ok">];
   return (
     <C.Provider value={value}>
-      {health !== "ok" && (
+      {health !== "ok" && health !== "offline" && (
         <div role="alert" className="fixed inset-x-0 top-0 z-[60] flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-warn/40 bg-warn/15 px-4 py-2 text-[13px] text-warn">
           <b>{msg}</b><span className="text-fg/80">{pending ? `${pending} unsaved change${pending === 1 ? " is" : "s are"} kept safely in this browser and will save automatically.` : "Nothing is lost. Your work is kept in this browser."}</span>
           <span className="ml-auto flex gap-2">{health === "expired" && <button className="btn !h-7 !py-0 text-xs" onClick={() => window.open("/relogin", "_blank")}>Sign in again</button>}<button className="btn !h-7 !py-0 text-xs" onClick={() => void check()}>Retry now</button></span>

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useOptimistic, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
+import { runOrQueue, usePending } from "@/lib/offlinequeue";
 import { deleteTaskInline, moveTask, restoreTaskAction } from "@/lib/actions";
 import { TaskLightbox } from "./lightbox";
 import { addCardAction, bulkBoardAction, moveCardAction, type BulkOp } from "@/lib/actions5";
@@ -20,7 +21,9 @@ const lift = "shadow-[0_1px_1px_rgb(9_30_66/0.25),0_0_1px_rgb(9_30_66/0.31)] dar
 export function Board({ columns, cards, today, projectId = null, hiddenNote, toolbar }: { columns: Column[]; cards: Card[]; today: string; projectId?: number | null; hiddenNote?: React.ReactNode; toolbar?: React.ReactNode }) {
   const router = useRouter();
   const [items, setItems] = useOptimistic(cards, (s, a: { id: number; status: string; before?: number | null }) => { const c = s.find((x) => x.id === a.id); if (!c) return s; const rest = s.filter((x) => x.id !== a.id), at = a.before ? rest.findIndex((x) => x.id === a.before) : -1; const moved = { ...c, status: a.status }; return at < 0 ? [...rest, moved] : [...rest.slice(0, at), moved, ...rest.slice(at)]; });
-  const [, start] = useTransition();
+  const [, start] = useTransition(), pending = usePending();
+  const movedOffline = new Map<number, string>(); for (const o of pending) if (o.type === "move") movedOffline.set(o.task, o.status);
+  const shown = movedOffline.size ? items.map((c) => (movedOffline.has(c.id) ? { ...c, status: movedOffline.get(c.id)! } : c)) : items; // cards you moved while offline sit in their new column until they sync
   const [over, setOver] = useState<string | null>(null), [selecting, setSelecting] = useState(false), [sel, setSel] = useState<Set<number>>(new Set()), [active, setActive] = useState(0), track = useRef<HTMLDivElement>(null);
   const step = () => { const el = track.current, first = el?.children[0] as HTMLElement | undefined; return first ? first.offsetWidth + 10 : 0; }; // a column plus the gap
   const onScroll = () => { const el = track.current, w = step(); if (el && w && window.matchMedia("(max-width: 767px)").matches) setActive(Math.max(0, Math.min(columns.length - 1, Math.round(el.scrollLeft / w)))); };
@@ -32,7 +35,7 @@ export function Board({ columns, cards, today, projectId = null, hiddenNote, too
   const toggle = (id: number) => setSel((s) => { const n = new Set(s); if (!n.delete(id)) n.add(id); return n; });
   const bulk = (o: BulkOp) => start(async () => { const r = await bulkBoardAction([...sel], o); toast(r.ok ? (r.message ?? "Done") : r.error); if (r.ok && o.op === "delete") { setSel(new Set()); setSelecting(false); } }); // other changes keep the selection, so you can apply several in a row
   const kindOf = (key: string): Kind => columns.find((c) => c.key === key)?.kind ?? "todo";
-  const move = (id: number, status: string) => start(async () => { const rep = items.find((x) => x.id === id)?.repeat; setItems({ id, status: rep && kindOf(status) === "done" ? columns[0].key : status }); const r = await moveTask(id, status); if (!r.ok) toast(r.error ?? "Couldn't move that card"); });
+  const move = (id: number, status: string) => start(async () => { const rep = items.find((x) => x.id === id)?.repeat; setItems({ id, status: rep && kindOf(status) === "done" ? columns[0].key : status }); const q = await runOrQueue({ type: "move", task: id, status }, () => moveTask(id, status)); if (q.queued) { toast("Moved. Will sync when you're back online"); return; } if (!q.result.ok) toast(q.result.error ?? "Couldn't move that card"); });
   /** Drop `id` into `status`, just before card `before` (or at the end), keeping the column's manual order. */
   const place = (id: number, status: string, before: number | null) => start(async () => {
     setItems({ id, status, before });
@@ -52,7 +55,7 @@ export function Board({ columns, cards, today, projectId = null, hiddenNote, too
   return (
     <>
     {lightbox !== null && <TaskLightbox id={lightbox} onClose={closeLightbox} />}
-    <div role="tablist" aria-label="Columns" className="sticky top-12 z-10 -mx-4 mb-2 flex gap-1.5 overflow-x-auto bg-bg/95 px-4 py-1.5 backdrop-blur md:hidden">{columns.map((c) => <button key={c.key} role="tab" aria-selected={shownCol === c.key} onClick={() => goTo(columns.findIndex((x) => x.key === c.key))} className={`shrink-0 rounded-full border px-3 py-1.5 text-[13px] ${shownCol === c.key ? "border-accent/50 bg-accent/10 font-medium text-accent" : "text-mute"}`}>{c.name} <span className="text-dim">{items.filter((x) => x.status === c.key).length}</span></button>)}</div>
+    <div role="tablist" aria-label="Columns" className="sticky top-12 z-10 -mx-4 mb-2 flex gap-1.5 overflow-x-auto bg-bg/95 px-4 py-1.5 backdrop-blur md:hidden">{columns.map((c) => <button key={c.key} role="tab" aria-selected={shownCol === c.key} onClick={() => goTo(columns.findIndex((x) => x.key === c.key))} className={`shrink-0 rounded-full border px-3 py-1.5 text-[13px] ${shownCol === c.key ? "border-accent/50 bg-accent/10 font-medium text-accent" : "text-mute"}`}>{c.name} <span className="text-dim">{shown.filter((x) => x.status === c.key).length}</span></button>)}</div>
     <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
       <button type="button" aria-expanded={tools} onClick={() => setTools((v) => !v)} className={`btn !h-8 text-xs md:hidden ${tools ? "!border-accent/40 !bg-accent/10 !text-accent" : ""}`}><Icon name="search" size={13} />Filters</button>
       <div className={`${tools ? "flex" : "hidden"} w-full flex-wrap items-center gap-x-3 gap-y-2 md:order-none md:flex md:w-auto`}>{toolbar}</div>
@@ -63,13 +66,14 @@ export function Board({ columns, cards, today, projectId = null, hiddenNote, too
     </div>
     <div ref={track} onScroll={onScroll} className="-mx-4 flex snap-x snap-mandatory scroll-pl-4 items-start gap-2.5 overflow-x-auto overscroll-x-contain px-4 pb-3 md:-mx-8 md:snap-none md:px-8">
       {columns.map((col, ci) => {
-        const list = items.filter((c) => c.status === col.key);
+        const list = shown.filter((c) => c.status === col.key), waiting = pending.filter((o) => o.type === "addcard" && o.column === col.key) as Extract<(typeof pending)[number], { type: "addcard" }>[];
         return (
           <section key={col.key} onDragOver={(e) => { e.preventDefault(); setOver(col.key); }} onDragLeave={() => setOver(null)}
             onDrop={(e) => { e.preventDefault(); setOver(null); const id = Number(e.dataTransfer.getData("text/plain")); if (id) place(id, col.key, null); }}
             className={`rise w-full shrink-0 snap-start rounded-xl bg-raise/60 p-1.5 transition md:block md:min-h-[calc(100dvh-17rem)] md:w-auto md:min-w-[272px] md:max-w-[480px] md:flex-1 ${over === col.key ? "ring-2 ring-accent/50" : ""}`} style={{ ["--i" as string]: ci }}>
             <h2 className="flex items-center gap-1.5 px-1.5 pb-1.5 pt-1 text-[12px] font-semibold text-mute"><StatusIcon status={col.kind} size={12} /><span className="truncate">{col.name}</span><span className="font-medium text-dim">{list.length}</span>{col.kind !== "done" && list.some((c) => c.estimate) && <span className="ml-auto font-normal text-dim" title="Estimated time in this column">{fmtMinutes(list.reduce((n, c) => n + (c.estimate ?? 0), 0))}</span>}</h2>
             <ul className="space-y-1.5">
+              {waiting.map((o) => <li key={o.id} className="rounded-lg border border-dashed bg-panel/60 px-2.5 py-2 text-[13.5px] text-mute" title="Waiting to sync">{o.text}<div className="mt-1 text-[11px] text-dim">Waiting to sync</div></li>)}
               {list.map((c) => {
                 const done = col.kind === "done";
                 const d = c.due && !done ? (c.due < today ? "text-danger" : c.due === today ? "text-ok" : "text-mute") : "text-mute";
@@ -120,7 +124,7 @@ export function Board({ columns, cards, today, projectId = null, hiddenNote, too
 /** "+ Add card" at the bottom of a column. Enter adds and keeps the box open for the next one. */
 function AddCard({ column, projectId }: { column: Column; projectId: number | null }) {
   const [open, setOpen] = useState(false), [text, setText] = useState(""), [busy, start] = useTransition(), box = useRef<HTMLDivElement>(null);
-  const submit = (keepOpen: boolean) => { const t = text.trim(); if (!t) { if (!keepOpen) setOpen(false); return; } start(async () => { const r = await addCardAction(t, column.key, projectId); if (r.ok) { setText(""); if (!keepOpen) setOpen(false); } else toast(r.error); }); };
+  const submit = (keepOpen: boolean) => { const t = text.trim(); if (!t) { if (!keepOpen) setOpen(false); return; } start(async () => { const q = await runOrQueue({ type: "addcard", text: t, column: column.key, project_id: projectId }, () => addCardAction(t, column.key, projectId)); if (q.queued) { toast("Saved. Will sync when you're back online"); setText(""); if (!keepOpen) setOpen(false); return; } if (q.result.ok) { setText(""); if (!keepOpen) setOpen(false); } else toast(q.result.error); }); };
   // Click away: add what's typed, or just close the box if it's empty (it never stays open on the board).
   const leave = (e: React.FocusEvent) => { if (box.current?.contains(e.relatedTarget as Node)) return; submit(false); };
   if (!open) return <button onClick={() => setOpen(true)} className="mt-2 flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-[13px] text-mute hover:bg-panel/70 hover:text-fg"><Icon name="plus" size={14} />Add card</button>;
