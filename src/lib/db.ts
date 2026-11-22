@@ -125,8 +125,18 @@ function migrate(d: Database.Database) {
   // v9: board automations (rules + a record of what each has already done), and a change counter so open tabs can tell when anything changed. Additive.
   d.exec("CREATE TABLE IF NOT EXISTS board_rules (id INTEGER PRIMARY KEY, project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE, kind TEXT NOT NULL DEFAULT 'due', offset_days INTEGER NOT NULL DEFAULT 0, column_key TEXT NOT NULL, to_top INTEGER NOT NULL DEFAULT 1, set_priority INTEGER, enabled INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL DEFAULT (datetime('now')))");
   d.exec("CREATE TABLE IF NOT EXISTS rule_runs (rule_id INTEGER NOT NULL REFERENCES board_rules(id) ON DELETE CASCADE, task_id INTEGER NOT NULL, due TEXT NOT NULL, at TEXT NOT NULL DEFAULT (datetime('now')), PRIMARY KEY (rule_id, task_id, due))");
+  // v10: file attachments (stored in the database, so backups include them), when a card entered its column (for "moved to" / "stuck in" rules), more automation options, custom fields. All additive.
+  d.exec("CREATE TABLE IF NOT EXISTS attachments (id INTEGER PRIMARY KEY, task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE, name TEXT NOT NULL, mime TEXT NOT NULL, size INTEGER NOT NULL, data BLOB NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')))");
+  d.exec("CREATE INDEX IF NOT EXISTS attachments_task ON attachments(task_id)");
+  if (!has("tasks", "status_at")) d.exec("ALTER TABLE tasks ADD COLUMN status_at TEXT");
+  d.exec("CREATE TRIGGER IF NOT EXISTS tasks_status_at AFTER UPDATE OF status ON tasks WHEN NEW.status IS NOT OLD.status BEGIN UPDATE tasks SET status_at = datetime('now') WHERE id = NEW.id; END");
+  if (!has("board_rules", "when_column")) d.exec("ALTER TABLE board_rules ADD COLUMN when_column TEXT NOT NULL DEFAULT ''");
+  if (!has("board_rules", "add_tag")) d.exec("ALTER TABLE board_rules ADD COLUMN add_tag TEXT NOT NULL DEFAULT ''");
+  if (!has("board_rules", "set_due")) d.exec("ALTER TABLE board_rules ADD COLUMN set_due TEXT NOT NULL DEFAULT ''");
+  d.exec("CREATE TABLE IF NOT EXISTS custom_fields (id INTEGER PRIMARY KEY, project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE, name TEXT NOT NULL, type TEXT NOT NULL DEFAULT 'text', options TEXT NOT NULL DEFAULT '', show_on_card INTEGER NOT NULL DEFAULT 0, position INTEGER NOT NULL DEFAULT 0)");
+  d.exec("CREATE TABLE IF NOT EXISTS task_fields (task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE, field_id INTEGER NOT NULL REFERENCES custom_fields(id) ON DELETE CASCADE, value TEXT NOT NULL DEFAULT '', PRIMARY KEY (task_id, field_id))");
   d.exec("CREATE TABLE IF NOT EXISTS data_rev (id INTEGER PRIMARY KEY CHECK (id = 1), rev INTEGER NOT NULL DEFAULT 0)"); d.exec("INSERT OR IGNORE INTO data_rev (id, rev) VALUES (1, 0)");
-  for (const t of ["tasks", "task_tags", "projects", "statuses", "tags", "notes", "goals", "key_results", "favourites", "board_rules"])
+  for (const t of ["tasks", "task_tags", "projects", "statuses", "tags", "notes", "goals", "key_results", "favourites", "board_rules", "attachments", "custom_fields", "task_fields"])
     for (const [n, ev] of [["i", "INSERT"], ["u", "UPDATE"], ["d", "DELETE"]]) d.exec(`CREATE TRIGGER IF NOT EXISTS rev_${t}_${n} AFTER ${ev} ON ${t} BEGIN UPDATE data_rev SET rev = rev + 1 WHERE id = 1; END`);
   // v5: voice memos can belong to a project (existing memos stay unassigned)
   if (!(d.prepare("PRAGMA table_info(voice_memos)").all() as { name: string }[]).some((c) => c.name === "project_id")) d.exec("ALTER TABLE voice_memos ADD COLUMN project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL");
@@ -150,7 +160,7 @@ function migrate(d: Database.Database) {
 }
 
 /** Bump when the schema changes. Existing databases below this get an automatic safety copy before they are migrated. */
-export const SCHEMA_VERSION = 9;
+export const SCHEMA_VERSION = 10;
 /**
  * Before upgrading an existing database to a newer schema, save a complete copy next to it (VACUUM INTO is safe while the app runs).
  * If this can't be written the upgrade stops rather than risk your data; set LIFEOS_SKIP_UPGRADE_BACKUP=1 to override. Keeps the newest 3.

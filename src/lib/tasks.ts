@@ -12,7 +12,7 @@ export type TaskRow = {
   id: number; title: string; notes: string; project_id: number | null; priority: number;
   due: string | null; due_time: string | null; estimate: number | null; done_at: string | null; status: Status; repeat: string | null;
   parent_id: number | null; source: string; meta: string | null; deleted_at: string | null;
-  status_kind: Kind; status_name: string; position: number | null; project_name: string | null; project_color: string | null; tags: string[]; sub_total: number; sub_done: number;
+  status_kind: Kind; status_name: string; position: number | null; project_name: string | null; project_color: string | null; tags: string[]; sub_total: number; sub_done: number; att_total: number;
 };
 export type NewTask = {
   title: string; notes?: string; project_id?: number | null; project?: string; due?: string | null; due_time?: string | null; estimate?: number | null;
@@ -22,7 +22,7 @@ export type NewTask = {
 const SELECT = `SELECT t.*, p.name AS project_name, p.color AS project_color,
   COALESCE(st.kind, CASE t.status WHEN 'done' THEN 'done' WHEN 'doing' THEN 'doing' ELSE 'todo' END) AS status_kind, COALESCE(st.name, t.status) AS status_name,
   (SELECT group_concat(g.name, ',') FROM task_tags tt JOIN tags g ON g.id=tt.tag_id WHERE tt.task_id=t.id) AS tags,
-  (SELECT count(*) FROM tasks s WHERE s.parent_id=t.id AND s.deleted_at IS NULL) AS sub_total,
+  (SELECT count(*) FROM tasks s WHERE s.parent_id=t.id AND s.deleted_at IS NULL) AS sub_total, (SELECT count(*) FROM attachments a WHERE a.task_id=t.id) AS att_total,
   (SELECT count(*) FROM tasks s WHERE s.parent_id=t.id AND s.deleted_at IS NULL AND s.done_at IS NOT NULL) AS sub_done
   FROM tasks t LEFT JOIN projects p ON p.id=t.project_id LEFT JOIN statuses st ON st.key=t.status`;
 type Raw = Omit<TaskRow, "tags"> & { tags: string | null };

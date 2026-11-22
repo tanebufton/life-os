@@ -48,6 +48,7 @@ export function TaskRow({ t }: { t: TaskRow }) {
           {t.estimate ? <span className="inline-flex items-center gap-1 text-mute" title="Estimate"><Icon name="clock" size={12} />{fmtMinutes(t.estimate)}</span> : null}
           {t.repeat && <span className="inline-flex items-center gap-1 text-mute" title="Repeats"><Icon name="repeat" size={12} />{repeatLabel(t.repeat)}</span>}
           {t.sub_total > 0 && <span className="inline-flex items-center gap-1 text-mute" title="Subtasks"><Icon name="list" size={12} />{t.sub_done}/{t.sub_total}</span>}
+          {t.att_total > 0 && <span className="inline-flex items-center gap-1 text-mute" title={`${t.att_total} attachment${t.att_total === 1 ? "" : "s"}`}><Icon name="paperclip" size={12} />{t.att_total}</span>}
           {t.status_kind === "doing" && !done && <span className="lozenge bg-accent/15 text-accent">{t.status_name}</span>}
           {from !== null && from !== undefined && <span className="inline-flex items-center gap-1 text-mute" title="Imported from email"><Icon name="mail" size={12} />{from || "Email"}</span>}
           {t.source === "share" && <span className="inline-flex items-center gap-1 text-mute"><Icon name="share" size={12} />Shared</span>}

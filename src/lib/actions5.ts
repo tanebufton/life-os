@@ -10,6 +10,7 @@ import { toggleFavourite, type FavKind } from "./favourites";
 import { PROJECT_VIEWS } from "./projectviews";
 import { redirect } from "next/navigation";
 import { setSetting } from "./settings";
+import { deleteAttachment } from "./attachments";
 import { deleteRule, runBoardAutomations, saveRule, type RuleInput } from "./automations";
 import { parsePrefs } from "./sidebar";
 import { createTask, deleteTask, getTask, moveCard, parseQuickAdd, parseTags, queryTasks, reschedule, setStatus, setTaskOrder, updateTask } from "./tasks";
@@ -133,3 +134,4 @@ export async function setNoteIconAction(id: number, icon: string): Promise<R> { 
 // ---------- board automations ----------
 export async function saveRuleAction(i: RuleInput): Promise<R> { return run(() => { saveRule(i); const n = runBoardAutomations({ force: true }); return n ? `Saved. ${n} card${n === 1 ? "" : "s"} moved now` : "Saved"; }); }
 export async function deleteRuleAction(id: number): Promise<R> { return run(() => { deleteRule(id); return "Automation removed"; }); }
+export async function deleteAttachmentAction(id: number): Promise<R> { return run(() => { deleteAttachment(id); }); }
