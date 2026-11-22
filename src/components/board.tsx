@@ -129,14 +129,25 @@ export function Board({ columns, cards, today, projectId = null, hiddenNote, too
 
 /** "+ Add card" at the bottom of a column. Enter adds and keeps the box open for the next one. */
 function AddCard({ column, projectId }: { column: Column; projectId: number | null }) {
-  const [open, setOpen] = useState(false), [text, setText] = useState(""), [busy, start] = useTransition(), box = useRef<HTMLDivElement>(null);
-  const submit = (keepOpen: boolean) => { const t = text.trim(); if (!t) { if (!keepOpen) setOpen(false); return; } start(async () => { const q = await runOrQueue({ type: "addcard", text: t, column: column.key, project_id: projectId }, () => addCardAction(t, column.key, projectId)); if (q.queued) { toast("Saved. Will sync when you're back online"); setText(""); if (!keepOpen) setOpen(false); return; } if (q.result.ok) { setText(""); if (!keepOpen) setOpen(false); } else toast(q.result.error); }); };
+  const [open, setOpen] = useState(false), [text, setText] = useState(""), [busy, start] = useTransition(), box = useRef<HTMLDivElement>(null), inflight = useRef(false);
+  const submit = (keepOpen: boolean) => {
+    const t = text.trim(); if (!t) { if (!keepOpen) setOpen(false); return; }
+    if (inflight.current) return; inflight.current = true; // one card per submit, however many things fire at once (Enter, click-away, a double click)
+    setText(""); if (!keepOpen) setOpen(false);
+    start(async () => {
+      try {
+        const q = await runOrQueue({ type: "addcard", text: t, column: column.key, project_id: projectId }, () => addCardAction(t, column.key, projectId));
+        if (q.queued) toast("Saved. Will sync when you're back online");
+        else if (!q.result.ok) { toast(q.result.error); setText(t); setOpen(true); } // didn't save: give the text back
+      } finally { inflight.current = false; }
+    });
+  };
   // Click away: add what's typed, or just close the box if it's empty (it never stays open on the board).
   const leave = (e: React.FocusEvent) => { if (box.current?.contains(e.relatedTarget as Node)) return; submit(false); };
   if (!open) return <button onClick={() => setOpen(true)} className="mt-2 flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-[13px] text-mute hover:bg-panel/70 hover:text-fg"><Icon name="plus" size={14} />Add card</button>;
   return (
     <div ref={box} onBlur={leave} className="mt-2 rounded-lg bg-panel p-2 shadow-sm">
-      <textarea autoFocus value={text} onChange={(e) => setText(e.target.value)} rows={2} placeholder="Title (try: Call vet friday #pets !high)" aria-label={`New card in ${column.name}`} disabled={busy}
+      <textarea autoFocus value={text} onChange={(e) => setText(e.target.value)} rows={2} placeholder="Title (try: Call vet friday #pets !high)" aria-label={`New card in ${column.name}`}
         onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(true); } if (e.key === "Escape") { setText(""); setOpen(false); } }} className="field resize-none text-[14px]" />
       <div className="mt-1.5 flex items-center gap-2"><button className="btn-primary !h-7 text-xs" disabled={busy || !text.trim()} onClick={() => submit(true)}>Add</button><button className="text-xs text-mute hover:text-fg" onClick={() => { setText(""); setOpen(false); }}>Cancel</button></div>
     </div>
