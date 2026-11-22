@@ -1,0 +1,50 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>LifeOS</title>
+<style>
+:root{color-scheme:light dark;--bg:#fff;--fg:#1f1f1e;--mute:#706f6b;--line:#e4e3df;--acc:#1877f2;--bad:#d44c47;--ok:#1f845a;--raise:#f4f3f0}
+@media(prefers-color-scheme:dark){:root{--bg:#191919;--fg:#ececea;--mute:#a3a29d;--line:#33332f;--raise:#262624}}
+*{box-sizing:border-box}body{margin:0;font:14px/1.45 system-ui,sans-serif;background:var(--bg);color:var(--fg);width:400px;min-height:300px}
+nav{display:flex;align-items:center;gap:2px;padding:8px 10px 0;border-bottom:1px solid var(--line)}
+nav button{border:0;background:transparent;color:var(--mute);font:inherit;padding:8px 12px;border-bottom:2px solid transparent;margin-bottom:-1px;cursor:pointer}
+nav button[aria-selected=true]{color:var(--fg);font-weight:600;border-color:var(--acc)}nav a{margin-left:auto;color:var(--mute);font-size:12px;text-decoration:none;padding:6px}
+section{padding:14px;display:flex;flex-direction:column;gap:10px}[hidden]{display:none!important}
+label.l{font-size:12px;font-weight:600;color:var(--mute);display:block;margin-bottom:3px}
+input[type=text],input[type=date],textarea,select{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:transparent;color:inherit;font:inherit;outline:none}
+input:focus,textarea:focus,select:focus{border-color:var(--acc)}textarea{resize:vertical;min-height:84px}
+.seg{display:flex;gap:6px;flex-wrap:wrap}.seg button{padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--mute);font:inherit;font-size:13px;cursor:pointer}.seg button[aria-pressed=true]{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 12%,transparent);color:var(--acc)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}button.b{padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:transparent;color:inherit;font:inherit;cursor:pointer}button.b.p{background:var(--acc);border-color:var(--acc);color:#fff}button.b:disabled{opacity:.5;cursor:default}
+.site{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--mute);min-width:0}.site img{width:16px;height:16px;border-radius:3px}.site span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#msg,#tmsg{min-height:18px;font-size:13px}.err{color:var(--bad)}.ok{color:var(--ok)}a{color:var(--acc)}small{color:var(--mute)}
+ul.tasks{list-style:none;margin:0;padding:0}ul.tasks li{display:flex;gap:10px;align-items:flex-start;padding:7px 2px;border-bottom:1px solid var(--line)}ul.tasks li:last-child{border:0}
+ul.tasks input{margin-top:3px}ul.tasks a{color:inherit;text-decoration:none}ul.tasks a:hover{text-decoration:underline}ul.tasks .d{font-size:12px;color:var(--mute)}ul.tasks .late{color:var(--bad)}ul.tasks li.gone a{text-decoration:line-through;color:var(--mute)}
+.setup{padding:14px;border:1px solid var(--line);border-radius:10px;margin:14px;background:var(--raise)}
+.top{display:flex;align-items:center;gap:12px}#mic{width:56px;height:56px;border-radius:50%;border:0;background:var(--acc);color:#fff;cursor:pointer;display:grid;place-items:center;flex:none}
+#mic.on{background:var(--bad);animation:p 1.2s infinite}@keyframes p{50%{opacity:.6}}#mic:disabled{opacity:.4;cursor:default}#hint{color:var(--mute);font-size:13px}#t{min-height:100px}
+</style></head><body data-tab="page">
+<nav role="tablist"><button role="tab" data-tab="page" aria-selected="true">Page</button><button role="tab" data-tab="today" aria-selected="false">Today</button><button role="tab" data-tab="voice" aria-selected="false">Voice</button><a href="options.html" target="_blank">Settings</a></nav>
+<div id="setup" class="setup" hidden><b>Connect to LifeOS</b><p style="margin:6px 0 10px;color:var(--mute);font-size:13px">Enter your LifeOS address and press Connect. It takes a few seconds.</p><button class="b p" id="gosetup">Open settings</button></div>
+
+<section id="p-page">
+  <div class="site"><img id="fav" alt="" hidden><span id="host"></span></div>
+  <div><label class="l" for="title">Title</label><input type="text" id="title" autocomplete="off"></div>
+  <div><label class="l" for="notes">Notes</label><textarea id="notes" placeholder="Anything you selected on the page is added here"></textarea></div>
+  <div><label class="l">Follow up</label><div class="seg" id="when"><button data-w="" aria-pressed="true">No date</button><button data-w="today" aria-pressed="false">Today</button><button data-w="tomorrow" aria-pressed="false">Tomorrow</button><button data-w="week" aria-pressed="false">Next week</button></div></div>
+  <div class="row"><div style="flex:1;min-width:140px"><label class="l" for="project">Project</label><select id="project"><option value="">Inbox</option></select></div><div style="flex:1;min-width:120px"><label class="l" for="tags">Tags</label><input type="text" id="tags" placeholder="clip" autocomplete="off"></div></div>
+  <div class="row"><label style="display:flex;gap:6px;align-items:center;font-size:13px"><input type="checkbox" id="high">High priority</label></div>
+  <div class="row"><button class="b p" id="add">Add task</button><button class="b" id="addnote">Save as note</button></div>
+  <div id="msg" role="status"></div>
+</section>
+
+<section id="p-today" hidden>
+  <input type="text" id="quick" placeholder="Add a task… e.g. call mum tomorrow 5pm #family" autocomplete="off" aria-label="Quick add">
+  <ul class="tasks" id="list"></ul><div id="tmsg" role="status"></div>
+  <small><a href="#" id="openapp">Open LifeOS</a></small>
+</section>
+
+<section id="p-voice" hidden>
+  <div class="top"><button id="mic" aria-label="Hold to talk" aria-pressed="false" style="touch-action:none;user-select:none"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button><div id="hint"></div></div>
+  <div id="perm" hidden style="padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px">The microphone needs allowing once. <button class="b" id="allow" style="padding:3px 8px;margin-left:6px">Allow</button></div>
+  <textarea id="t" placeholder="Your words appear here. You can edit them." aria-label="Transcript"></textarea>
+  <div class="row"><button class="b p" id="task">Save as task</button><button class="b" id="note">Note</button><button class="b" id="memo">Memo</button></div>
+  <div id="vmsg" role="status"></div><small>Hold the button or the Space bar, speak, then let go to add a task. Or type and press Ctrl/⌘ + Enter.</small>
+</section>
+<script src="common.js"></script><script src="popup.js"></script><script src="recorder.js"></script></body></html>

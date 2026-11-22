@@ -1,12 +1,43 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><title>LifeOS Voice settings</title>
-<style>*{box-sizing:border-box}:root{color-scheme:light dark}body{max-width:560px;margin:40px auto;padding:0 16px;font:15px/1.5 system-ui,sans-serif}h1{font-size:22px}label{display:block;margin:14px 0 4px;font-weight:600;font-size:13px}input{width:100%;padding:8px 10px;border:1px solid #8884;border-radius:8px;font:inherit;background:transparent;color:inherit}
-button{margin-top:16px;padding:8px 14px;border-radius:8px;border:0;background:#1877f2;color:#fff;font:inherit;cursor:pointer}button.s{background:transparent;color:inherit;border:1px solid #8886;margin-left:8px}details{margin-top:22px}p.h{color:#8a8985;font-size:13px;margin:4px 0}#m{margin-top:14px;min-height:22px}.err{color:#d44c47}.ok{color:#1f845a}</style></head><body>
-<h1>LifeOS Voice</h1><p class="h">Where your LifeOS lives, and a token so it knows it's you.</p>
-<label for="base">LifeOS address</label><input id="base" placeholder="https://lifeos.example.com" autocomplete="off"><p class="h">The same address you open in the browser (a Cloudflare tunnel or Tailscale address).</p>
-<label for="token">API token</label><input id="token" type="password" placeholder="lifeos_…" autocomplete="off"><p class="h">LifeOS → Settings → API &amp; calendar feed → create a token.</p>
-<label for="project">Send voice memos to</label><select id="project" style="width:100%;padding:8px 10px;border:1px solid #8884;border-radius:8px;font:inherit;background:transparent;color:inherit"><option value="">LifeOS default (or no project)</option></select><p class="h">Pick a project and every memo and task you record here is filed under it. The list appears after you save and test.</p>
-<details><summary>Behind Cloudflare Access? (optional)</summary><p class="h">Create a service token in Cloudflare Zero Trust and add a policy that allows it on <code>/api/v1/*</code>.</p>
-<label for="cfId">CF-Access-Client-Id</label><input id="cfId" autocomplete="off"><label for="cfSecret">CF-Access-Client-Secret</label><input id="cfSecret" type="password" autocomplete="off"></details>
-<button id="save">Save &amp; test</button>
-<h2 style="font-size:16px;margin-top:28px" id="mic">Microphone</h2><p class="h">Chrome only shows the microphone prompt on a normal page, so allow it here once. The toolbar recorder then works for good.</p><button id="allowmic" class="s" style="margin-left:0">Allow the microphone</button><div id="micmsg" role="status" style="margin-top:8px;min-height:20px"></div><div id="m" role="status"></div>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>LifeOS extension settings</title>
+<style>
+*{box-sizing:border-box}:root{color-scheme:light dark;--line:#8884;--acc:#1877f2;--bad:#d44c47;--ok:#1f845a;--mute:#8a8985}
+body{max-width:580px;margin:40px auto;padding:0 16px;font:15px/1.5 system-ui,sans-serif}h1{font-size:22px;margin-bottom:2px}h2{font-size:16px;margin:30px 0 4px}.h{color:var(--mute);font-size:13px;margin:2px 0 8px}
+label{display:block;margin:14px 0 4px;font-weight:600;font-size:13px}input[type=text],input[type=password],input[type=url],select{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font:inherit;background:transparent;color:inherit}
+button{padding:8px 14px;border-radius:8px;border:0;background:var(--acc);color:#fff;font:inherit;cursor:pointer}button.s{background:transparent;color:inherit;border:1px solid var(--line)}button:disabled{opacity:.5}
+.row{display:flex;gap:8px;align-items:center}.row input{flex:1}.card{border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-top:10px}
+#state{margin-top:10px;font-size:14px}.err{color:var(--bad)}.ok{color:var(--ok)}code{background:#8882;padding:1px 5px;border-radius:4px}details{margin-top:14px}summary{cursor:pointer;color:var(--mute)}
+</style></head><body>
+<h1>LifeOS</h1><p class="h">The Chrome extension: add the page you're on, see what's due, and speak a note.</p>
+
+<h2>Connect</h2>
+<div class="card">
+  <label for="base" style="margin-top:0">Your LifeOS address</label>
+  <div class="row"><input id="base" type="url" placeholder="https://life.example.com" autocomplete="off"><button id="connect">Connect</button></div>
+  <p class="h">The address you open LifeOS at. Press Connect: a LifeOS tab opens (sign in there if it asks), you press one button, and the extension gets its own key. No copying.</p>
+  <div id="state" role="status"></div>
+  <p class="h" id="acct" hidden></p><button class="s" id="disconnect" hidden>Disconnect</button>
+</div>
+
+<h2>Defaults</h2>
+<div class="card">
+  <label for="project" style="margin-top:0">Add pages, selections and voice notes to</label>
+  <select id="project"><option value="">Inbox (no project)</option></select>
+  <label for="followup">When I add a page, follow up</label>
+  <select id="followup"><option value="">With no date</option><option value="today">Today</option><option value="tomorrow">Tomorrow</option><option value="week">Next week</option></select>
+  <label for="tags">Tag clipped pages with</label><input id="tags" type="text" placeholder="clip" autocomplete="off"><p class="h">Separate tags with spaces. Leave empty for none.</p>
+  <label style="display:flex;gap:8px;align-items:center;font-weight:400"><input type="checkbox" id="badge"> Show the number of tasks due today on the toolbar icon</label>
+</div>
+
+<h2>Ways to add things</h2>
+<div class="card h" style="color:inherit"><p style="margin:0 0 6px"><b>Toolbar button:</b> add this page, check what's due, or record a voice note.</p><p style="margin:0 0 6px"><b>Right-click</b> a page, some selected text, or a link: “Add … to LifeOS”.</p><p style="margin:0 0 6px"><b>Alt+Shift+A</b> adds the current page instantly. <b>Alt+Shift+V</b> opens the voice recorder. (Change them at <code>chrome://extensions/shortcuts</code>.)</p><p style="margin:0"><b>Address bar:</b> type <code>lf</code>, press Tab, then a task to add it, or a few letters to find one.</p></div>
+
+<details><summary>Advanced</summary>
+  <p class="h">Only needed if Connect can't be used. Create a token in LifeOS → Settings → Connections → API.</p>
+  <label for="token">API token</label><input id="token" type="password" placeholder="lifeos_…" autocomplete="off">
+  <label for="cfId">Cloudflare Access service token: Client ID (optional)</label><input id="cfId" type="text" autocomplete="off">
+  <label for="cfSecret">Client Secret (optional)</label><input id="cfSecret" type="password" autocomplete="off">
+  <p><button id="savemanual" class="s">Save and test</button></p><div id="manualmsg" role="status"></div>
+</details>
+
+<h2 id="mic">Microphone</h2><p class="h">Chrome only shows the microphone prompt on a normal page, so allow it here once. The recorder then works for good.</p><button id="allowmic" class="s">Allow the microphone</button> <span id="micmsg"></span>
 <script src="common.js"></script><script src="options.js"></script></body></html>

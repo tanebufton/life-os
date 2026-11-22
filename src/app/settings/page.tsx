@@ -103,19 +103,19 @@ export default async function Settings({ searchParams }: { searchParams: Promise
 
       <Section cur={tab} tab="connect" id="install" i={0} title="Install the app" desc="Put LifeOS on your phone or desktop like any other app."><InstallApp /></Section>
 
-      {f.voice && (
-        <Section cur={tab} tab="connect" id="extension" i={0} title="Chrome extension" desc="Record a voice memo from any tab without opening LifeOS. It speaks to your LifeOS with an API token, so it works from anywhere you can reach it.">
+      {(
+        <Section cur={tab} tab="connect" id="extension" i={0} title="Chrome extension" desc="Add the page you're on (or text you select) as a follow-up task, see what's due and tick it off, and record voice notes, all without opening LifeOS. Right-click menus, Alt+Shift+A, and an address-bar shortcut (type lf) are included.">
           <Panel bodyClass="space-y-4 p-4">
             <div className="flex flex-wrap items-center gap-3"><a href="/api/extension" download className="btn-primary"><Icon name="download" size={14} />Download the extension</a><span className="text-xs text-mute">A small zip (about 20 KB). Chrome, Edge, Brave and other Chromium browsers.</span></div>
             <ol className="list-decimal space-y-1.5 pl-5 text-[13px] text-mute">
               <li>Unzip it somewhere you&apos;ll keep it (Chrome reads it from there).</li>
-              <li>Open <code className="rounded bg-raise px-1">chrome://extensions</code>, switch on <b className="text-fg">Developer mode</b>, click <b className="text-fg">Load unpacked</b> and pick the <code className="rounded bg-raise px-1">lifeos-voice</code> folder.</li>
-              <li>Open its options and paste this address plus an API token (create one under API &amp; calendar feed below).</li>
+              <li>Open <code className="rounded bg-raise px-1">chrome://extensions</code>, switch on <b className="text-fg">Developer mode</b>, click <b className="text-fg">Load unpacked</b> and pick the <code className="rounded bg-raise px-1">lifeos-extension</code> folder.</li>
+              <li>Its settings open. Enter the address below and press <b className="text-fg">Connect</b>. A LifeOS tab opens, you press one button, and the extension gets its own key. No copying. (Revoke it any time under API &amp; calendar feed below.)</li>
             </ol>
             <div><div className="mb-1 text-xs font-medium text-mute">Your LifeOS address</div><CopyBox value={origin} /></div>
-            <form action={saveVoiceProject} className="space-y-1.5 border-t pt-4"><label className="text-[13px] font-medium" htmlFor="voice-project">Default project for voice memos</label>
+            {f.voice && <form action={saveVoiceProject} className="space-y-1.5 border-t pt-4"><label className="text-[13px] font-medium" htmlFor="voice-project">Default project for voice memos</label>
               <div className="flex gap-2"><select id="voice-project" name="project" defaultValue={nv("voice_project")} className="field"><option value="">None</option>{(db.prepare("SELECT id, name FROM projects WHERE archived=0 ORDER BY name").all() as { id: number; name: string }[]).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select><button className="btn-primary">Save</button></div>
-              <p className="text-xs text-dim">Used when a memo arrives without a project. You can also pick one in the extension&apos;s own options, which wins over this.</p></form>
+              <p className="text-xs text-dim">Used when a memo arrives without a project. You can also pick one in the extension&apos;s own options, which wins over this.</p></form>}
           </Panel>
         </Section>)}
 

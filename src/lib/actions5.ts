@@ -11,6 +11,7 @@ import { PROJECT_VIEWS } from "./projectviews";
 import { redirect } from "next/navigation";
 import { setSetting } from "./settings";
 import { completeTask, reopenTask } from "./tasks";
+import { createToken } from "./tokens";
 import { deleteAttachment } from "./attachments";
 import { deleteField, moveField, saveField, setFieldValue, type FieldInput } from "./fields";
 import { deleteRule, runBoardAutomations, saveRule, type RuleInput } from "./automations";
@@ -147,3 +148,11 @@ export async function setFieldValueAction(taskId: number, fieldId: number, value
 // ---------- offline sync (idempotent forms of tick and move, so replaying them is safe) ----------
 export async function setDoneAction(id: number, done: boolean): Promise<R> { return run(() => { const t = getTask(id); if (!t) throw new Error("Task not found"); if (done && !t.done_at) completeTask(id); else if (!done && t.done_at) reopenTask(id); }); }
 export async function moveTask(id: number, status: string): Promise<R> { return run(() => { if (!getTask(id)) throw new Error("Task not found"); setStatus(id, status); }); }
+
+/** The Chrome extension asks for a key of its own: write access to tasks and voice, valid for a year, revocable in Settings. Shown once, to the page the signed-in person is looking at. */
+export async function createExtensionToken(label: string): Promise<{ token: string }> {
+  const name = `Chrome extension${label ? ` (${label.replace(/[^\w .-]/g, "").slice(0, 30)})` : ""} · ${new Date().toISOString().slice(0, 10)}`;
+  const token = createToken(name, { level: "write", areas: ["tasks", "voice"], days: 365 });
+  revalidatePath("/settings");
+  return { token };
+}

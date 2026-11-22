@@ -24,7 +24,7 @@ On a phone it uses a bottom bar (which can hold a project of your choice), a sli
 **Capture, fast**
 - One **Add a task** bar everywhere. Type naturally: `Pay rent every month #bills @home !high 31 march at 9am ~30m`.
 - **Voice:** hold the mic in the bar and talk, let go and the task is added (or tap to start and stop). Uses your browser's speech recognition.
-- **Chrome extension** (download it from Settings → Connections): record from any tab without opening LifeOS, with a default project.
+- **Chrome extension** (download it from Settings → Connections; connects in one click): add the page you're on, or text you selected, as a follow-up task; see what's due and tick it off; right-click menus; an address-bar shortcut; voice notes.
 - **Email to tasks**, a **Telegram bot**, the **REST API**, iOS Shortcuts, the phone share sheet, and **Claude** over MCP.
 
 **Plan your time**

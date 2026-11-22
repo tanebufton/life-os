@@ -1,13 +1,17 @@
 {
   "manifest_version": 3,
-  "name": "LifeOS Voice",
-  "version": "1.0.0",
-  "description": "Speak a thought and send it to your LifeOS as a task, note or memo, without opening it.",
+  "name": "LifeOS",
+  "version": "2.0.0",
+  "description": "Add the page you're on, your selection or a voice note to LifeOS, see what's due and tick it off, all from the toolbar.",
   "icons": { "16": "icons/16.png", "32": "icons/32.png", "48": "icons/48.png", "128": "icons/128.png" },
-  "action": { "default_title": "Record a voice memo to LifeOS", "default_popup": "recorder.html" },
+  "action": { "default_title": "LifeOS", "default_popup": "popup.html" },
   "background": { "service_worker": "background.js" },
   "options_ui": { "page": "options.html", "open_in_tab": true },
-  "permissions": ["storage"],
+  "permissions": ["storage", "contextMenus", "activeTab", "scripting", "alarms"],
   "optional_host_permissions": ["https://*/*", "http://*/*"],
-  "commands": { "record": { "suggested_key": { "default": "Alt+Shift+V" }, "description": "Record a voice memo" } }
+  "omnibox": { "keyword": "lf" },
+  "commands": {
+    "add-page": { "suggested_key": { "default": "Alt+Shift+A" }, "description": "Add this page to LifeOS" },
+    "record": { "suggested_key": { "default": "Alt+Shift+V" }, "description": "Record a voice note" }
+  }
 }

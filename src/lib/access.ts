@@ -30,3 +30,9 @@ export async function checkAccess(i: AccessInput, env: Record<string, string | u
   if (env.LIFEOS_REQUIRE_CF_ACCESS === "1" && !i.emailHeader) return { ok: false, reason: "no identity header" };
   return { ok: true };
 }
+
+/** The signed-in person's email from the Cloudflare Access token, for display only. By the time a page renders, the middleware has already checked the token's signature. */
+export function accessEmail(jwt?: string | null): string | null {
+  if (!jwt) return null;
+  try { const p = JSON.parse(Buffer.from(jwt.split(".")[1] ?? "", "base64url").toString("utf8")); return typeof p.email === "string" ? p.email : null; } catch { return null; }
+}
