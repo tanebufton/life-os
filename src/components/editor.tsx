@@ -77,7 +77,7 @@ export function TaskEditor({ task, projects, focus, columns, head, children, tod
           className="w-full rounded-md bg-transparent px-1 py-1 text-[28px] font-bold leading-tight tracking-tight outline-none hover:bg-raise/60 focus:bg-raise/60 md:text-[30px]" />
       </div>
       <div className="min-w-0 lg:col-start-1 lg:row-start-2">
-        <MarkdownField value={v.notes} onChange={(x) => { set("notes", x); save({ notes: x }, 800); }} onBlur={() => void flush()} rows={10} label="Notes" placeholder="Add notes. Markdown works: **bold**, lists, checklists. Links are picked up automatically." defaultMode={v.notes ? "view" : "edit"} />
+        <MarkdownField value={v.notes} onChange={(x) => { set("notes", x); save({ notes: x }, 800); }} onBlur={() => void flush()} rows={10} label="Notes" placeholder="Add notes. Markdown works: **bold**, lists, checklists. Links are picked up automatically." defaultMode="edit" />
       </div>
       <aside className="rounded-xl border bg-panel p-3 lg:col-start-2 lg:row-span-3 lg:row-start-1" aria-label="Properties">
         <div className="mb-1 flex min-h-6 items-center justify-between px-1 text-xs text-dim"><span className="font-semibold text-mute">Properties</span><SaveStatus state={state === "idle" ? "idle" : state === "saving" ? "saving" : state === "saved" ? "saved" : "error"} error={err ? state : undefined} /></div>
