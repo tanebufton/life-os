@@ -87,7 +87,6 @@ function migrate(d: Database.Database) {
     CREATE TABLE IF NOT EXISTS task_comments (id INTEGER PRIMARY KEY, task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE, body TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')));
     CREATE TABLE IF NOT EXISTS saved_filters (id INTEGER PRIMARY KEY, name TEXT NOT NULL, query TEXT NOT NULL);
   `);
-  d.exec("UPDATE tasks SET status='done' WHERE done_at IS NOT NULL AND status!='done'");
   d.exec("DELETE FROM tasks WHERE deleted_at IS NOT NULL AND deleted_at < datetime('now','-30 days')");
   // Board columns. A status is a column with a "kind" (todo/doing/done) so counts, reminders and Today keep working with custom names.
   // project_id NULL = the default set; a project can own its own set. Keys are unique across all sets, so a key alone identifies a column.
@@ -99,6 +98,7 @@ function migrate(d: Database.Database) {
     const ins = d.prepare("INSERT INTO statuses (project_id, key, name, kind, position) VALUES (NULL, ?, ?, ?, ?)");
     ins.run("todo", "To do", "todo", 0); ins.run("doing", "In progress", "doing", 1); ins.run("done", "Done", "done", 2);
   }
+  repairStatuses(d); // runs at every start: puts any card whose column its board doesn't have back into a matching one
   // API token scopes (added after the table existed in earlier versions)
   const tcols = (d.prepare("PRAGMA table_info(api_tokens)").all() as { name: string }[]).map((c) => c.name);
   if (!tcols.includes("level")) d.exec("ALTER TABLE api_tokens ADD COLUMN level TEXT NOT NULL DEFAULT 'write'"); // existing tokens keep read+write
@@ -177,6 +177,27 @@ function safetyCopy(d: Database.Database) {
     const old = fs.readdirSync(path.dirname(file)).filter((f) => f.startsWith(prefix)).sort().reverse().slice(3);
     for (const f of old) try { fs.unlinkSync(path.join(path.dirname(file), f)); } catch { /* best effort */ }
   } catch (e) { throw new Error(`LifeOS could not save a safety copy before upgrading the database (${(e as Error).message}). Free some disk space, or set LIFEOS_SKIP_UPGRADE_BACKUP=1 to upgrade without one.`); }
+}
+
+/**
+ * Keeps every card in a column that exists on its own board. A completed card belongs in a "done" column of its board, an open one in a to-do or doing column.
+ * (An older start-up step reset every completed card to the default "done" column, which orphaned the finished cards of projects with their own columns: they were still saved, just not shown on the board.)
+ * Cards already in a valid column are never touched. Returns how many were moved.
+ */
+export function repairStatuses(d: Database.Database): number {
+  type S = { project_id: number | null; key: string; kind: "todo" | "doing" | "done" };
+  const all = d.prepare("SELECT project_id, key, kind FROM statuses ORDER BY position, id").all() as S[], by = new Map<number | null, S[]>();
+  for (const s of all) { const l = by.get(s.project_id); if (l) l.push(s); else by.set(s.project_id, [s]); }
+  const defaults = by.get(null) ?? [], kindOfKey = new Map(all.map((s) => [s.key, s.kind])), upd = d.prepare("UPDATE tasks SET status=? WHERE id=?");
+  let n = 0;
+  for (const t of d.prepare("SELECT id, project_id, status, done_at FROM tasks WHERE deleted_at IS NULL").all() as { id: number; project_id: number | null; status: string; done_at: string | null }[]) {
+    const set = (t.project_id !== null ? by.get(t.project_id) : undefined) ?? defaults, cur = set.find((s) => s.key === t.status), wantDone = t.done_at !== null;
+    if (cur && ((cur.kind === "done") === wantDone || !wantDone)) continue; // fine (an open card sitting in a done column is left as it is)
+    const kind = wantDone ? "done" : kindOfKey.get(t.status) === "doing" ? "doing" : "todo";
+    const target = set.find((s) => s.kind === kind) ?? (kind === "done" ? set[set.length - 1] : kind === "doing" ? set.find((s) => s.kind === "todo") : set.find((s) => s.kind !== "done")) ?? set[0];
+    if (target && target.key !== t.status) { upd.run(target.key, t.id); n++; }
+  }
+  return n;
 }
 
 const g = globalThis as unknown as { __db?: Database.Database };
