@@ -22,7 +22,7 @@ const bad = Cal.addFeed("Bad", "http://127.0.0.1:4666/html"); assert.match((awai
 assert.ok(Cal.eventsOn("2026-11-19").length > 0); delete process.env.LIFEOS_ALLOW_PRIVATE_FETCH; assert.throws(() => Cal.addFeed("local", "http://127.0.0.1/x.ics")); process.env.LIFEOS_ALLOW_PRIVATE_FETCH = "1"; ok("calendar: private addresses blocked unless explicitly allowed");
 
 // ---- planner
-const day = D.addDays(t, 3); S.setSetting("work_start", "09:00"); S.setSetting("work_end", "12:00");
+let day = D.addDays(t, 3); while (D.weekday(day) === 1) day = D.addDays(day, 1); /* not a Monday: the fixture calendar has a weekly Monday meeting */ S.setSetting("work_start", "09:00"); S.setSetting("work_end", "12:00");
 db.prepare("INSERT INTO cal_events (feed_id, uid, title, date, start_time, end_time, all_day) VALUES (?,?,?,?,?,?,0)").run(fid, "pl1", "Standup", day, "09:30", "10:00");
 const a = T.createTask({ title: "Write report", due: day, due_time: "10:00", estimate: 60 }); const u1 = T.createTask({ title: "Big one", due: day, estimate: 90, priority: 1 }), u2 = T.createTask({ title: "Small", due: day, estimate: 15 }), u3 = T.createTask({ title: "No estimate", due: day }), u4 = T.createTask({ title: "Huge", due: day, estimate: 240 });
 const blocks = P.dayBlocks(day).blocks; assert.deepEqual(blocks.map((b: any) => [b.title, b.start, b.end]), [["Standup", 570, 600], ["Write report", 600, 660]]); ok("planner: timed tasks sized by estimate + calendar events, ordered");
