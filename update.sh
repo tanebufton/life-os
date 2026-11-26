@@ -19,7 +19,7 @@ fi
 docker compose --profile mcp up -d --remove-orphans
 # Tidy up, only now that the new version is built and running (the script stops at the first failure above, so a bad update never prunes anything).
 # 1. the previous LifeOS image, now untagged.  2. old build cache beyond ~3 GB (the newest cache stays, so the next update is still quick).
-freed=$( { docker image prune -f; docker builder prune -f --keep-storage 3GB; } 2>/dev/null | sed -n 's/^Total reclaimed space: *//p' | paste -sd'+' - || true)
+freed=$( { docker image prune -f; docker builder prune -f --keep-storage 3GB; } 2>/dev/null | sed -n 's/^Total\( reclaimed space\)\{0,1\}:[[:space:]]*//p' | paste -sd'+' - || true)
 [ -n "${freed:-}" ] && echo "Cleaned up old images and build cache (freed: ${freed//+/ + })."
 # ./update.sh --deep also removes every image nothing is using that is over a week old (old cloudflared versions and so on). Running containers are never touched.
 [ "${1:-}" = "--deep" ] && docker image prune -a -f --filter "until=168h" | tail -1
