@@ -7,7 +7,7 @@ import { FEATURES, featureDefault, isFeature, setFeature, type FeatureKey } from
 import { logFocus as logFocusLib } from "./focus";
 import { notify, notifyConfigured } from "./notify";
 import { getSetting, setSetting } from "./settings";
-import { createTask, completeTask, deleteTask as softDelete, duplicateTask, getTask, parseQuickAdd, parseTags, reopenTask, reschedule, restoreTask, setStatus, updateTask, type Status } from "./tasks";
+import { addReminder, removeReminder, resolveLeftovers, setFocus, createTask, completeTask, deleteTask as softDelete, duplicateTask, getTask, parseQuickAdd, parseTags, reopenTask, reschedule, restoreTask, setStatus, updateTask, type Status } from "./tasks";
 import { createToken, icalSecret, inboundSecret, revokeToken } from "./tokens";
 import { today } from "./time";
 import { enrichLinkTask } from "./misc";
@@ -52,6 +52,15 @@ export async function restoreTaskAction(id: number) { restoreTask(id); refresh()
 export async function deleteTask(id: number) { softDelete(id); refresh(); redirect(`/tasks?deleted=${id}`); }
 export async function duplicateTaskAction(id: number): Promise<number | null> { const n = duplicateTask(id); refresh(); return n; }
 export async function startFocus(id: number) { if (getTask(id)?.status_kind === "todo") setStatus(id, "doing"); refresh(); }
+/** "Must do today" on or off. */
+export async function setFocusAction(id: number, on: boolean): Promise<boolean> { const ok = setFocus(id, !!on); refresh(); return ok; }
+/** Yesterday's (or earlier) unfinished focus tasks: carry them over to today, or drop them from focus. */
+export async function resolveLeftoversAction(ids: number[], carry: boolean): Promise<number> { const n = resolveLeftovers(z.array(z.number().int().positive()).max(500).parse(ids), !!carry); refresh(); return n; }
+export async function addReminderAction(taskId: number, r: { at?: string; before?: number }): Promise<{ ok: true; id: number } | { ok: false; error: string }> {
+  try { const id = addReminder(taskId, { ...(typeof r.at === "string" ? { at: r.at } : {}), ...(typeof r.before === "number" ? { before: Math.round(r.before) } : {}) }); if (!id) return { ok: false, error: "Task not found" }; refresh(); return { ok: true, id }; }
+  catch (e) { return { ok: false, error: (e as Error).message }; }
+}
+export async function removeReminderAction(id: number): Promise<boolean> { const ok = removeReminder(id); refresh(); return ok; }
 export async function addSubtask(parentId: number, title: string) { const t = title.trim(); if (t) createTask({ title: t, parent_id: parentId }); refresh(); }
 
 const Patch = z.object({
@@ -59,6 +68,7 @@ const Patch = z.object({
   due: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(), due_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).nullable().optional(),
   estimate: z.number().int().min(1).max(1440).nullable().optional(), priority: z.number().int().min(-1).max(1).optional(), repeat: z.string().max(40).nullable().optional(),
   tags: z.string().max(300).optional(), status: Status.optional(),
+  start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(), focus: z.boolean().optional(),
 });
 /** Autosave from the task editor. Returns an error string instead of throwing so the UI can show it inline. */
 export async function patchTask(id: number, raw: unknown): Promise<{ ok: true } | { ok: false; error: string }> {

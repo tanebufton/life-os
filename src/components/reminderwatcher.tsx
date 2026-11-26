@@ -3,7 +3,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 
-type Due = { id: number; title: string; due: string; time: string; project: string | null; token: string };
+type Due = { id: number; title: string; due: string | null; time: string; project: string | null; token: string; label?: string };
 const SEEN = "lifeos:rem:seen";
 const seen = (): string[] => { try { return JSON.parse(localStorage.getItem(SEEN) || "[]"); } catch { return []; } };
 const remember = (t: string) => { try { localStorage.setItem(SEEN, JSON.stringify([...seen(), t].slice(-200))); } catch { /* ignore */ } };
@@ -24,7 +24,7 @@ export function ReminderWatcher({ enabled }: { enabled: boolean }) {
         const granted = "Notification" in window && Notification.permission === "granted", reg = granted ? await Promise.race([navigator.serviceWorker?.ready, new Promise<undefined>((r) => setTimeout(() => r(undefined), 4000))]) : undefined, already = new Set(seen());
         for (const d of j.due) {
           if (already.has(d.token)) continue; remember(d.token);
-          const body = [d.time, d.project].filter(Boolean).join(" · ");
+          const body = [d.label ?? d.time, d.project].filter(Boolean).join(" · ");
           const fallback = () => toast(d.title, { description: body, duration: 60_000, action: { label: "Mark done", onClick: () => void post(d.id, "done").then(() => router.refresh()) }, cancel: { label: `Snooze ${j.snooze} min`, onClick: () => void post(d.id, "snooze", j.snooze) } });
           // One failing notification (blocked, or the worker went away) must not stop the others: fall back to an in-page prompt with the same buttons.
           try { if (!reg) throw new Error("no service worker"); await reg.showNotification(d.title, { body, tag: `task-${d.id}`, requireInteraction: true, data: { id: d.id, snooze: j.snooze, url: `/tasks/${d.id}` }, actions: [{ action: "done", title: "Mark done" }, { action: "snooze", title: `Snooze ${j.snooze} min` }] } as NotificationOptions); } catch { fallback(); }

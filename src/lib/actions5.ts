@@ -109,6 +109,10 @@ export async function moveTaskToProjectAction(taskId: number, projectId: number 
 export async function saveBrowserNotifyAction(on: boolean, lead: number, snooze: number): Promise<R> {
   return run(() => { const l = Math.min(120, Math.max(0, Math.round(Number(lead) || 0))), s = Math.min(240, Math.max(1, Math.round(Number(snooze) || 15))); setSetting("notify_browser", on ? "1" : "0"); setSetting("notify_lead", String(l)); setSetting("notify_snooze", String(s)); return "Saved"; });
 }
+/** The default reminder time (for reminders typed with a date but no time), and whether dated tasks with no time remind you then. */
+export async function saveDefaultReminderAction(time: string, on: boolean): Promise<R> {
+  return run(() => { if (time && !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) throw new Error("Pick a time like 09:00"); setSetting("remind_default_time", time || null); setSetting("remind_default_on", on && time ? "1" : "0"); return "Saved"; });
+}
 /** Save a new order for some projects (the ones in one area, top to bottom). Everything else keeps its place. */
 export async function reorderProjectsAction(ids: number[]): Promise<R> {
   return run(() => { const clean = ids.filter((n) => Number.isInteger(n)); const st = db.prepare("UPDATE projects SET position=? WHERE id=?"); db.transaction(() => clean.forEach((id, i) => st.run(i + 1, id)))(); });

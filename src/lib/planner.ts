@@ -23,7 +23,7 @@ export function dayBlocks(date: string): { blocks: Block[]; allDay: { title: str
   return { blocks, allDay };
 }
 export function unscheduled(date: string, t = today()): TaskRow[] {
-  return queryTasks({ dueBy: date }).filter((x) => !x.due_time && (x.due === date || (date === t && x.due! < t)));
+  return queryTasks({ dueBy: date, started: true }).filter((x) => !x.due_time && (x.due === date || (date === t && x.due! < t)));
 }
 /** Free gaps (minutes since midnight) inside [from, to], excluding open tasks and events. */
 export function freeSlots(date: string, from: number, to: number): [number, number][] {

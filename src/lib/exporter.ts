@@ -16,7 +16,7 @@ export function exportAll() {
     goals: (db.prepare("SELECT * FROM goals").all() as { id: number }[]).map((g) => ({ ...g, tags: entityTags("goal", g.id) })), key_results: all("key_results"),
     // Data from features that have been removed from the app (people, habits, journal, money, subscriptions) is still exported, so nothing is lost.
     people: all("people"), interactions: all("interactions"),
-    voice_memos: db.prepare("SELECT * FROM voice_memos WHERE deleted_at IS NULL").all(), custom_fields: all("custom_fields"), task_fields: all("task_fields"), board_rules: all("board_rules"), attachments: db.prepare("SELECT id, task_id, name, mime, size, created_at FROM attachments").all(), templates: all("templates"), saved_filters: all("saved_filters"),
+    voice_memos: db.prepare("SELECT * FROM voice_memos WHERE deleted_at IS NULL").all(), custom_fields: all("custom_fields"), task_fields: all("task_fields"), task_reminders: all("task_reminders"), board_rules: all("board_rules"), attachments: db.prepare("SELECT id, task_id, name, mime, size, created_at FROM attachments").all(), templates: all("templates"), saved_filters: all("saved_filters"),
     habits: db.prepare("SELECT * FROM habits").all(), habit_logs: db.prepare("SELECT * FROM habit_logs").all(),
     journal: db.prepare("SELECT * FROM journal").all(), focus_sessions: db.prepare("SELECT * FROM focus_sessions").all(),
     money: { categories: all("money_categories"), budgets: all("budget_overrides"), rules: all("money_rules"), transactions: all("transactions"), savings: all("savings_goals"), subscriptions: all("subscriptions"), price_history: all("sub_price_history") },

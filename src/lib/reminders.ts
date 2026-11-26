@@ -7,7 +7,7 @@ import { getSetting } from "./settings";
 import { fmtTime } from "./dates";
 import { queryTasks } from "./tasks";
 import { localNow } from "./time";
-import { browserNotifyConfig, dueReminders } from "./browsernotify";
+import { browserNotifyConfig, dueReminders, extraReminders } from "./browsernotify";
 import { pushConfigured, sendPush, type PushPayload } from "./webpush";
 
 const mins = (hm: string) => { const [h, m] = hm.split(":").map(Number); return h * 60 + m; };
@@ -25,7 +25,9 @@ export async function pending(now = new Date()): Promise<{ key: string; note: No
     const key = `task:${t.id}:${t.due}:${t.due_time}`;
     if (late >= 0 && late <= 120 && !sent(key)) out.push({ key, note: { title: t.title, body: `Due ${fmtTime(t.due_time)}${t.project_name ? " · " + t.project_name : ""}${t.estimate ? ` · ~${t.estimate}m` : ""}`, click: `/tasks/${t.id}`, priority: t.priority > 0 ? 4 : 3, tags: ["alarm_clock"] } });
   }
-  // 2. morning brief
+  // 2. reminders you set on a task, and dated tasks with no time at the default reminder time (if that is on)
+  for (const r of extraReminders(now)) { const key = `task:${r.token}`; if (!sent(key)) out.push({ key, note: { title: r.title, body: [r.label, r.project].filter(Boolean).join(" · "), click: `/tasks/${r.id}`, priority: 4, tags: ["bell"] } }); }
+  // 3. morning brief
   const brief = await briefNote(now, `brief:${date}`); if (brief) out.push({ key: `brief:${date}`, note: brief });
   if (inQuietHours(hm, getSetting("quiet_start"), getSetting("quiet_end"))) return []; // held back, not marked as sent, so they go out when quiet hours end
   return out;
@@ -35,7 +37,7 @@ async function briefNote(now: Date, key: string): Promise<Note | null> {
   const cur = mins(localNow(now).hm), bt = getSetting("brief_time") ?? "08:00";
   if (!bt || cur < mins(bt) || cur > mins(bt) + 180 || sent(key)) return null;
   const b = await dailyBrief({ network: false });
-  if (b.overdue.length + b.due_today.length + b.in_progress.length === 0) return null;
+  if (b.overdue.length + b.due_today.length + b.in_progress.length + (b.focus?.length ?? 0) === 0) return null;
   const x = briefText(b); return { title: x.title, body: x.body, click: "/", tags: ["sunrise"] };
 }
 /**
@@ -67,7 +69,7 @@ export async function pushPending(now = new Date()): Promise<PushItem[]> {
   const snooze = browserNotifyConfig().snooze, out: PushItem[] = [];
   for (const d of dueReminders(now)) {
     const key = `push:${d.token}`;
-    if (!sent(key)) out.push({ key, ttl: 2 * 3600, payload: { title: d.title, body: [`Due ${fmtTime(d.time)}`, d.project].filter(Boolean).join(" · "), url: `/tasks/${d.id}?reminder=1`, tag: `task-${d.id}`, id: d.id, snooze, actions: true, priority: 4 } });
+    if (!sent(key)) out.push({ key, ttl: 2 * 3600, payload: { title: d.title, body: [d.label, d.project].filter(Boolean).join(" · "), url: `/tasks/${d.id}?reminder=1`, tag: `task-${d.id}`, id: d.id, snooze, actions: true, priority: 4 } });
   }
   const brief = await briefNote(now, `push:brief:${date}`);
   if (brief) out.push({ key: `push:brief:${date}`, ttl: 6 * 3600, payload: { title: brief.title, body: brief.body, url: "/", tag: "lifeos-brief" } });

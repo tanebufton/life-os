@@ -17,13 +17,13 @@ const dayLabel = (d: string, t: string) => (d === t ? "Today" : d === addDays(t,
 export default async function Upcoming({ searchParams }: { searchParams: Promise<{ view?: string; m?: string; d?: string; s?: string }> }) {
   const { view, m, d: wd, s: pick } = await searchParams;
   const t = today(), month = view === "month", week = view === "week";
-  const all = queryTasks({ dueBy: addDays(t, 400) });
+  const all = queryTasks({ dueBy: addDays(t, 400), started: true });
   const tab = (on: boolean) => `rounded-md px-3 py-1 text-[13px] font-medium ${on ? "bg-panel shadow-sm" : "text-mute hover:text-fg"}`;
   const head = <PageHead title="Upcoming" sub={month ? "Month at a glance" : week ? "The week, with drag-to-reschedule" : "The next two weeks, day by day"} right={<div className="inline-flex rounded-lg bg-raise p-0.5"><Link href="/upcoming" className={tab(!month && !week)}>Agenda</Link><Link href="/upcoming?view=week" className={tab(week)}>Week</Link><Link href="/upcoming?view=month" className={tab(month)}>Month</Link></div>} />;
 
   if (week) {
     const anchor = wd && /^\d{4}-\d{2}-\d{2}$/.test(wd) ? wd : t, start = addDays(anchor, -((weekday(anchor) + 6) % 7)), dates = Array.from({ length: 7 }, (_, i) => addDays(start, i));
-    const tasks = queryTasks({ dueBy: dates[6] }).filter((x) => x.due! >= dates[0]), overdue = queryTasks({ dueBy: addDays(dates[0], -1) }).filter((x) => x.due! < dates[0] && x.due! < t);
+    const tasks = queryTasks({ dueBy: dates[6], started: true }).filter((x) => x.due! >= dates[0]), overdue = queryTasks({ dueBy: addDays(dates[0], -1), started: true }).filter((x) => x.due! < dates[0] && x.due! < t);
     const evs = isOn("calendar") ? eventsBetween(dates[0], dates[6]) : [];
     const days = dates.map((d) => ({ date: d, label: new Intl.DateTimeFormat("en-NZ", { timeZone: "UTC", weekday: "short" }).format(new Date(d + "T00:00:00Z")), num: Number(d.slice(8)), isToday: d === t,
       tasks: tasks.filter((x) => x.due === d).sort((a, b) => (a.due_time ?? "99").localeCompare(b.due_time ?? "99")).map((x) => ({ id: x.id, title: x.title, time: x.due_time, priority: x.priority, minutes: x.estimate })),

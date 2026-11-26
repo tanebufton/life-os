@@ -9,7 +9,7 @@ import { StatusIcon } from "@/components/StatusIcon";
 import { db, Project } from "@/lib/db";
 import { isOn } from "@/lib/features";
 import { today } from "@/lib/time";
-import { repeatLabel, getTask, subtasks } from "@/lib/tasks";
+import { defaultReminderTime, inFocus, listReminders, repeatLabel, getTask, subtasks } from "@/lib/tasks";
 import { issueKey } from "@/lib/ui";
 import { addCommentAction, deleteCommentAction, saveTemplateFromTask } from "@/lib/actions3";
 import { listComments } from "@/lib/misc";
@@ -38,7 +38,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
     <div className="max-w-[1500px]">
       <Suspense fallback={null}><ReminderBanner id={t.id} done={!!t.done_at} snooze={browserNotifyConfig().snooze} /></Suspense>
       <div className="rise">
-        <TaskEditor fields={(() => { const vals = taskFieldValues(t.id); return listFields(t.project_id).map((f) => ({ id: f.id, name: f.name, type: f.type, options: f.options, value: vals[f.id] ?? "" })); })()} today={today()} focus={isOn("focus")} projects={projects} columns={columns} head={<>
+        <TaskEditor reminders={isOn("reminders") && !t.done_at ? listReminders(t.id).map((r) => ({ id: r.id, at: r.at, before_min: r.before_min })) : undefined} defaultReminderTime={defaultReminderTime()} fields={(() => { const vals = taskFieldValues(t.id); return listFields(t.project_id).map((f) => ({ id: f.id, name: f.name, type: f.type, options: f.options, value: vals[f.id] ?? "" })); })()} today={today()} focus={isOn("focus")} projects={projects} columns={columns} head={<>
         <div className="mb-1 flex items-center gap-2 text-xs text-mute">
           {parent && <><Link href={`/tasks/${parent.id}`} className="inline-flex max-w-[16rem] items-center gap-1 truncate hover:text-fg"><Icon name="chevRight" size={12} className="rotate-180" />{parent.title}</Link><span aria-hidden>/</span></>}
           <StatusIcon status={t.status_kind} size={15} /><span className="font-medium">{issueKey(t.project_name, t.id)}</span>
@@ -48,7 +48,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
           <span className="ml-1"><FavouriteButton kind="task" id={t.id} on={isFavourite("task", t.id)} /></span>
         </div>
         {meta?.from && <p className="mb-2 text-xs text-mute">From {meta.from}{meta.subject ? <> · “{meta.subject}”</> : null}</p>}
-        </>} task={{ id: t.id, title: t.title, notes: t.notes, status: t.status, priority: t.priority, project_id: t.project_id, due: t.due, due_time: t.due_time, estimate: t.estimate, repeat: t.repeat ? repeatLabel(t.repeat) : "", tags: t.tags.join(" ") }}>
+        </>} task={{ id: t.id, title: t.title, notes: t.notes, status: t.status, priority: t.priority, project_id: t.project_id, due: t.due, due_time: t.due_time, estimate: t.estimate, repeat: t.repeat ? repeatLabel(t.repeat) : "", tags: t.tags.join(" "), start_date: t.start_date, focus: t.done_at ? undefined : inFocus(t) }}>
           {!t.parent_id && <SubtaskList parentId={t.id} items={kids} />}
           <Attachments taskId={t.id} files={listAttachments(t.id)} />
           <LinksPanel kind="task" id={t.id} links={listLinks("task", t.id)} />

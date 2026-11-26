@@ -5,9 +5,10 @@ import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { deleteTaskInline, duplicateTaskAction, rescheduleAction, restoreTaskAction, startFocus } from "@/lib/actions";
 import { Icon } from "./Icon";
+import { FocusToggle } from "./taskextras";
 
 const item = "flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[13px] hover:bg-raise";
-export function RowActions({ id, due, focus }: { id: number; due: string | null; focus: boolean }) {
+export function RowActions({ id, due, focus, focused }: { id: number; due: string | null; focus: boolean; focused?: boolean }) {
   const [open, setOpen] = useState<null | "date" | "more">(null);
   const box = useRef<HTMLSpanElement>(null), menu = useRef<HTMLDivElement>(null), router = useRouter();
   const [pos, setPos] = useState<{ top?: number; bottom?: number; right: number } | null>(null);
@@ -29,6 +30,7 @@ export function RowActions({ id, due, focus }: { id: number; due: string | null;
   return (
     <span ref={box} className="flex shrink-0 items-center [@media(hover:hover)]:absolute [@media(hover:hover)]:right-1.5 [@media(hover:hover)]:top-1.5 [@media(hover:hover)]:rounded-md [@media(hover:hover)]:bg-raise [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:shadow-sm [@media(hover:hover)]:transition-opacity [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-within:opacity-100">
       <button onClick={() => setOpen(open === "date" ? null : "date")} aria-label="Reschedule" className={`${btn} hidden sm:grid`}><Icon name="calendar" size={15} /></button>
+      {focused !== undefined && <span className="hidden sm:inline"><FocusToggle id={id} on={focused} /></span>}
       <button onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); window.dispatchEvent(new CustomEvent("lifeos:taskmenu", { detail: { id, x: r.right, y: r.bottom + 4, focus } })); }} aria-label="More actions" className={btn}><Icon name="more" size={16} /></button>
       {open && pos && createPortal(
         <div ref={menu} style={{ position: "fixed", ...pos }} className="z-[60] w-52 rounded-xl border bg-panel p-1.5 shadow-[0_8px_30px_rgb(0_0_0/0.18)]">

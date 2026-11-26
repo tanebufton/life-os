@@ -62,8 +62,8 @@ async function handleUpdateInner(u: Update, send: (chat: number, text: string) =
   const [name, arg] = [cmd[1].toLowerCase(), cmd[2].trim()], t = today();
   switch (name) {
     case "start": case "help": return reply(HELP);
-    case "today": { const due = queryTasks({ dueBy: t }); return reply(`Due & overdue (${due.length})\n${list(due, "Nothing due. Enjoy the day.")}`); }
-    case "inbox": { const inbox = queryTasks({ inbox: true }); return reply(`Inbox (${inbox.length})\n${list(inbox.slice(0, 12), "Inbox zero.")}`); }
+    case "today": { const due = queryTasks({ dueBy: t, started: true }); return reply(`Due & overdue (${due.length})\n${list(due, "Nothing due. Enjoy the day.")}`); }
+    case "inbox": { const inbox = queryTasks({ inbox: true, started: true }); return reply(`Inbox (${inbox.length})\n${list(inbox.slice(0, 12), "Inbox zero.")}`); }
     case "done": { const id = Number(arg.replace("#", "")); const x = id ? getTask(id) : undefined; if (!x) return reply("Which task? Try /done 12 (see /today for ids)."); const r = completeTask(id); return reply(`Done: ${x.title}${r?.next_due ? ` · next ${r.next_due}` : ""}`); }
     case "search": { if (!arg) return reply("Search for what? e.g. /search invoice"); const r = searchTasks(arg, 10); return reply(`Results for "${arg}"\n${list(r, "No matches.")}`); }
     case "brief": return reply((({ title, body }) => `${title}\n${body}`)(briefText(await dailyBrief({ network: false }))));

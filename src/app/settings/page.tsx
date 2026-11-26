@@ -11,7 +11,8 @@ import { TextScale } from "@/components/textscale";
 import { FieldsManager } from "@/components/fieldsmanager";
 import { OfflineSettings } from "@/components/offlinesync";
 import { listAllFields } from "@/lib/fields";
-import { BrowserReminders } from "@/components/browserreminders";
+import { BrowserReminders, DefaultReminder } from "@/components/browserreminders";
+import { defaultReminderTime } from "@/lib/tasks";
 import { browserNotifyConfig } from "@/lib/browsernotify";
 import { PushDevices } from "@/components/pushdevices";
 import { listDevices, vapidPublicKey } from "@/lib/webpush";
@@ -90,6 +91,7 @@ export default async function Settings({ searchParams }: { searchParams: Promise
 
       {f.reminders && (<>
         <Section cur={tab} tab="reminders" id="browser-reminders" i={2} title="Browser reminders" desc="A pop-up while LifeOS is open, with Mark done and Snooze buttons, like Outlook."><Panel>{(() => { const b = browserNotifyConfig(); return <BrowserReminders on={b.on} lead={b.lead} snooze={b.snooze} />; })()}</Panel></Section>
+        <Section cur={tab} tab="reminders" id="task-reminders" i={2} title="Task reminders" desc="Reminders you set on a task, and the time used when you give a reminder a day but no time."><Panel><DefaultReminder time={defaultReminderTime()} on={getSetting("remind_default_on") === "1"} /></Panel></Section>
         <Section cur={tab} tab="reminders" id="push" i={2} title="Push notifications" desc="Reminders on your phone or computer even when LifeOS is closed. Works in Chrome, Edge, Firefox and Android, and on iPhone once LifeOS is added to the Home Screen."><Panel>{tab === "reminders" ? <PushDevices publicKey={vapidPublicKey()} devices={listDevices().map(({ id, endpoint, label, created_at, last_ok, last_error }) => ({ id, endpoint, label, created_at, last_ok, last_error }))} /> : null}</Panel></Section>
         <Section cur={tab} tab="reminders" id="reminders" i={3} title="Reminders & push" desc="Get a push when a task with a time is due, plus a morning brief and an evening habit nudge. Uses ntfy (free app, self-hostable) and/or any webhook (Slack, Discord, Home Assistant…).">
           <Panel><form action={saveNotifySettings} className="space-y-4 p-4">

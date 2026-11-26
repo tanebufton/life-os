@@ -1,31 +1,15 @@
 // Pure quick-add parser + repeat helpers (no DB, safe in the browser).
 import { addDays, addMonths, weekday } from "./dates";
+import { DAY_LIST_RE, ORD_RE, daysRule, normalizeRepeat } from "./repeat";
 
 export type Parsed = {
   title: string; project?: string; due?: string | null; due_time?: string | null; estimate?: number | null; priority?: number; tags?: string[]; repeat?: string | null; status?: "todo" | "doing" | "done";
+  start_date?: string | null; focus?: boolean; reminders?: ReminderSpec[];
 };
 
-const ALIAS: Record<string, string> = {
-  daily: "1d", day: "1d", weekly: "1w", week: "1w", monthly: "1m", month: "1m",
-  yearly: "1y", year: "1y", annually: "1y", weekdays: "weekdays", weekday: "weekdays",
-};
-export function normalizeRepeat(s?: string | null): string | null {
-  if (!s || !s.trim()) return null;
-  const x = s.trim().toLowerCase();
-  if (Object.hasOwn(ALIAS, x)) return ALIAS[x];
-  const m = x.match(/^(?:every\s+)?(\d+)\s*(d|w|m|y|days?|weeks?|months?|years?)$/);
-  if (m && +m[1] >= 1 && +m[1] <= 365) return `${+m[1]}${m[2][0]}`;
-  throw new Error(`Invalid repeat "${s}". Use daily, weekdays, weekly, monthly, yearly, or e.g. "every 3 days".`);
-}
-export function describeRepeat(r: string): string {
-  if (r === "weekdays") return "weekdays";
-  const n = parseInt(r), u = r.slice(-1) as "d" | "w" | "m" | "y";
-  return n === 1 ? { d: "daily", w: "weekly", m: "monthly", y: "yearly" }[u] : `every ${n} ${{ d: "day", w: "week", m: "month", y: "year" }[u]}s`;
-}
-
-/** How a repeat reads in the app: sentence case, like the rest of the text ("Weekly", "Every 2 weeks"). The API keeps the lowercase form. */
-export const repeatLabel = (r: string) => { const d = describeRepeat(r); return d.charAt(0).toUpperCase() + d.slice(1); };
-
+export { describeRepeat, normalizeRepeat, repeatLabel } from "./repeat";
+/** A reminder typed in quick add ("remind me tomorrow at 4pm", "remind me 30m before"). Resolved against the task's date when it is saved. */
+export type ReminderSpec = { date?: string; time?: string; before?: number };
 const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
 const MONTH_RE = "(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)";
 /** "31 march" / "march 31st" / "mar 31 2027" -> YYYY-MM-DD. Without a year it is the next occurrence (this year, or next if already past). */
@@ -35,6 +19,31 @@ function monthDay(day: number, month: string, year: string | undefined, today: s
   if (year) return mk(+year);
   const y = +today.slice(0, 4), c = mk(y);
   return c && c >= today ? c : mk(y + 1);
+}
+/** One date word for start: and remind me: today, tomorrow, a weekday (the next one), next week/month, "in 3 days", 3d, 2w, or YYYY-MM-DD. */
+export function dateWord(w: string, t: string): string | undefined {
+  const x = w.trim().toLowerCase().replace(/[-_]/g, " ").replace(/\s+/g, " ");
+  let m: RegExpMatchArray | null;
+  if (/^\d{4} \d{2} \d{2}$/.test(x)) return x.replace(/ /g, "-");
+  if (x === "today" || x === "tonight") return t;
+  if (x === "tomorrow" || x === "tmrw") return addDays(t, 1);
+  if (x === "next week" || x === "nextweek") return addDays(t, ((1 - weekday(t) + 7) % 7) || 7);
+  if (x === "next month" || x === "nextmonth") return addMonths(t, 1);
+  if (x === "weekend") return addDays(t, ((6 - weekday(t) + 7) % 7) || 7);
+  if ((m = x.match(/^(?:in )?(\d+) ?(d|days?|w|weeks?|m|months?)$/))) return m[2][0] === "m" ? addMonths(t, +m[1]) : addDays(t, +m[1] * (m[2][0] === "w" ? 7 : 1));
+  const i = DAYS.findIndex((d) => x.length >= 3 && d.startsWith(x.replace(/^(?:on|next) /, "")));
+  if (i >= 0) return addDays(t, ((i - weekday(t) + 6) % 7) + 1);
+}
+const DATE_WORD_RE = "(?:today|tonight|tomorrow|tmrw|next\\s+week|next\\s+month|weekend|in\\s+\\d+\\s*(?:days?|weeks?|months?)|\\d{4}-\\d{2}-\\d{2}|(?:on\\s+|next\\s+)?(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*)";
+const TIME_RE = "(?:\\d{1,2}(?::\\d{2})?\\s*(?:am|pm)|\\d{1,2}:\\d{2}|noon|midday)";
+/** "4pm" / "16:30" / "noon" -> "HH:MM" (undefined if it isn't a real time). */
+export function timeWord(w: string): string | undefined {
+  const x = w.trim().toLowerCase(), pad = (n: number) => String(n).padStart(2, "0");
+  if (x === "noon" || x === "midday") return "12:00";
+  let m = x.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$/);
+  if (m && +m[1] >= 1 && +m[1] <= 12 && +(m[2] ?? 0) < 60) return `${pad((+m[1] % 12) + (m[3] === "pm" ? 12 : 0))}:${m[2] ?? "00"}`;
+  m = x.match(/^(\d{1,2}):(\d{2})$/);
+  if (m && +m[1] < 24 && +m[2] < 60) return `${pad(+m[1])}:${m[2]}`;
 }
 const DAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
 /** "Pay rent every month #bills @home !high tomorrow" -> structured task. `t` is today's date in the user's timezone. */
@@ -51,7 +60,26 @@ export function parseQuickAdd(input: string, t: string): Parsed {
   eat(/\s!(high|h|!)(?=\s)/i, () => (out.priority = 1));
   eat(/\s!(low|l)(?=\s)/i, () => (out.priority = -1));
   eat(/\s!(doing)(?=\s)/i, () => (out.status = "doing"));
-  eat(/\s(?:every\s+(\d+\s*(?:d|w|m|y|days?|weeks?|months?|years?)|day|week|weekday|weekdays|month|year)|(daily|weekly|monthly|yearly|weekdays))(?=\s)/i,
+  eat(/\s!(focus|today|must)(?=\s)/i, () => (out.focus = true));
+  // reminders first, so their date and time aren't taken as the due date: "remind me tomorrow at 4pm", "remind me fri 9am", "remind me 30m before"
+  for (let i = 0; i < 5; i++) {
+    let hit = false;
+    eat(/\sremind(?:\s+me)?\s+(\d+(?:\.\d+)?)\s*(m|min|mins|minutes?|h|hr|hrs|hours?|d|days?)\s+before(?=\s)/i, (m) => { const n = parseFloat(m[1]), u = m[2][0].toLowerCase(); (out.reminders ??= []).push({ before: Math.max(1, Math.round(u === "h" ? n * 60 : u === "d" ? n * 1440 : n)) }); hit = true; });
+    if (!hit) eatIf(new RegExp(`\\sremind(?:\\s+me)?(?:\\s+(${DATE_WORD_RE}))?(?:\\s+at)?(?:\\s+(${TIME_RE}))?(?=\\s)`, "i"), (m) => {
+      if (!m[1] && !m[2]) return false;
+      const date = m[1] ? dateWord(m[1], t) : undefined, time = m[2] ? timeWord(m[2]) : undefined;
+      if ((m[1] && !date) || (m[2] && !time)) return false;
+      (out.reminders ??= []).push({ ...(date ? { date } : {}), ...(time ? { time } : {}) }); return (hit = true);
+    });
+    if (!hit) break;
+  }
+  eatIf(/\s(?:start|starts|starting|hide\s+until):(\S+)(?=\s)/i, (m) => { const d = dateWord(m[1], t); if (d) out.start_date = d; return !!d; });
+  // repeats that name days: "every mon and thu", "every last friday", "every first weekday of the quarter", "every 15th", "every 3 days after done"
+  eatIf(new RegExp(`\\severy\\s+(${DAY_LIST_RE})(?=\\s)`, "i"), (m) => { try { out.repeat = daysRule(m[1]); return true; } catch { return false; } });
+  if (out.repeat === undefined) eatIf(new RegExp(`\\severy\\s+(${ORD_RE}\\s+(?:week|work(?:ing)?|business)\\s?day(?:\\s+of\\s+(?:the\\s+)?(?:month|quarter))?|${ORD_RE}\\s+(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*(?:\\s+of\\s+(?:the\\s+)?month)?|\\d{1,2}(?:st|nd|rd|th)(?:\\s+of\\s+(?:the\\s+)?month)?|last\\s+day\\s+of\\s+(?:the\\s+)?month|(?:\\d+\\s+)?(?:days?|weeks?|months?)\\s+after\\s+(?:done|completion|completing|finishing|i\\s+finish(?:\\s+it)?))(?=\\s)`, "i"),
+    (m) => { try { out.repeat = normalizeRepeat(m[1].replace(/\s+/g, " ")); return true; } catch { return false; } });
+  if (out.repeat === undefined)
+  eat(/\s(?:every\s+(\d+\s*(?:d|w|m|y|days?|weeks?|months?|years?)|day|week|weekday|weekdays|month|year|quarter|fortnight)|(daily|weekly|monthly|yearly|weekdays|quarterly|fortnightly))(?=\s)/i,
     (m) => (out.repeat = normalizeRepeat(m[1] ?? m[2])));
   eat(/\s(\d{4}-\d{2}-\d{2})(?=\s)/, (m) => (out.due = m[1]));
   if (out.due === undefined) eat(/\s(today|tonight)(?=\s)/i, () => (out.due = t));
