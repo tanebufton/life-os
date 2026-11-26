@@ -29,7 +29,7 @@ ENV LIFEOS_FAST_BUILD=1
 # Next.js makes a new random Server Actions key on every build inside Docker, and that key is part of the compile cache's version, so the cache
 # was thrown away every time and each update compiled from scratch. Keeping one key in the cache mount (renewed every 14 days, as Next.js does
 # outside Docker) makes the cache hit. The key ends up in the built image either way, so it is no more exposed than before.
-RUN --mount=type=cache,target=/app/.next/cache \
+RUN --mount=type=cache,target=/app/.next/cache,sharing=locked \
     k=.next/cache/server-actions.key; find "$k" -mtime +14 -delete 2>/dev/null; \
     [ -s "$k" ] || node -e "process.stdout.write(require('crypto').randomBytes(32).toString('base64'))" > "$k"; \
     NEXT_SERVER_ACTIONS_ENCRYPTION_KEY="$(cat "$k")" npm run build
