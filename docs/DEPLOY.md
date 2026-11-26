@@ -14,7 +14,7 @@ Measured on the production build. "Idle" is a freshly started container; "after 
 | `cloudflared` | small | not measured |
 
 - **Runtime:** about **400 MB** for web + worker, about **550 MB** with MCP. A **1 GB** machine is fine, **2 GB** is comfortable.
-- **Building the image on the server** peaked at **~800 MB**, so on a 1 GB machine pull the prebuilt image (below) instead of building.
+- **Building the image on the server** peaked at **~800 MB**, so on a 1 GB machine let GitHub build it and download it instead (see *Updating* below).
 - **CPU:** any modern single core is enough. One user, mostly idle. ARM works (Raspberry Pi 4/5, 64-bit OS): the image builds on `linux/arm64` too.
 - **Disk:** the image is **1.55 GB unpacked (302 MB to download)**, so allow **4 GB** for Docker plus the volume. The database itself is small (the seeded demo is ~240 KB; a few years of heavy use is tens of MB). SQLite needs a real disk (not a network share).
 - **Network:** outbound only. No inbound ports, no public IP, no TLS to manage.
@@ -84,9 +84,19 @@ claude mcp add --transport http lifeos https://<machine>.<tailnet>.ts.net:8443/m
 ## Updating
 Before LifeOS changes your database's structure for a new version it **saves a complete copy next to it** (`lifeos.db.pre-upgrade-v<old>-<time>`, the newest three are kept), then upgrades in place. If an upgrade ever misbehaves, stop the app and copy that file over `lifeos.db`. Your R2 backup is the second safety net. New versions only add to the database; they never delete or rewrite your existing tasks, notes or settings. The tests include upgrading a real database from the previous release and checking every row survives.
 
-```bash
-git pull && docker compose up -d --build     # or: docker compose pull && docker compose up -d
-```
+Run `./update.sh`. It pulls the code, gets the image for that commit, restarts what changed and clears the previous image.
+
+**Let GitHub build the image (recommended).** Every push to `main` runs `.github/workflows/image.yml`, which builds the image natively for Intel (`linux/amd64`) and ARM (`linux/arm64`) and publishes it to GitHub's registry as `ghcr.io/<you>/life-os:sha-<commit>`. The server then only downloads it: an update takes well under a minute, uses no CPU or build memory (so a 1 GB machine is fine), and needs no build cache on disk. One-time setup:
+
+1. After the first run of the workflow (repo → **Actions** → *Image*), open the package (your profile → **Packages** → *life-os* → **Package settings**) and make sure its visibility is **Private**. The image is built from public code, but it contains the Next.js Server Actions key, so keep it to yourself.
+2. Create a token for the server: GitHub → Settings → Developer settings → **Personal access tokens (classic)** → scope **`read:packages`** only, no expiry or a long one.
+3. On the server: `docker login ghcr.io -u <your GitHub user>` and paste the token as the password (Docker keeps it in `~/.docker/config.json`).
+4. Add `LIFEOS_REGISTRY_IMAGE=ghcr.io/<your GitHub user, lower case>/life-os` to `.env`.
+
+If you run `./update.sh` straight after pushing, it waits for GitHub to finish (checking every 15s, up to 15 minutes, `LIFEOS_PULL_WAIT` in seconds to change that). If the image can't be downloaded (not signed in, the workflow failed, no network to ghcr.io), it says why and builds on the server instead, so an update never gets stuck. `./update.sh --build` always builds on the server.
+
+**Or build on the server.** Leave `LIFEOS_REGISTRY_IMAGE` unset and `./update.sh` builds the image itself (cached, so usually a minute or two on a small machine). By hand: `git pull && docker compose up -d --build`.
+
 Database migrations run automatically on start. The data lives in the `lifeos-data` volume and survives updates.
 
 ## Backups and recovery

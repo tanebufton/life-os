@@ -1,0 +1,70 @@
+# Builds the Docker image on every push to main and publishes it to GitHub's registry (ghcr.io/<owner>/<repo>),
+# so the server only downloads it (./update.sh) instead of building it. Tagged with the commit (sha-<full sha>) and latest.
+# Runs only on pushes to main (never on pull requests, so a fork can't publish anything) and only needs this repo's own token.
+# Keep the package private (GitHub → your profile → Packages → life-os → Package settings): the build contains
+# the Next.js Server Actions key. The server signs in once with `docker login ghcr.io` (see docs/DEPLOY.md).
+name: Image
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+concurrency:
+  group: image
+  cancel-in-progress: false
+permissions:
+  contents: read
+  packages: write
+env:
+  REGISTRY_IMAGE: ghcr.io/${{ github.repository }}
+
+jobs:
+  build:
+    # Each platform is built natively (ARM on GitHub's ARM runners, no slow emulation), then the two are joined into one image below.
+    strategy:
+      matrix:
+        include:
+          - { platform: linux/amd64, runner: ubuntu-24.04 }
+          - { platform: linux/arm64, runner: ubuntu-24.04-arm }
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with: { registry: ghcr.io, username: "${{ github.actor }}", password: "${{ secrets.GITHUB_TOKEN }}" }
+      - name: Lower-case image name
+        run: echo "REGISTRY_IMAGE=${REGISTRY_IMAGE,,}" >> "$GITHUB_ENV"
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          build-args: GIT_COMMIT=${{ github.sha }}
+          outputs: type=image,name=${{ env.REGISTRY_IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          provenance: false
+          cache-from: type=gha,scope=${{ matrix.platform }}
+          cache-to: type=gha,scope=${{ matrix.platform }},mode=max
+      - name: Save digest
+        run: mkdir -p /tmp/digests && touch "/tmp/digests/${DIGEST#sha256:}"
+        env: { DIGEST: "${{ steps.build.outputs.digest }}" }
+      - uses: actions/upload-artifact@v5
+        with:
+          name: digest-${{ matrix.runner }}
+          path: /tmp/digests/*
+          retention-days: 1
+
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v5
+        with: { path: /tmp/digests, pattern: "digest-*", merge-multiple: true }
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with: { registry: ghcr.io, username: "${{ github.actor }}", password: "${{ secrets.GITHUB_TOKEN }}" }
+      - name: Tag sha-<commit> and latest
+        working-directory: /tmp/digests
+        run: |
+          img="${REGISTRY_IMAGE,,}"
+          docker buildx imagetools create -t "$img:sha-$GITHUB_SHA" -t "$img:latest" $(printf "$img@sha256:%s " *)
+          docker buildx imagetools inspect "$img:sha-$GITHUB_SHA"

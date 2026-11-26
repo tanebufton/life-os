@@ -68,9 +68,9 @@ Data lives in `data/lifeos.db` (override with `LIFEOS_DB`).
 
 Docker Compose + Cloudflare Tunnel + Access is the recommended setup. See **[docs/DEPLOY.md](docs/DEPLOY.md)** for sizing, setup, security and recovery.
 
-**Update:** run `./update.sh` in your checkout. It pulls, builds the image once (web, worker and MCP share it), restarts what changed and tidies old images. It skips the build only when the running image was already built from the latest commit, and tidies up old images and build cache afterwards (`./update.sh --deep` also clears unused images older than a week). The image is built in stages with cached dependencies and no compiler step, so after the first build an update is mostly the Next.js compile. The script prints how long the build took; if it is still slow, `docker compose build --progress=plain web` shows which step.
+**Update:** run `./update.sh` in your checkout. It pulls the code, gets the image for that commit (web, worker and MCP share it), restarts what changed and clears the previous image. With `LIFEOS_REGISTRY_IMAGE` set, GitHub builds the image on every push to `main` and the server only downloads it, so an update takes well under a minute ([setup](docs/DEPLOY.md#updating): a private package and a one-time `docker login ghcr.io`). Without it, or if the download isn't available, the image is built on the server with cached dependencies and Next.js compile cache. `./update.sh --build` always builds here, `--rebuild` gets the image again, `--deep` also clears unused images older than a week.
 
-**Fastest:** run it without Docker. The Next.js build cache stays in the folder, so an update is usually under a minute:
+**Without Docker:** the Next.js build cache stays in the folder, so an update is usually a minute or two:
 
 ```
 git pull && npm ci && npm run build && sudo systemctl restart lifeos lifeos-worker lifeos-mcp
