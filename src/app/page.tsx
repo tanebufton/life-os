@@ -9,30 +9,34 @@ import { featureMap, isOn } from "@/lib/features";
 import { resolveWidgets } from "@/lib/widgets";
 import { focusToday } from "@/lib/focus";
 import { getSetting } from "@/lib/settings";
-import { doneToday, queryTasks } from "@/lib/tasks";
+import { byPosition, doneToday, focusLeftovers, queryTasks } from "@/lib/tasks";
+import { FocusLeftovers } from "@/components/taskextras";
 import { today, tz } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
 
 export default function Today() {
   const t = today(), f = featureMap();
-  const open = queryTasks();
-  const overdue = open.filter((x) => x.due && x.due < t).length;
-  const toDo = open.filter((x) => x.due && x.due <= t).length;
-  const planned = open.filter((x) => x.due && x.due <= t).reduce((n, x) => n + (x.estimate ?? 0), 0);
+  // "Must do today" tasks pin to the top; tasks with a start date still ahead stay out of sight until then.
+  const focus = byPosition(queryTasks({ focus: true, includeSub: true })), inFocus = new Set(focus.map((x) => x.id));
+  const open = queryTasks({ started: true }).filter((x) => !inFocus.has(x.id)), leftovers = focusLeftovers();
+  const overdue = [...focus, ...open].filter((x) => x.due && x.due < t).length;
+  const toDo = open.filter((x) => x.due && x.due <= t).length + focus.length;
+  const planned = [...focus, ...open.filter((x) => x.due && x.due <= t)].reduce((n, x) => n + (x.estimate ?? 0), 0);
   const widgets = resolveWidgets(getSetting("today_widgets"), isOn);
   const emailNew = f.email ? open.filter((x) => x.source === "email" && !x.due && !x.project_id).length : 0;
   // Undated tasks are "To do": the same tasks that sit in the board's To do column. Only tasks with no project AND no date are unsorted "Inbox" items, which have their own page.
   const unsorted = open.filter((x) => !x.project_id && !x.due).length, undated = open.filter((x) => !x.due && x.status_kind === "todo").length;
-  const groups = bucket(open).filter((g) => g.label !== "Later").map((g) => (g.label === "No date" ? { ...g, label: "To do", tasks: g.tasks.slice(0, 8) } : g));
+  const groups = [{ label: "Today's focus", tone: "warn" as const, tasks: focus }, ...bucket(open).filter((g) => g.label !== "Later").map((g) => (g.label === "No date" ? { ...g, label: "To do", tasks: g.tasks.slice(0, 8) } : g))];
   const date = new Intl.DateTimeFormat("en-NZ", { timeZone: tz(), weekday: "long", day: "numeric", month: "long" }).format(new Date());
   return (
     <>
-      <PageHead title="Today" sub={<>{date} · {toDo ? `${toDo} ${toDo === 1 ? "task" : "tasks"} to do` : "nothing due"}</>}
+      <PageHead title="Today" sub={<>{date} · {toDo ? `${toDo} ${toDo === 1 ? "task" : "tasks"} to do` : "nothing due"}{focus.length ? ` · ${focus.length} in focus` : ""}</>}
         right={<>{f.planner && <Link href="/planner" className="btn"><Icon name="planner" size={15} className="text-mute" />Timeline</Link>}{f.review && <Link href="/review" className="btn"><Icon name="review" size={15} className="text-accent" />Plan my day</Link>}</>} />
       {emailNew > 0 && (
         <Link href="/inbox" className="rise mb-5 flex items-center gap-3 rounded-xl border border-accent/30 bg-accent/5 px-4 py-3 text-[14px] hover:bg-accent/10">
           <Icon name="mail" size={18} className="text-accent" /><span><b>{emailNew}</b> new {emailNew === 1 ? "task" : "tasks"} from email waiting in your inbox</span><Icon name="arrow" size={15} className="ml-auto text-accent" /></Link>)}
+      {leftovers.length > 0 && <FocusLeftovers items={leftovers.map((x) => ({ id: x.id, title: x.title, focus_on: x.focus_on! }))} />}
       <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-x-12 gap-y-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div><TaskGroups groups={groups} empty={<>You&apos;re all caught up. Enjoy the day.</>} />
           {undated > 8 && <Link href="/tasks" className="mt-2 inline-block px-2 text-xs text-accent hover:underline">+{undated - 8} more to do in My tasks</Link>}

@@ -37,13 +37,16 @@ export function TaskRow({ t }: { t: TaskRow }) {
   const due = t.due ? dueInfo(t.due, done) : null;
   const url = firstUrl(t.title, t.notes);
   const from = t.source === "email" && t.meta ? (JSON.parse(t.meta).from as string | undefined)?.replace(/<.*>/, "").trim() : null;
+  const now = today(), later = !done && !!t.start_date && t.start_date > now, focused = !done && t.focus_on === now;
   const ring = t.priority > 0 ? "border-danger bg-danger/10 hover:bg-danger/20" : t.priority < 0 ? "border-accent/70 hover:bg-accent/10" : "border-fg/35 hover:bg-fg/5";
   return (
-    <li data-task-id={t.id} className="group relative flex items-start gap-3 border-b px-2 py-2.5 transition-colors last:border-b-0 hover:bg-raise/60">
+    <li data-task-id={t.id} className={`group relative flex items-start gap-3 border-b px-2 py-2.5 transition-colors last:border-b-0 hover:bg-raise/60 ${later ? "opacity-60" : ""}`}>
       <div className="flex pt-px"><CheckButton id={t.id} done={done} ring={ring} /></div>
       <div className="min-w-0 flex-1">
         <Link href={`/tasks/${t.id}`} className={`block truncate text-[14.5px] leading-[18px] ${done ? "text-dim line-through" : ""}`}>{t.title}</Link>
         <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+          {focused && <span className="inline-flex items-center gap-1 font-medium text-warn" title="Must do today"><Icon name="flame" size={12} />Must do today</span>}
+          {later && <span className="inline-flex items-center gap-1 text-mute" title={`Hidden from Today, Upcoming and Inbox until ${nice(t.start_date!)}`}><Icon name="sunrise" size={12} />Starts {dueInfo(t.start_date!, false).text}</span>}
           {due && <span className={`inline-flex items-center gap-1 ${due.cls}`}><Icon name="calendar" size={12} />{due.text}{t.due_time && <span className="text-mute">· {fmtTime(t.due_time)}</span>}</span>}
           {t.estimate ? <span className="inline-flex items-center gap-1 text-mute" title="Estimate"><Icon name="clock" size={12} />{fmtMinutes(t.estimate)}</span> : null}
           {t.repeat && <span className="inline-flex items-center gap-1 text-mute" title="Repeats"><Icon name="repeat" size={12} />{repeatLabel(t.repeat)}</span>}
@@ -57,7 +60,7 @@ export function TaskRow({ t }: { t: TaskRow }) {
         </div>
       </div>
       {t.project_name && <span className="mt-px hidden shrink-0 items-center gap-1.5 text-xs text-mute sm:inline-flex"><span className="h-2 w-2 rounded-[3px]" style={{ background: t.project_color ?? "#888" }} />{t.project_name}</span>}
-      {!done && <RowActions id={t.id} due={t.due} focus={isOn("focus")} />}
+      {!done && <RowActions id={t.id} due={t.due} focus={isOn("focus")} focused={focused} />}
     </li>
   );
 }

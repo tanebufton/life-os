@@ -16,12 +16,12 @@ const item = (t: TaskRow) => ({ id: t.id, title: t.title, due: t.due, time: t.du
 
 export default async function Review({ searchParams }: { searchParams: Promise<{ mode?: string }> }) {
   const week = (await searchParams).mode === "week";
-  const t = today(), open = queryTasks();
+  const t = today(), open = queryTasks({ started: true });
   const tab = (on: boolean) => `rounded-md px-3 py-1 text-[13px] font-medium ${on ? "bg-panel shadow-sm" : "text-mute hover:text-fg"}`;
   const head = <PageHead title={week ? "Weekly review" : "Plan your day"} sub={week ? "Look back, clear the decks, look ahead" : "Decide what today is really for"} right={<div className="inline-flex rounded-lg bg-raise p-0.5"><Link href="/review" className={tab(!week)}>Plan day</Link><Link href="/review?mode=week" className={tab(week)}>Weekly review</Link></div>} />;
 
   if (!week) {
-    const overdue = open.filter((x) => x.due && x.due < t), today_ = open.filter((x) => x.due === t), unsorted = queryTasks({ inbox: true });
+    const overdue = open.filter((x) => x.due && x.due < t), today_ = open.filter((x) => x.due === t), unsorted = queryTasks({ inbox: true, started: true });
     const planned = today_.reduce((n, x) => n + (x.estimate ?? 0), 0), cap = Number(getSetting("capacity_min") ?? 360), ratio = cap ? planned / cap : 0;
     const sg = suggestions(t), groups = [["Added recently, no date", sg.recent], ["Pushed back again and again", sg.postponed], ["Long overdue", sg.stale], ["Coming up in the next 2 days", sg.soon]] as const;
     return (

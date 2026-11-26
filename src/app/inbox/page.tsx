@@ -12,7 +12,7 @@ import { listMemos } from "@/lib/voice";
 export const dynamic = "force-dynamic";
 export default async function Inbox({ searchParams }: { searchParams: Promise<{ shared?: string; tab?: string }> }) {
   const { shared, tab: t } = await searchParams, memos = isOn("voice") ? listMemos(200) : [], voice = memos.length > 0, tab = voice && t === "memos" ? "memos" : "tasks";
-  const unsorted = queryTasks({ inbox: true });
+  const unsorted = queryTasks({ inbox: true, started: true });
   const fromEmail = unsorted.filter((t) => t.source === "email"), fromShare = unsorted.filter((t) => t.source === "share");
   const rest = unsorted.filter((t) => t.source !== "email" && t.source !== "share");
   return (

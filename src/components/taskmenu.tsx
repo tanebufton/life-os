@@ -16,9 +16,9 @@ export function TaskMenu({ today, projects }: { today: string; projects: Proj[] 
       const el = (e.target as HTMLElement | null)?.closest?.("[data-task-id], [data-ctx-task]") as HTMLElement | null;
       if (!el || (e.target as HTMLElement).closest("input, textarea, select, a[href^='http']")) return;
       const id = Number(el.dataset.taskId ?? el.dataset.ctxTask); if (!id) return;
-      e.preventDefault(); setSub(null); setM({ id, x: Math.min(e.clientX, innerWidth - 232), y: Math.min(e.clientY, innerHeight - 330) });
+      e.preventDefault(); setSub(null); setM({ id, x: Math.min(e.clientX, innerWidth - 232), y: Math.max(8, Math.min(e.clientY, innerHeight - 440)) });
     };
-    const fromButton = (e: Event) => { const d = (e as CustomEvent<{ id: number; x: number; y: number; focus?: boolean }>).detail; setSub(null); setM({ id: d.id, focus: d.focus, x: Math.max(8, Math.min(d.x - 224, innerWidth - 232)), y: Math.min(d.y, innerHeight - 380) }); };
+    const fromButton = (e: Event) => { const d = (e as CustomEvent<{ id: number; x: number; y: number; focus?: boolean }>).detail; setSub(null); setM({ id: d.id, focus: d.focus, x: Math.max(8, Math.min(d.x - 224, innerWidth - 232)), y: Math.max(8, Math.min(d.y, innerHeight - 490)) }); };
     window.addEventListener("lifeos:taskmenu", fromButton);
     const close = (e: Event) => { if (e instanceof KeyboardEvent ? e.key === "Escape" : !ref.current?.contains(e.target as Node)) setM(null); };
     document.addEventListener("contextmenu", ctx); document.addEventListener("mousedown", close); document.addEventListener("keydown", close); window.addEventListener("scroll", () => setM(null), true);
@@ -42,6 +42,16 @@ export function TaskMenu({ today, projects }: { today: string; projects: Proj[] 
         <div className="flex flex-wrap gap-1 px-1.5 pb-1">
           {([["Today", 0], ["Tomorrow", 1], ["Next week", 7]] as const).map(([l, n]) => <button key={l} role="menuitem" onClick={() => set({ due: addDays(today, n) })} className="rounded-full border px-2.5 py-1 text-[12px] hover:bg-raise">{l}</button>)}
           <button role="menuitem" onClick={() => set({ due: null, due_time: null })} className="rounded-full px-2.5 py-1 text-[12px] text-mute hover:bg-raise">No date</button>
+        </div>
+        <div className={head}>Today&apos;s focus</div>
+        <div className="flex flex-wrap gap-1 px-1.5 pb-1">
+          <button role="menuitem" onClick={() => set({ focus: true })} className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[12px] hover:bg-raise"><Icon name="flame" size={12} className="text-warn" />Must do today</button>
+          <button role="menuitem" onClick={() => set({ focus: false })} className="rounded-full px-2.5 py-1 text-[12px] text-mute hover:bg-raise">Not today</button>
+        </div>
+        <div className={head}>Hide until</div>
+        <div className="flex flex-wrap gap-1 px-1.5 pb-1">
+          {([["Tomorrow", 1], ["Next week", 7]] as const).map(([l, n]) => <button key={l} role="menuitem" onClick={() => set({ start_date: addDays(today, n) })} className="rounded-full border px-2.5 py-1 text-[12px] hover:bg-raise">{l}</button>)}
+          <button role="menuitem" onClick={() => set({ start_date: null })} className="rounded-full px-2.5 py-1 text-[12px] text-mute hover:bg-raise">Show now</button>
         </div>
         <div className={head}>Priority</div>
         <div className="flex gap-1 px-1.5 pb-1">{([["High", 1], ["Normal", 0], ["Low", -1]] as const).map(([l, n]) => <button key={l} role="menuitem" onClick={() => set({ priority: n })} className="rounded-full border px-2.5 py-1 text-[12px] hover:bg-raise">{l}</button>)}</div>

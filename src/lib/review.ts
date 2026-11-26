@@ -10,7 +10,7 @@ export function completedSince(days = 7, t = today()) {
 }
 export function weeklyReview(t = today()) {
   const done = completedSince(7, t);
-  const open = queryTasks();
+  const open = queryTasks({ started: true });
   return {
     done, doneToday: doneToday(),
     focusMinutes: focusStats(7).reduce((n, x) => n + x.minutes, 0),
