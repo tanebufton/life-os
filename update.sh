@@ -12,7 +12,13 @@ start=$(date +%s)
 arg="${1:-}"
 # Settings come from the environment, or else from .env (the same file docker compose reads).
 envfile() { [ -f .env ] && sed -n "s/^[[:space:]]*$1=[\"']\{0,1\}\([^\"'#[:space:]]*\).*/\1/p" .env | tail -1; true; }
+before=$(git hash-object "$0")
 git pull --ff-only
+# If this pull changed update.sh itself, start the new copy (bash would otherwise keep running the old one to the end).
+if [ "$(git hash-object "$0")" != "$before" ] && [ -z "${LIFEOS_UPDATE_RESTARTED:-}" ]; then
+  echo "update.sh itself was updated, restarting it."
+  LIFEOS_UPDATE_RESTARTED=1 exec bash "$0" "$@"
+fi
 export DOCKER_BUILDKIT=1 GIT_COMMIT=$(git rev-parse HEAD)
 image="${LIFEOS_IMAGE:-$(envfile LIFEOS_IMAGE)}"; image="${image:-life-os:local}"
 registry="${LIFEOS_REGISTRY_IMAGE:-$(envfile LIFEOS_REGISTRY_IMAGE)}"
